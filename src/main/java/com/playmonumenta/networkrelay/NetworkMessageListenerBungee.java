@@ -60,7 +60,7 @@ public class NetworkMessageListenerBungee implements Listener {
 		}
 
 		boolean warnLegacyServerType = false;
-		JsonPrimitive serverTypeJson = data.getAsJsonPrimitive("server_type");
+		JsonPrimitive serverTypeJson = data.getAsJsonPrimitive("server-type");
 		if (serverTypeJson != null) {
 			String serverTypeString = serverTypeJson.getAsString();
 			if (serverTypeString != null) {

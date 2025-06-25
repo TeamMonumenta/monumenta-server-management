@@ -43,6 +43,7 @@ public class NetworkMessageListenerVelocity {
 	public void gatherHeartbeatData(GatherHeartbeatDataEventVelocity event) {
 		JsonObject data = new JsonObject();
 		data.addProperty("server-type", "proxy");
+		data.add("shard-pings", VelocityShardPingManager.getShardPingsJson());
 		event.setPluginData(NetworkRelayAPI.NETWORK_RELAY_HEARTBEAT_IDENTIFIER, data);
 	}
 
@@ -77,7 +78,7 @@ public class NetworkMessageListenerVelocity {
 			}
 
 			boolean warnLegacyServerType = false;
-			JsonPrimitive serverTypeJson = data.getAsJsonPrimitive("server_type");
+			JsonPrimitive serverTypeJson = data.getAsJsonPrimitive("server-type");
 			if (serverTypeJson != null) {
 				String serverTypeString = serverTypeJson.getAsString();
 				if (serverTypeString != null) {

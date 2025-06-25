@@ -144,7 +144,7 @@ public class BroadcastCommand implements Listener {
 			return;
 		}
 
-		JsonPrimitive serverTypeJson = data.getAsJsonPrimitive("server_type");
+		JsonPrimitive serverTypeJson = data.getAsJsonPrimitive("server-type");
 		if (serverTypeJson != null) {
 			String serverTypeString = serverTypeJson.getAsString();
 			if (serverTypeString != null) {

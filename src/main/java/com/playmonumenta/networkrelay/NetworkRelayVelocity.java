@@ -86,6 +86,7 @@ public class NetworkRelayVelocity {
 			mLogger.error("RabbitMQ manager failed to initialize. This plugin will not function");
 			e.printStackTrace();
 		}
+		VelocityShardPingManager.schedulePingUpdates(this);
 
 		//Loaded last to avoid issues where it not being able to load the shard would cause it to fail.
 		this.mServer.getEventManager().register(this, new RemotePlayerManagerVelocity());
