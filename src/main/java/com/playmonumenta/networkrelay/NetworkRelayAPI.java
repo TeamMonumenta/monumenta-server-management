@@ -3,6 +3,7 @@ package com.playmonumenta.networkrelay;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import com.playmonumenta.networkrelay.shardhealth.ShardHealth;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -184,6 +185,20 @@ public class NetworkRelayAPI {
 			}
 		}
 		return null;
+	}
+
+	public static ShardHealth remoteShardHealth(String shardName) {
+		JsonObject remoteNetworkRelayHeartbeatData
+			= getHeartbeatPluginData(shardName, "networkrelay");
+
+		if (
+			remoteNetworkRelayHeartbeatData != null &&
+				remoteNetworkRelayHeartbeatData.get("shard_health") instanceof JsonObject shardHealthJson
+		) {
+			return ShardHealth.fromJson(shardHealthJson);
+		}
+
+		return ShardHealth.zeroHealth();
 	}
 
 	/**

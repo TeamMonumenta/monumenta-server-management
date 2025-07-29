@@ -1,6 +1,7 @@
 package com.playmonumenta.networkrelay;
 
 import com.playmonumenta.networkrelay.config.BukkitConfig;
+import com.playmonumenta.networkrelay.shardhealth.ShardHealthManager;
 import java.io.File;
 import java.util.Objects;
 import java.util.logging.Level;
@@ -22,6 +23,7 @@ public class NetworkRelay extends JavaPlugin {
 		ListShardsCommand.register();
 		RemotePlayerAPICommand.register();
 		WhereIsCommand.register();
+		ShardHealthManager.init();
 	}
 
 	@Override
@@ -71,6 +73,8 @@ public class NetworkRelay extends JavaPlugin {
 		//Loaded last to avoid issues where it not being able to load the shard would cause it to fail.
 		Bukkit.getServer().getPluginManager().registerEvents(RemotePlayerManagerPaper.getInstance(), this);
 		RemotePlayerAPI.init(RemotePlayerManagerPaper.getInstance());
+
+		ShardHealthManager.startRunningAverageClock(this);
 	}
 
 	@Override
@@ -80,6 +84,7 @@ public class NetworkRelay extends JavaPlugin {
 			mRabbitMQManager.stop();
 		}
 		INSTANCE = null;
+		ShardHealthManager.stopRunningAverageClock();
 		getServer().getScheduler().cancelTasks(this);
 	}
 

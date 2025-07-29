@@ -1,7 +1,7 @@
 import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
 
 plugins {
-	id("com.playmonumenta.gradle-config") version "1.+"
+	id("com.playmonumenta.gradle-config") version "3.2"
 }
 
 repositories {
@@ -25,14 +25,15 @@ dependencies {
 }
 
 monumenta {
+	id("MonumentaNetworkRelay")
 	name("MonumentaNetworkRelay")
 	paper(
-		"com.playmonumenta.networkrelay.NetworkRelay", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.18",
+		"com.playmonumenta.networkrelay.NetworkRelay", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20",
 		depends = listOf("CommandAPI"),
 		softDepends = listOf(
 			"PlaceholderAPI",
 			"ViaVersion"
 		)
 	)
-	waterfall("com.playmonumenta.networkrelay.NetworkRelayBungee", "1.18")
+	waterfall("com.playmonumenta.networkrelay.NetworkRelayBungee", "1.20")
 }

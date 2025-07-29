@@ -1,6 +1,7 @@
 package com.playmonumenta.networkrelay;
 
 import com.google.gson.JsonObject;
+import com.playmonumenta.networkrelay.shardhealth.ShardHealth;
 import com.viaversion.viaversion.api.Via;
 import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
@@ -35,6 +36,8 @@ public class NetworkMessageListener implements Listener {
 			int protocolVersionNumber = Via.getAPI().getPlayerVersion(event.mRemotePlayer.mUuid);
 			data.addProperty("protocol_version", protocolVersionNumber);
 		}
+
+		data.add("shard_health", ShardHealth.averageHealth().toJson());
 
 		event.setPluginData("networkrelay", data);
 	}
