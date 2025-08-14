@@ -125,7 +125,11 @@ public class G1Listener {
 				final var type = G1GcCycleInfo.G1GcCycleType.getType(info.getGcName());
 
 				if (type.isEmpty()) {
-					NetworkRelay.getInstance().getLogger().warning("Unknown GC cycle type: " + info.getGcName());
+					try {
+						NetworkRelay.getInstance().getLogger().warning("Unknown GC cycle type: " + info.getGcName());
+					} catch (RuntimeException ignored) {
+						// Unable to get plugin instance this early
+					}
 				} else {
 					final var preEden = getUsed(info.getGcInfo().getMemoryUsageBeforeGc(), G1_EDEN);
 					final var preSurvivor = getUsed(info.getGcInfo().getMemoryUsageBeforeGc(), G1_SURVIVOR);
@@ -144,7 +148,11 @@ public class G1Listener {
 						preEden - postEden
 					);
 
-					NetworkRelay.getInstance().getLogger().info("Recorded gc event: " + wrappedInfo);
+					try {
+						NetworkRelay.getInstance().getLogger().info("Recorded gc event: " + wrappedInfo);
+					} catch (RuntimeException ignored) {
+						// Unable to get plugin instance this early
+					}
 
 					mEventQueue.add(wrappedInfo);
 				}

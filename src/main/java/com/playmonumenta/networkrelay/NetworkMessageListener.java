@@ -24,6 +24,7 @@ public class NetworkMessageListener implements Listener {
 			data.addProperty("server-address", mServerAddress);
 		}
 		data.addProperty("server-type", "minecraft");
+		data.add("shard_health", ShardHealth.averageHealth().toJson());
 		event.setPluginData(NetworkRelayAPI.NETWORK_RELAY_HEARTBEAT_IDENTIFIER, data);
 	}
 
@@ -36,8 +37,6 @@ public class NetworkMessageListener implements Listener {
 			int protocolVersionNumber = Via.getAPI().getPlayerVersion(event.mRemotePlayer.mUuid);
 			data.addProperty("protocol_version", protocolVersionNumber);
 		}
-
-		data.add("shard_health", ShardHealth.averageHealth().toJson());
 
 		event.setPluginData("networkrelay", data);
 	}

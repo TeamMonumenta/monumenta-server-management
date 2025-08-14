@@ -189,7 +189,7 @@ public class NetworkRelayAPI {
 
 	public static ShardHealth remoteShardHealth(String shardName) {
 		JsonObject remoteNetworkRelayHeartbeatData
-			= getHeartbeatPluginData(shardName, "networkrelay");
+			= getHeartbeatPluginData(shardName, NETWORK_RELAY_HEARTBEAT_IDENTIFIER);
 
 		if (
 			remoteNetworkRelayHeartbeatData != null &&
