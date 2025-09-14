@@ -1,0 +1,7 @@
+name: MonumentaRedisSyncExample
+main: com.playmonumenta.redissync.example.MonumentaRedisSyncExample
+version: 0.0.1
+api-version: 1.18
+author: Combustible
+depend: [MonumentaRedisSync]
+softdepend: []
