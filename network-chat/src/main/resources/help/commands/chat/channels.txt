@@ -1,0 +1,10 @@
+When first setting up NetworkChat, no channels exist. You can create them with <gold>/chat new <channel name> <channel type></gold>
+Then, set default channels with <gold>/chat server setdefaultchannel \<channel type or default> \<channel></gold>
+The default chat is used when typing in chat with no command, and the default of each type controls <gold>\<channel type></gold> and the single-letter shortcuts
+This help message can be overridden by creating <aqua><arg1>/<arg2>/.../<arg#>.txt</aqua> files in <aqua>plugins/MonumentaNetworkChat/help/formatting/links.txt</aqua>
+
+- To mute the global chat: <gold>/chat leave \<channel>
+- To unmute the global chat: <gold>/chat join \<channel>
+- To hide all player chat, pause and press Options -> Chat Settings -> Chat: Commands Only
+- To keep messages from scrolling by, use <gold>/pausechat</gold> or <gold>/pc</gold> - run it again to disable
+- Pausing chat only works on messages sent through NetworkChat for now. This may be changed in the future.

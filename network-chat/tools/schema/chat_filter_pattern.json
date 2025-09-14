@@ -1,0 +1,59 @@
+{
+  "title": "Chat Filter Pattern",
+  "properties": {
+    "mId": {
+      "title": "ID",
+      "type": "string",
+      "description": "Chat filter pattern ID - used to uniquely describe and identify each filter pattern",
+      "minLength": 1,
+      "propertyOrder": 1
+    },
+    "mIsLiteral": {
+      "title": "Is Literal",
+      "type": "boolean",
+      "description": "If true, treat this as literal text. Otherwise, treat as a regular expression.",
+      "propertyOrder": 2,
+      "default": false
+    },
+    "mPatternString": {
+      "title": "Pattern String",
+      "type": "string",
+      "description": "The literal text or regular expression to be matched. Use of https://regex101.com/ is strongly encouraged (set it to Java).",
+      "minLength": 1,
+      "propertyOrder": 3
+    },
+    "mIsBadWord": {
+      "title": "Is Bad Word",
+      "type": "boolean",
+      "description": "Bad words are blocked from chat. You may wish to set a command to log who said it where for accountability, or to otherwise punish the user directly. Note that this does not strictly need to be a single word - it could be multiple words, or formatting with a known exploit.",
+      "default": true,
+      "propertyOrder": 4
+    },
+    "mReplacementMiniMessage": {
+      "title": "Replacement MiniMessage",
+      "type": "string",
+      "description": "MiniMessage-formatted replacement text, with web editor here: https://webui.advntr.dev/ This supports pattern replacements, including capturing groups, with optional escapes. $0 is the text that was originally matched, $1 is the text matched by the first (capturing group), and so on. If the captured text needs to be placed inside of quotes, use $\\0 (or whichever number) to insert the escaped version.",
+      "propertyOrder": 5,
+      "default": "<bold>$0</bold>",
+      "format": "textarea"
+    },
+    "mCommand": {
+      "title": "Command",
+      "type": "string",
+      "description": "Runs a command when this filter pattern is matched.The following case-sensitive replacements are made before running the command: \"<channel_name>\" gets replaced with the name of the channel that was spoken in@S gets replaced with the command sender typing the message@T gets replaced with the sender type@U gets replaced with the sender's UUID if they are a player/entity@O gets replaced with the original message@R gets replaced with the message after replacements from other filter patterns@OE and @RE are versions of @O and @R that are escaped for safe use inside of quotes",
+      "minLength": 1,
+      "default": "auditlogsevereplayer @S \"@S said TYPE FILTER DESCRIPTION HERE in <channel_name>: @OE\"",
+      "propertyOrder": 6
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "description": "A chat filter pattern, used to match literal text or regular expressions and act upon them",
+  "required": [
+    "mId",
+    "mIsLiteral",
+    "mPatternString",
+    "mIsBadWord",
+    "mReplacementMiniMessage"
+  ]
+}

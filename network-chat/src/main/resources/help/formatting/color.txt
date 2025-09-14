@@ -1,0 +1,6 @@
+NetworkChat supports every color from Raw Json Text.
+For example - <blue>\<blue></blue>\</blue> and <#ffbfbf>\<#ffbfbf></#ffbfbf>\</#ffbfbf>.
+
+However, you can also use fancier color formatting more easily than with raw json text:
+<rainbow>\<rainbow></rainbow>\</rainbow>
+Gradients are supported in theory, but are broken at this time.

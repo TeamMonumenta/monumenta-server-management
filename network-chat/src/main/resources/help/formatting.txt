@@ -1,0 +1,14 @@
+NetworkChat uses Adventure's MiniMessage text formatting, with a permission check for each format category.
+<blue><u><click:open_url:"https://webui.adventure.kyori.net/">https://webui.adventure.kyori.net/</click></u></blue>
+
+If you want an overview without opening the link, keep reading:
+This is a tag-based system, where opening tags look like \<this>, and optional closing tags like \</this>.
+- <b>\<b> or \<bold></b>
+- <i>\<i>, \<em>, or \<italic></i>
+- <u>\<u> or \<underlined></u>
+- <st>\<st> or \<strikethrough></st>
+- \<obf> or \<obfuscated>: <obf>Muahahahaha</obf>
+
+Additionally, unlike with MiniMessage, NetworkChat:
+- treats anything starting with <b>http://</b> or <b>https://</b> up to the next space as a link.
+- has ||spoiler tags!||
