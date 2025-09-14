@@ -1,0 +1,4 @@
+# Set the default log level of this plugin
+# Should be one of: ALL FINEST FINER FINE INFO WARNING SEVERE OFF
+log-level: INFO
+

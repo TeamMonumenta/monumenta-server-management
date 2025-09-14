@@ -1,0 +1,76 @@
+# Set the default log level of this plugin
+# Should be one of: ALL FINEST FINER FINE INFO WARNING SEVERE OFF
+log-level: INFO
+
+# Whether or not this server should automatically sort players into worlds by score when they join
+# Worlds will be automatically created and/or loaded as needed. Recommend combining this with instance pregeneration
+sort-world-by-score-on-join: false
+
+# Whether or not this server should automatically sort players into worlds by score when they respawn
+# Worlds will be automatically created and/or loaded as needed. Recommend combining this with instance pregeneration
+sort-world-by-score-on-respawn: false
+
+# If set to true and a world joins with an instance score that doesn't already have a corresponding world,
+# a new world will be copied & loaded automatically from the template world
+allow-instance-autocreation: true
+
+# After how many ticks of no players should a world be unloaded?
+# This setting only takes effect if is-instanced is true
+# Will not unload the primary world
+# Set to <= 0 to disable automatic unloading
+# The system that manages this checks world activity every 10s
+unload-inactive-world-after-ticks: 12000
+
+# Notify players with this permission which world they are on when they join
+# Set to null to disable
+notify-world-permission: "monumenta.worldmanagement.worldnotify"
+
+# Command used to create worlds (by copying them).
+# Will be executed via the shell in the server directory like "command srcWorld destWorld"
+# Note that the default here (cp -a) will only work on Linux and Mac
+# If the world contains entities, those entities will have the same UUID as in the source world, and they will conflict
+# This is normally fine as Spigot will assign them new UUIDs when the conflict is detected
+# The exception to this is if any entities are assigned scoreboard values, in which case they may be lost / behave strangely
+# Ideally this would be set to a tool that can copy the worlds and generate new UUIDs for entities
+#   For example use https://github.com/TeamMonumenta/monumenta-automation/blob/master/utility_code/copy_world.py
+copy-world-command: "cp -a"
+
+instancing:
+  # Shard name from Monumenta Network Relay API; not fully implemented, use only one entry for now
+  shard:
+    # The scoreboard objective used to determine what world instance a player should be sent to
+    instance-objective: Instance
+
+    # Base name of instanced worlds. Worlds will be named <basename>-# (i.e. instance-1, instance-2, etc.)
+    # Should be all lowercase
+    base-world-name: instance
+
+    # Command to run on players when they join an instanced world for the first time (useful for instance autocreation)
+    # This will be run via the console like: /execute as <player> at @s run <command>
+    # Set to null to disable
+    join-instance-command: null
+
+    # Command to run on players when they re-join an instanced world after having been there before
+    # This will be run via the console like: /execute as <player> at @s run <command>
+    # Set to null to disable
+    rejoin-instance-command: null
+
+    # Command to run on players when they respawn in instanced world after dying
+    # This will be run via the console like: /execute as <player> at @s run <command>
+    # Set to null to disable
+    respawn-instance-command: null
+
+    # Number of instances to pre-generate so they are available when a player joins
+    # When the server starts up for the first time with no existing instances, this many instances will be generated immediately as async tasks
+    # After that, when a player joins within the last # instances, more instances will be generated to maintain this number of never-joined instances afterwards
+    # Highly recommended to use this to significantly decrease world loading wait times to get new instances
+    # Set to 0 to disable
+    pregenerated-instances: 0
+
+    # Variants and the respective score value in $variant-objective that sets a player to this variant
+    # Default variant should have the value 0, which will be used if $variant-objective doesn't exist or has a value that isn't otherwise listed here
+    variant-objective: null
+    variants:
+      # Name of the template world that will be copied to generate new instances
+      # Should be all lowercase
+      template: 0
