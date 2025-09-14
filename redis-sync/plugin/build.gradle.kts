@@ -1,6 +1,6 @@
 dependencies {
 	implementation(libs.lettuce)
-	compileOnly(libs.networkrelay)
+	compileOnly(project(":network-relay"))
 	compileOnly(libs.commandapi)
 
 	// velocity dependencies

@@ -1,7 +1,7 @@
 import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
 
 plugins {
-	id("com.playmonumenta.gradle-config") version "3.2"
+	alias(libs.plugins.gradle.config)
 }
 
 repositories {
@@ -17,7 +17,7 @@ dependencies {
 	implementation(libs.rabbitmq)
 	compileOnly(libs.annotations)
 	compileOnly(libs.commandapi)
-	compileOnly(libs.placerholderapi)
+	compileOnly(libs.placeholderapi)
 	compileOnly(libs.velocity)
 	compileOnly(libs.viaversion)
 	annotationProcessor(libs.velocity)
@@ -35,5 +35,4 @@ monumenta {
 			"ViaVersion"
 		)
 	)
-	waterfall("com.playmonumenta.networkrelay.NetworkRelayBungee", "1.20")
 }

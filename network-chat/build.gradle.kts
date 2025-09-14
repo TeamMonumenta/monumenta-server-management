@@ -1,7 +1,7 @@
 import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
 
 plugins {
-	id("com.playmonumenta.gradle-config") version "3.+"
+	alias(libs.plugins.gradle.config)
 }
 
 repositories {
@@ -14,12 +14,8 @@ dependencies {
 	implementation(libs.minimessage)
 	implementation(libs.commons)
 	compileOnly(libs.commandapi)
-	compileOnly(libs.networkrelay)
-	compileOnly(libs.redissync) {
-		artifact {
-			classifier = "all"
-		}
-	}
+	compileOnly(project(":network-relay"))
+	compileOnly(project(":redis-sync:redissync"))
 	compileOnly(libs.lettuce)
 	compileOnly(libs.placeholderapi)
 	compileOnly(libs.protocollib)

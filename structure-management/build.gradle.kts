@@ -1,7 +1,7 @@
 import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
 
 plugins {
-    id("com.playmonumenta.gradle-config") version "2.+"
+	alias(libs.plugins.gradle.config)
 }
 
 dependencies {
@@ -10,11 +10,11 @@ dependencies {
         isTransitive = false
     }
     compileOnly(libs.commandapi)
-    compileOnly(libs.sq) {
+    /*compileOnly(libs.sq) {
         artifact {
             classifier = "all"
         }
-    }
+    }*/
 }
 
 tasks {
@@ -24,7 +24,8 @@ tasks {
 }
 
 monumenta {
-    name("MonumentaStructureManagement")
+	id("MonumentaStructureManagement")
+	name("MonumentaStructureManagement")
     paper(
         "com.playmonumenta.structures.StructuresPlugin", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20",
         depends = listOf("CommandAPI", "FastAsyncWorldEdit", "ScriptedQuests")

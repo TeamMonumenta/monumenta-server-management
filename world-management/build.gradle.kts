@@ -1,20 +1,17 @@
 import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
 
 plugins {
-	id("com.playmonumenta.gradle-config") version "1.+"
+	alias(libs.plugins.gradle.config)
 }
 
 dependencies {
 	compileOnly(libs.commandapi)
-	compileOnly(libs.redissync) {
-		artifact {
-			classifier = "all"
-		}
-	}
-	compileOnly(libs.gson)
+	compileOnly(project(":redis-sync:redissync"))
+	// compileOnly(libs.gson)
 }
 
 monumenta {
+	id("MonumentaWorldManagement")
 	name("MonumentaWorldManagement")
 	paper(
 		"com.playmonumenta.worlds.paper.WorldManagementPlugin",
@@ -22,9 +19,5 @@ monumenta {
 		"1.19",
 		depends = listOf("CommandAPI", "MonumentaRedisSync"),
 		softDepends = listOf()
-	)
-	waterfall(
-		"com.playmonumenta.worlds.bungee.WorldManagementBungeePlugin", "1.19",
-		depends = listOf("MonumentaRedisSync")
 	)
 }

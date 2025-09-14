@@ -1,7 +1,0 @@
-name: NetworkChatExample
-main: com.playmonumenta.networkchatexample.NetworkChatExample
-version: 0.0.1
-api-version: 1.13
-depend: [CommandAPI,MonumentaNetworkRelay]
-softdepend: []
-commands:

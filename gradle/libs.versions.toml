@@ -1,0 +1,39 @@
+[versions]
+minimessage = "4.11.0"
+commons = "1.3"
+junit = "5.9.3"
+snakeyaml = "2.0"
+annotations = "16.0.2"
+rabbitmq = "5.20.0"
+commandapi = "9.4.1"
+placeholderapi = "2.11.6"
+velocity = "3.3.0-SNAPSHOT"
+viaversion = "5.2.0"
+slf4j = "1.7.36"
+mixinapi = "1.0.2"
+lettuce = "6.3.2.RELEASE"
+fawe = "2.9.1"
+protocollib = "5.0.0"
+gradle-config = "3.3"
+
+[libraries]
+minimessage = { module = "net.kyori:adventure-text-minimessage", version.ref = "minimessage" }
+commons = { module = "org.apache.commons:commons-text", version.ref = "commons" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
+annotations = { module = "org.jetbrains:annotations", version.ref = "annotations" }
+rabbitmq = { module = "com.rabbitmq:amqp-client", version.ref = "rabbitmq" }
+commandapi = { module = "dev.jorel:commandapi-bukkit-core", version.ref = "commandapi" }
+placeholderapi = { module = "me.clip:placeholderapi", version.ref = "placeholderapi" }
+velocity = { module = "com.velocitypowered:velocity-api", version.ref = "velocity" }
+viaversion = { module = "com.viaversion:viaversion-api", version.ref = "viaversion" }
+slf4j = { module = "org.slf4j:jul-to-slf4j", version.ref = "slf4j" }
+lettuce = { module = "io.lettuce:lettuce-core", version.ref = "lettuce" }
+mixinapi = { module = "com.playmonumenta.papermixins:plugin-api", version.ref = "mixinapi" }
+fawe-core = { module = "com.fastasyncworldedit:FastAsyncWorldEdit-Core", version.ref = "fawe" }
+fawe-bukkit = { module = "com.fastasyncworldedit:FastAsyncWorldEdit-Bukkit", version.ref = "fawe" }
+protocollib = { module = "com.comphenix.protocol:ProtocolLib", version.ref = "protocollib" }
+
+[plugins]
+gradle-config = { id = "com.playmonumenta.gradle-config", version.ref = "gradle-config" }

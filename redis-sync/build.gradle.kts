@@ -1,7 +1,7 @@
 import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
 
 plugins {
-	id("com.playmonumenta.gradle-config") version "3.+"
+	alias(libs.plugins.gradle.config)
 }
 
 val mixinapi = libs.mixinapi
@@ -16,14 +16,12 @@ tasks {
 monumenta {
 	id("MonumentaRedisSync")
 	name("RedisSync")
-	pluginProject(":redissync")
+	pluginProject("redissync")
 	paper(
 		"com.playmonumenta.redissync.MonumentaRedisSync", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20",
 		depends = listOf("CommandAPI"),
 		softDepends = listOf("MonumentaNetworkRelay")
 	)
-
-	waterfall("com.playmonumenta.redissync.MonumentaRedisSyncBungee", "1.20")
 
 	versionAdapterApi("adapter_api", paper = "1.18.2")
 	versionAdapter("adapter_v1_20_R3", "1.20.4") {
@@ -31,5 +29,5 @@ monumenta {
 			compileOnly(mixinapi)
 		}
 	}
-	javaSimple(":redissync-example")
+	javaSimple("redissync-example")
 }
