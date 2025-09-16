@@ -29,4 +29,5 @@ monumenta {
 		}
 	}
 	javaSimple("redissync-example")
+	gitPrefix("redis-sync/")
 }

@@ -36,4 +36,5 @@ monumenta {
 		),
 		softDepends = listOf("ViaVersion")
 	)
+	gitPrefix("network-chat/")
 }

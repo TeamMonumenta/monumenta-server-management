@@ -20,4 +20,5 @@ monumenta {
 		depends = listOf("CommandAPI", "MonumentaRedisSync"),
 		softDepends = listOf()
 	)
+	gitPrefix("world-management/")
 }

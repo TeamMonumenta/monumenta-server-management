@@ -14,7 +14,7 @@ mixinapi = "1.0.2"
 lettuce = "6.3.2.RELEASE"
 fawe = "2.9.1"
 protocollib = "5.0.0"
-gradle-config = "3.3"
+gradle-config = "3.5-SNAPSHOT"
 sq = "7.5"
 
 [libraries]

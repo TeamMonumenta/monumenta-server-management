@@ -35,4 +35,5 @@ monumenta {
 			"ViaVersion"
 		)
 	)
+	gitPrefix("network-relay/")
 }
