@@ -2,7 +2,6 @@ package com.playmonumenta.networkchat.custominventory;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import javax.annotation.Nullable;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.HumanEntity;
@@ -17,6 +16,7 @@ import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * This code was originally copied from NBTEditor, Copyright (C) 2013-2018 Gonçalo Baltazar (me@goncalomb.com), released under GPLv3.
@@ -52,7 +52,7 @@ public abstract class CustomInventory {
 						if (mPlugin == event.getPlugin()) {
 							mPlugin = null;
 							HandlerList.unregisterAll(mMainListener);
-							if (mOpenedInvsByPlugin.size() > 0) {
+							if (!mOpenedInvsByPlugin.isEmpty()) {
 								bindListener(mOpenedInvsByPlugin.keySet().iterator().next());
 							}
 						}

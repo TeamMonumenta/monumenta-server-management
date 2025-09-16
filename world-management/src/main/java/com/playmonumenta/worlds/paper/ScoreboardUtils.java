@@ -1,7 +1,6 @@
 package com.playmonumenta.worlds.paper;
 
 import java.util.Optional;
-
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;

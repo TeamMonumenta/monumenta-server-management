@@ -36,13 +36,13 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.Predicate;
-import javax.annotation.Nullable;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.jetbrains.annotations.Nullable;
 
 public class ChannelManager implements Listener {
 	public static final String NETWORK_CHAT_CHANNEL_UPDATE = "com.playmonumenta.networkchat.channel.Channel.update";
@@ -148,7 +148,7 @@ public class ChannelManager implements Listener {
 	public static ArgumentSuggestions<CommandSender> getChannelNameSuggestions(ChannelPredicate channelPredicate) {
 		return ArgumentSuggestions.strings(info -> {
 			Predicate<Channel> predicate = channelPredicate.toPredicate(info.sender());
-			return CommandUtils.quoteIfNeeded(ChannelManager.getChannelNames(predicate)).toArray(new String[0]);
+			return CommandUtils.quoteIfNeeded(getChannelNames(predicate)).toArray(new String[0]);
 		});
 	}
 

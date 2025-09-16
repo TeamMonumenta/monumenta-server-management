@@ -13,15 +13,14 @@ import com.playmonumenta.networkchat.utils.MessagingUtils;
 import com.playmonumenta.networkchat.utils.ReplacerWithEscape;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
-import javax.annotation.Nullable;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.TextReplacementConfig;
@@ -31,6 +30,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.block.CommandBlock;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
+import org.jetbrains.annotations.Nullable;
 
 // A collection of regex to filter chat
 public class ChatFilter {
@@ -329,7 +329,7 @@ public class ChatFilter {
 		} else {
 			Gson gson = new Gson();
 
-			ArrayList<File> files = FileUtils.getFilesInDirectory(sender,
+			List<File> files = FileUtils.getFilesInDirectory(sender,
 				folderLocation,
 				".json",
 				"Unable to find global filters due to IO error:");

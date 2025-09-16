@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 // A data structure used to efficiently complete many strings, and/or map them to values.
 public class Trie<V> implements Cloneable {

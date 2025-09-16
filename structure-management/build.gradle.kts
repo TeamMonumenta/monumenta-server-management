@@ -10,11 +10,11 @@ dependencies {
         isTransitive = false
     }
     compileOnly(libs.commandapi)
-    /*compileOnly(libs.sq) {
+    compileOnly(libs.sq) {
         artifact {
             classifier = "all"
         }
-    }*/
+    }
 }
 
 tasks {

@@ -15,11 +15,11 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import javax.annotation.Nullable;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.command.CommandSender;
+import org.jetbrains.annotations.Nullable;
 
 // Settings for which channel to use for a given type, and for chatting without a command
 public class DefaultChannels {

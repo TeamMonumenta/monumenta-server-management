@@ -11,7 +11,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Map;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
 import net.minecraft.SharedConstants;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.DoubleTag;
@@ -22,6 +21,7 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.scores.Scoreboard;
 import org.bukkit.craftbukkit.v1_20_R3.scoreboard.CraftScoreboard;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.Nullable;
 
 public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 	/**

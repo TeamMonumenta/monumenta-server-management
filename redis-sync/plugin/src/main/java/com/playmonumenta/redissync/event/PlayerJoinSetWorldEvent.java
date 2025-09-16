@@ -1,13 +1,12 @@
 package com.playmonumenta.redissync.event;
 
 import java.util.UUID;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.player.PlayerEvent;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * This event fires when a player joins and their data is loaded, but before they are loaded into a world.
@@ -21,11 +20,11 @@ public class PlayerJoinSetWorldEvent extends PlayerEvent {
 
 	private static final HandlerList handlers = new HandlerList();
 
-	private @Nonnull World mWorld;
+	private @NotNull World mWorld;
 	private final @Nullable UUID mLastSavedWorldUUID;
 	private final @Nullable String mLastSavedWorldName;
 
-	public PlayerJoinSetWorldEvent(Player player, @Nonnull World world, @Nullable UUID lastSavedWorldUUID, @Nullable String lastSavedWorldName) {
+	public PlayerJoinSetWorldEvent(Player player, @NotNull World world, @Nullable UUID lastSavedWorldUUID, @Nullable String lastSavedWorldName) {
 		super(player);
 		mWorld = world;
 		mLastSavedWorldUUID = lastSavedWorldUUID;
@@ -53,14 +52,14 @@ public class PlayerJoinSetWorldEvent extends PlayerEvent {
 	/*
 	 * Get the world the player is currently set to join on login
 	 */
-	public @Nonnull World getWorld() {
+	public @NotNull World getWorld() {
 		return mWorld;
 	}
 
 	/* Causes a player to be logged into this world instead
 	 * This takes a world object that should be currently loaded
 	 */
-	public void setWorld(@Nonnull World world) {
+	public void setWorld(@NotNull World world) {
 		mWorld = world;
 	}
 

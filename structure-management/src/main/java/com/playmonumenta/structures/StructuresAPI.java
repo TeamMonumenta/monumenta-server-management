@@ -29,9 +29,11 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -39,8 +41,6 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -56,6 +56,8 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class StructuresAPI {
 	public static final String FORMAT = "sponge";
@@ -71,7 +73,7 @@ public class StructuresAPI {
 	 * This old version defaults to not loading biomes, caller should specify what they prefer using alternate API
 	 */
 	@Deprecated
-	public static CompletableFuture<Void> loadAndPasteStructure(@Nonnull String path, @Nonnull Location loc, boolean includeEntities) {
+	public static CompletableFuture<Void> loadAndPasteStructure(@NotNull String path, @NotNull Location loc, boolean includeEntities) {
 		return loadAndPasteStructure(path, loc, includeEntities, false);
 	}
 
@@ -82,7 +84,7 @@ public class StructuresAPI {
 	 * <p>
 	 * See the details of those functions for more information
 	 */
-	public static CompletableFuture<Void> loadAndPasteStructure(@Nonnull String path, @Nonnull Location loc, boolean includeEntities, boolean includeBiomes) {
+	public static CompletableFuture<Void> loadAndPasteStructure(@NotNull String path, @NotNull Location loc, boolean includeEntities, boolean includeBiomes) {
 		/* Clone the input variable to make sure the caller doesn't change it while we're still loading */
 		Location pasteLoc = loc.clone();
 
@@ -100,7 +102,7 @@ public class StructuresAPI {
 	 * Suggest chaining on .whenComplete((clipboard, ex) -> your code) to consume the result on the main thread
 	 * clipboard will be non-null on success, otherwise ex will be a non-null exception if something went wrong
 	 */
-	public static CompletableFuture<BlockArrayClipboard> loadStructure(@Nonnull String path) {
+	public static CompletableFuture<BlockArrayClipboard> loadStructure(@NotNull String path) {
 		CompletableFuture<BlockArrayClipboard> future = new CompletableFuture<>();
 
 		MSLog.fine("loadStructure: Started loading structure '" + path + "'");
@@ -160,7 +162,7 @@ public class StructuresAPI {
 	 * Suggest chaining on .whenComplete((unused, ex) -> your code) to continue after the operation is complete
 	 * unused will always be null, ex will be a non-null exception if something went wrong
 	 */
-	public static CompletableFuture<Void> copyAreaAndSaveStructure(@Nonnull String path, @Nonnull Location loc1, @Nonnull Location loc2) {
+	public static CompletableFuture<Void> copyAreaAndSaveStructure(@NotNull String path, @NotNull Location loc1, @NotNull Location loc2) {
 		MSLog.fine("copyAreaAndSaveStructure: Started copying '" + path + "' at " +
 				   loc1.getWorld().getName() + "(" + loc1.getBlockX() + " " + loc1.getBlockY() + " " + loc1.getBlockZ() + ")  " +
 				   loc2.getWorld().getName() + "(" + loc2.getBlockX() + " " + loc2.getBlockY() + " " + loc2.getBlockZ() + ")");
@@ -233,7 +235,7 @@ public class StructuresAPI {
 	 * @param loc1 One corner of the bounding box to save
 	 * @param loc2 The opposite corner
 	 */
-	public static CompletableFuture<BlockArrayClipboard> copyArea(@Nonnull Location loc1, @Nonnull Location loc2) {
+	public static CompletableFuture<BlockArrayClipboard> copyArea(@NotNull Location loc1, @NotNull Location loc2) {
 		CompletableFuture<BlockArrayClipboard> future = new CompletableFuture<>();
 
 		/* Copy locations so caller can't change them after calling API */
@@ -310,7 +312,7 @@ public class StructuresAPI {
 	 * This old version defaults to not loading biomes, caller should specify what they prefer using alternate API
 	 */
 	@Deprecated
-	public static CompletableFuture<Void> pasteStructure(@Nonnull BlockArrayClipboard clipboard, @Nonnull Location loc, boolean includeEntities) {
+	public static CompletableFuture<Void> pasteStructure(@NotNull BlockArrayClipboard clipboard, @NotNull Location loc, boolean includeEntities) {
 		return pasteStructure(clipboard, loc, includeEntities, false);
 	}
 
@@ -319,7 +321,7 @@ public class StructuresAPI {
 	 * <p>
 	 * Must be called from main thread, will return immediately and do its work on an async thread
 	 */
-	public static CompletableFuture<Void> pasteStructure(@Nonnull BlockArrayClipboard clipboard, @Nonnull Location loc, boolean includeEntities, boolean includeBiomes) {
+	public static CompletableFuture<Void> pasteStructure(@NotNull BlockArrayClipboard clipboard, @NotNull Location loc, boolean includeEntities, boolean includeBiomes) {
 		/*
 		 * This is the future given to the caller - when it's completed it should be safe to interact with the pasted area
 		 * In particular there is a 6s delay after pasting before this is marked as completed
@@ -494,6 +496,7 @@ public class StructuresAPI {
 		}
 
 		final Set<BlockVector2> chunks = region.getChunks();
+		final List<CompletableFuture<Void>> futures = new ArrayList<>(chunks.size());
 		final AtomicInteger numRemaining = new AtomicInteger(chunks.size());
 
 		/* This chunk consumer adds plugin chunk tickets to all the appropriate chunks to keep them loaded */

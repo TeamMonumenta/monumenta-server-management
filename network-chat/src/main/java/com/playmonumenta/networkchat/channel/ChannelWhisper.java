@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import javax.annotation.Nullable;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
@@ -39,6 +38,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.Nullable;
 
 // A channel visible to all shards
 public class ChannelWhisper extends Channel implements ChannelInviteOnly {
@@ -273,16 +273,6 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 		return getName(mParticipants);
 	}
 
-	@Override
-	public void setDescription(String description) throws WrapperCommandSyntaxException {
-		throw CommandAPI.failWithString("Whisper channels may not be given a description.");
-	}
-
-	@Override
-	public String getDescription() {
-		return "Whisper channels cannot have a description.";
-	}
-
 	public static String getName(Collection<UUID> participants) {
 		List<UUID> participantsList = new ArrayList<>(participants);
 		if (participantsList.size() == 1) {
@@ -295,6 +285,16 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 			name.append("_").append(participant.toString());
 		}
 		return name.toString();
+	}
+
+	@Override
+	public void setDescription(String description) throws WrapperCommandSyntaxException {
+		throw CommandAPI.failWithString("Whisper channels may not be given a description.");
+	}
+
+	@Override
+	public String getDescription() {
+		return "Whisper channels cannot have a description.";
 	}
 
 	@Override

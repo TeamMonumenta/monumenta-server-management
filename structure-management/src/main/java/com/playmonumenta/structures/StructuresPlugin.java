@@ -19,16 +19,18 @@ import com.playmonumenta.structures.managers.EventListener;
 import com.playmonumenta.structures.managers.RespawnManager;
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitWorker;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-public class StructuresPlugin extends JavaPlugin {
+public class StructuresPlugin extends JavaPlugin implements Executor {
 	public @Nullable RespawnManager mRespawnManager = null;
 
 	private static @Nullable StructuresPlugin INSTANCE = null;
@@ -175,5 +177,10 @@ public class StructuresPlugin extends JavaPlugin {
 			throw new RuntimeException("Attempted to get StructurePlugin before it finished loading");
 		}
 		return plugin.mRespawnManager;
+	}
+
+	@Override
+	public void execute(@NotNull Runnable command) {
+		Bukkit.getScheduler().runTask(this, command);
 	}
 }

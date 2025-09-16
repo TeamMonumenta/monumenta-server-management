@@ -26,7 +26,6 @@ import dev.jorel.commandapi.wrappers.NativeProxyCommandSender;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
-import javax.annotation.Nullable;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
@@ -36,6 +35,7 @@ import org.bukkit.command.BlockCommandSender;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.Nullable;
 
 // A channel visible only to this world (and moderators who opt in from elsewhere)
 public class ChannelWorld extends Channel implements ChannelAutoJoin, ChannelPermissionNode {

@@ -10,12 +10,8 @@ import com.playmonumenta.networkchat.channel.ChannelParty;
 import com.playmonumenta.networkchat.channel.ChannelTeam;
 import com.playmonumenta.networkchat.channel.ChannelWhisper;
 import com.playmonumenta.networkchat.channel.ChannelWorld;
-import com.playmonumenta.networkchat.commands.ChatCommand;
 import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.LiteralArgument;
-import dev.jorel.commandapi.arguments.MultiLiteralArgument;
-import java.util.ArrayList;
-import java.util.List;
 
 public class ChatNewCommand {
 	public static void register() {

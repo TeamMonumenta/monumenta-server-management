@@ -22,7 +22,6 @@ import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
-import javax.annotation.Nullable;
 import me.clip.placeholderapi.PlaceholderAPI;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
@@ -31,6 +30,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.Nullable;
 
 // A channel for server announcements
 public class ChannelAnnouncement extends Channel implements ChannelAutoJoin, ChannelPermissionNode {

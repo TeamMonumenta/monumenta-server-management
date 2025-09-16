@@ -25,12 +25,12 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
-import javax.annotation.Nullable;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.command.CommandSender;
+import org.jetbrains.annotations.Nullable;
 
 public class ChatHelpCommand {
 	static class HelpTreeNode extends TreeMap<String, HelpTreeNode> {
@@ -72,7 +72,7 @@ public class ChatHelpCommand {
 
 		// Load from plugin data folder
 		String folderLocation = plugin.getDataFolder() + File.separator + "help";
-		ArrayList<File> listOfFiles;
+		List<File> listOfFiles;
 		try {
 			File directory = new File(folderLocation);
 			if (!directory.exists()) {

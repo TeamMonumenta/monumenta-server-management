@@ -8,13 +8,13 @@ import com.playmonumenta.redissync.event.PlayerAccountTransferEvent;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerLoginEvent;
+import org.jetbrains.annotations.Nullable;
 
 public class NetworkRelayIntegration implements Listener {
 	private static @Nullable NetworkRelayIntegration INSTANCE = null;

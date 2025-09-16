@@ -3,8 +3,8 @@ package com.playmonumenta.structures.utils;
 import java.io.File;
 import java.nio.file.Paths;
 import java.util.regex.Pattern;
-import javax.annotation.Nullable;
 import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.Nullable;
 
 public class CommandUtils {
 	private static final String BASE_FOLDER_NAME = "structures";

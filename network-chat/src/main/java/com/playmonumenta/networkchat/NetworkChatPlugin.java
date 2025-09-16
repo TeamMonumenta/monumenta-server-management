@@ -24,7 +24,6 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.ZipFile;
-import javax.annotation.Nullable;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.Bukkit;
@@ -33,6 +32,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.jetbrains.annotations.Nullable;
 
 public class NetworkChatPlugin extends JavaPlugin implements Listener {
 	// Config is partially handled in other classes, such as ChannelManager
@@ -139,7 +139,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 		getServer().getPluginManager().registerEvents(PlayerStateManager.getInstance(), this);
 		getServer().getPluginManager().registerEvents(this, this);
 
-		RedisAPI.getInstance().async().hget(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_MESSAGE_COLORS_KEY)
+		RedisAPI.getInstance().async().hget(REDIS_CONFIG_PATH, REDIS_MESSAGE_COLORS_KEY)
 			.thenApply(dataStr -> {
 			if (dataStr != null) {
 				Gson gson = new Gson();
@@ -149,7 +149,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			return dataStr;
 		});
 
-		RedisAPI.getInstance().async().hget(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_MESSAGE_FORMATS_KEY)
+		RedisAPI.getInstance().async().hget(REDIS_CONFIG_PATH, REDIS_MESSAGE_FORMATS_KEY)
 			.thenApply(dataStr -> {
 			if (dataStr != null) {
 				Gson gson = new Gson();
@@ -168,7 +168,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			return dataStr;
 		});
 
-		RedisAPI.getInstance().async().hget(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_CHAT_FILTERS_KEY)
+		RedisAPI.getInstance().async().hget(REDIS_CONFIG_PATH, REDIS_CHAT_FILTERS_KEY)
 			.thenApply(dataStr -> {
 			if (dataStr != null) {
 				Gson gson = new Gson();
@@ -179,7 +179,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			return dataStr;
 		});
 
-		RedisAPI.getInstance().async().hget(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_CHAT_MOD_LOG_KEY)
+		RedisAPI.getInstance().async().hget(REDIS_CONFIG_PATH, REDIS_CHAT_MOD_LOG_KEY)
 			.thenApply(dataStr -> {
 				if (dataStr != null) {
 					Bukkit.getServer().getScheduler().runTask(INSTANCE,
@@ -212,7 +212,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 	}
 
 	public static void reload(CommandSender sender) {
-		Bukkit.getScheduler().runTaskAsynchronously(NetworkChatPlugin.getInstance(),
+		Bukkit.getScheduler().runTaskAsynchronously(getInstance(),
 			() -> mGlobalChatFilter = ChatFilter.globalFilter(sender));
 	}
 
@@ -244,7 +244,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			dataJson.addProperty(id, MessagingUtils.colorToString(color));
 		}
 
-		RedisAPI.getInstance().async().hset(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_MESSAGE_COLORS_KEY, dataJson.toString());
+		RedisAPI.getInstance().async().hset(REDIS_CONFIG_PATH, REDIS_MESSAGE_COLORS_KEY, dataJson.toString());
 
 		JsonObject wrappedConfigJson = new JsonObject();
 		wrappedConfigJson.add(REDIS_MESSAGE_COLORS_KEY, dataJson);
@@ -253,7 +253,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			                                             wrappedConfigJson,
 			                                             getMessageTtl());
 		} catch (Exception e) {
-			MMLog.severe("Failed to broadcast " + NetworkChatPlugin.NETWORK_CHAT_CONFIG_UPDATE);
+			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CONFIG_UPDATE);
 		}
 	}
 
@@ -287,7 +287,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			dataJson.addProperty(id, format);
 		}
 
-		RedisAPI.getInstance().async().hset(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_MESSAGE_FORMATS_KEY, dataJson.toString());
+		RedisAPI.getInstance().async().hset(REDIS_CONFIG_PATH, REDIS_MESSAGE_FORMATS_KEY, dataJson.toString());
 
 		JsonObject wrappedConfigJson = new JsonObject();
 		wrappedConfigJson.add(REDIS_MESSAGE_FORMATS_KEY, dataJson);
@@ -296,7 +296,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			                                             wrappedConfigJson,
 			                                             getMessageTtl());
 		} catch (Exception e) {
-			MMLog.severe("Failed to broadcast " + NetworkChatPlugin.NETWORK_CHAT_CONFIG_UPDATE);
+			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CONFIG_UPDATE);
 		}
 	}
 
@@ -320,7 +320,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 		String finishedCommand = command
 			.replace("<moderator>", moderator)
 			.replace("<details>", details);
-		Bukkit.getScheduler().runTask(NetworkChatPlugin.getInstance(),
+		Bukkit.getScheduler().runTask(getInstance(),
 			() -> Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), finishedCommand));
 	}
 
@@ -343,7 +343,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 	public static void saveGlobalFilter() {
 		JsonObject dataJson = mGlobalChatFilter.toJson();
 
-		RedisAPI.getInstance().async().hset(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_CHAT_FILTERS_KEY, dataJson.toString());
+		RedisAPI.getInstance().async().hset(REDIS_CONFIG_PATH, REDIS_CHAT_FILTERS_KEY, dataJson.toString());
 
 		JsonObject wrappedConfigJson = new JsonObject();
 		wrappedConfigJson.add(REDIS_CHAT_FILTERS_KEY, dataJson);
@@ -352,7 +352,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			                                             wrappedConfigJson,
 			                                             getMessageTtl());
 		} catch (Exception e) {
-			MMLog.severe("Failed to broadcast " + NetworkChatPlugin.NETWORK_CHAT_CONFIG_UPDATE);
+			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CONFIG_UPDATE);
 		}
 	}
 
@@ -360,10 +360,10 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 	public void networkRelayMessageEvent(NetworkRelayMessageEvent event) {
 		@Nullable JsonObject data;
 		switch (event.getChannel()) {
-			case NetworkChatPlugin.NETWORK_CHAT_CONFIG_UPDATE -> {
+			case NETWORK_CHAT_CONFIG_UPDATE -> {
 				data = event.getData();
 				if (data == null) {
-					MMLog.severe("Got " + NetworkChatPlugin.NETWORK_CHAT_CONFIG_UPDATE + " channel with null data");
+					MMLog.severe("Got " + NETWORK_CHAT_CONFIG_UPDATE + " channel with null data");
 					return;
 				}
 				@Nullable JsonObject messageColorsJson = data.getAsJsonObject(REDIS_MESSAGE_COLORS_KEY);

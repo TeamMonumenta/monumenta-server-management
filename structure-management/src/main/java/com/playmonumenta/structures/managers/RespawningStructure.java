@@ -2,8 +2,6 @@ package com.playmonumenta.structures.managers;
 
 import com.fastasyncworldedit.core.util.collection.BlockSet;
 import com.fastasyncworldedit.core.util.collection.MemBlockSet;
-import com.playmonumenta.scriptedquests.zones.Zone;
-import com.playmonumenta.scriptedquests.zones.ZoneNamespace;
 import com.playmonumenta.structures.StructuresAPI;
 import com.playmonumenta.structures.StructuresPlugin;
 import com.playmonumenta.structures.utils.MSLog;
@@ -13,15 +11,12 @@ import com.sk89q.worldedit.regions.Region;
 import com.sk89q.worldedit.world.block.BlockType;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
-import java.util.regex.Pattern;
-import javax.annotation.Nullable;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -33,6 +28,7 @@ import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
+import org.jetbrains.annotations.Nullable;
 
 public class RespawningStructure implements Comparable<RespawningStructure> {
 	public static class StructureBounds {
@@ -619,27 +615,25 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 
 	public void registerZone() {
 		RespawnManager respawnManager = StructuresPlugin.getRespawnManager();
-		ZoneNamespace zoneNamespaceInside = respawnManager.mZoneNamespaceInside;
-		ZoneNamespace zoneNamespaceNearby = respawnManager.mZoneNamespaceNearby;
 
-		Zone insideZone = new Zone(
-				zoneNamespaceInside,
-				Pattern.quote(mWorld.getName()),
+		respawnManager.registerRespawningStructureZone(
+			respawnManager.mZoneManager.registerInsideZone(
 				mInnerBounds.mLowerCorner.clone(),
 				mInnerBounds.mUpperCorner.clone(),
-				mName,
-				new LinkedHashSet<>());
-		Zone nearbyZone = new Zone(
-				zoneNamespaceNearby,
-				Pattern.quote(mWorld.getName()),
+				mWorld,
+				mName
+			),
+			this
+		);
+
+		respawnManager.registerRespawningStructureZone(
+			respawnManager.mZoneManager.registerNearbyZone(
 				mOuterBounds.mLowerCorner.clone(),
 				mOuterBounds.mUpperCorner.clone(),
-				mName,
-				new LinkedHashSet<>());
-		zoneNamespaceInside.addZone(insideZone);
-		zoneNamespaceNearby.addZone(nearbyZone);
-
-		respawnManager.registerRespawningStructureZone(insideZone, this);
-		respawnManager.registerRespawningStructureZone(nearbyZone, this);
+				mWorld,
+				mName
+			),
+			this
+		);
 	}
 }

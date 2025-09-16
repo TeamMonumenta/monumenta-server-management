@@ -4,7 +4,9 @@ import com.playmonumenta.structures.utils.Services;
 
 public interface ZoneServiceProvider extends Services.ServiceProvider<ZoneService> {
 	@Override
-	int priority();
+	default int priority() {
+		return 0;
+	}
 
 	@Override
 	ZoneService createService();
