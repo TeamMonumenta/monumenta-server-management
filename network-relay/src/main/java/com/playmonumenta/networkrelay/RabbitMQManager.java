@@ -33,7 +33,7 @@ public class RabbitMQManager {
 
 	private static @Nullable RabbitMQManager INSTANCE = null;
 
-	private final long mPrimaryThreadId;
+	private final Thread mPrimaryThread;
 	private final Gson mGson = new Gson();
 	private final Logger mLogger;
 	private final Channel mChannel;
@@ -125,8 +125,7 @@ public class RabbitMQManager {
 	protected RabbitMQManager(RabbitMQManagerAbstractionInterface abstraction, Logger logger, String shardName, String rabbitURI, int heartbeatInterval, int destinationTimeout, long defaultTTL) throws Exception {
 		// Once this project is running on Java 19 or higher, switch to Thread.threadId() instead
 		// (does not exist in this version)
-		//noinspection deprecation
-		mPrimaryThreadId = Thread.currentThread().getId();
+		mPrimaryThread = Thread.currentThread();
 		mAbstraction = abstraction;
 		mLogger = logger;
 		mShardName = shardName;
@@ -523,8 +522,7 @@ public class RabbitMQManager {
 	}
 
 	private boolean isPrimaryThread() {
-		//noinspection deprecation
-		return mPrimaryThreadId == Thread.currentThread().getId();
+		return mPrimaryThread == Thread.currentThread();
 	}
 
 	public void setServerFinishedStarting() {
