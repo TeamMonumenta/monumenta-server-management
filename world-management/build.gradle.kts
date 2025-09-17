@@ -12,7 +12,7 @@ dependencies {
 
 monumenta {
 	id("MonumentaWorldManagement")
-	name("MonumentaWorldManagement")
+	name("WorldManagement")
 	paper(
 		"com.playmonumenta.worlds.paper.WorldManagementPlugin",
 		BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
