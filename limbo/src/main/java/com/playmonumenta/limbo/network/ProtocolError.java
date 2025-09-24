@@ -5,7 +5,7 @@ import org.intellij.lang.annotations.PrintFormat;
 import org.jetbrains.annotations.ApiStatus;
 
 @ApiStatus.Internal
-public class ProtocolError extends RuntimeException {
+public final class ProtocolError extends RuntimeException {
 	private ProtocolError(String message) {
 		super(message);
 	}

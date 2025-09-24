@@ -14,7 +14,7 @@ public class Leb {
 	static final int SHIFT = 7;
 	static final int NEXT = 0x80;
 	static final int MASK = 0x7f;
-	static final int MAX_HEADER_SIZE = 3;
+	static final int MAX_HEADER_SIZE = 3; // Varint21LengthFieldPrepender MAX_VARINT21_BYTES
 
 	public static class FrameDecoder {
 		private final SocketChannel channel;
@@ -95,10 +95,10 @@ public class Leb {
 			headerScratch.position(0);
 			headerScratch.limit(headerScratch.capacity());
 
-			for (int i = 0; (size & ~Leb.MASK) != 0; i++) {
+			for (int i = 0; (size & ~MASK) != 0; i++) {
 				ProtocolError.check(i < 2, () -> "tried writing oversize packet");
-				headerScratch.put((byte) (size & Leb.MASK | Leb.NEXT));
-				size >>>= Leb.SHIFT;
+				headerScratch.put((byte) (size & MASK | NEXT));
+				size >>>= SHIFT;
 			}
 
 			headerScratch.put((byte) size);
