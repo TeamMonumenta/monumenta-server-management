@@ -11,7 +11,7 @@ public record ServerFlags(
 		return new ServerFlagsBuilder();
 	}
 
-	public static class ServerFlagsBuilder {
+	public final static class ServerFlagsBuilder {
 		private int writeBufferInitialSize = 4096;
 		private int readBufferInitialSize = 4096;
 		private int sockSendBufSize = 4096;

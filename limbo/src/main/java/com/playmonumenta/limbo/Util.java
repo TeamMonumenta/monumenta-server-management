@@ -4,7 +4,7 @@ import java.nio.ByteBuffer;
 import org.jetbrains.annotations.ApiStatus;
 
 @ApiStatus.Internal
-public class Util {
+public final class Util {
 	/**
 	 * @param buffer     the buffer, must be in write mode
 	 * @param targetSize the target size
