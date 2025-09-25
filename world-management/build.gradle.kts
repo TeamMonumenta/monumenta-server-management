@@ -6,7 +6,7 @@ plugins {
 
 dependencies {
 	compileOnly(libs.commandapi)
-	compileOnly(project(":redis-sync:redissync"))
+	compileOnly(project(":redis-sync:plugin"))
 	// compileOnly(libs.gson)
 }
 

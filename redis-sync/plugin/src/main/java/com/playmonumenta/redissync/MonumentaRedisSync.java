@@ -12,6 +12,7 @@ import com.playmonumenta.redissync.commands.Stash;
 import com.playmonumenta.redissync.commands.TransferServer;
 import com.playmonumenta.redissync.commands.UpgradeAllPlayers;
 import com.playmonumenta.redissync.config.BukkitConfig;
+import com.playmonumenta.redissync.utils.VersionAdapterHolder;
 import java.io.File;
 import java.util.Locale;
 import java.util.logging.Level;
@@ -26,33 +27,17 @@ import org.jetbrains.annotations.Nullable;
 public class MonumentaRedisSync extends JavaPlugin implements MonumentaRedisSyncInterface {
 	private static @Nullable MonumentaRedisSync INSTANCE = null;
 	private @Nullable RedisAPI mRedisAPI = null;
-	private @Nullable VersionAdapter mVersionAdapter = null;
+	private final VersionAdapterHolder<VersionAdapter> mVersionAdapter = new VersionAdapterHolder<>(
+		VersionAdapter.class,
+		this
+	);
+
 	private @Nullable CustomLogger mLogger = null;
-
-	private void loadVersionAdapter() {
-		/* From https://github.com/mbax/AbstractionExamplePlugin */
-
-		String packageName = this.getServer().getClass().getPackage().getName();
-		String version = packageName.substring(packageName.lastIndexOf('.') + 1);
-
-		try {
-			final Class<?> clazz = Class.forName("com.playmonumenta.redissync.adapters.VersionAdapter_" + version);
-			// Check if we have a valid adapter class at that location.
-			if (VersionAdapter.class.isAssignableFrom(clazz)) {
-				mVersionAdapter = (VersionAdapter) clazz.getConstructor(Logger.class).newInstance(this.getLogger());
-			}
-		} catch (final Exception e) {
-			e.printStackTrace();
-			getLogger().severe("Server version " + version + " is not supported!");
-			return;
-		}
-		getLogger().info("Loading support for " + version);
-	}
 
 	@Override
 	public void onLoad() {
-		loadVersionAdapter();
-
+		// pre-load adapter
+		mVersionAdapter.get();
 		/*
 		 * CommandAPI commands which register directly and are usable in functions
 		 *
@@ -93,11 +78,13 @@ public class MonumentaRedisSync extends JavaPlugin implements MonumentaRedisSync
 
 		loadConfig();
 		mRedisAPI = new RedisAPI(this, BukkitConfig.getRedisHost(), BukkitConfig.getRedisPort());
-		getServer().getPluginManager().registerEvents(new DataEventListener(this.getLogger(), mVersionAdapter), this);
-		getServer().getPluginManager().registerEvents(new ScoreboardCleanupListener(this, this.getLogger(), mVersionAdapter), this);
+		getServer().getPluginManager().registerEvents(new DataEventListener(this.getLogger(), mVersionAdapter.get()),
+            this);
+		getServer().getPluginManager().registerEvents(new ScoreboardCleanupListener(this, this.getLogger(),
+            mVersionAdapter.get()), this);
 		getServer().getPluginManager().registerEvents(AccountTransferManager.getInstance(), this);
 		if (BukkitConfig.getTicksPerPlayerAutosave() > 0) {
-			getServer().getPluginManager().registerEvents(new AutoSaveListener(this, mVersionAdapter), this);
+			getServer().getPluginManager().registerEvents(new AutoSaveListener(this, mVersionAdapter.get()), this);
 		}
 
 		this.getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
@@ -123,11 +110,7 @@ public class MonumentaRedisSync extends JavaPlugin implements MonumentaRedisSync
 	}
 
 	public VersionAdapter getVersionAdapter() {
-		VersionAdapter versionAdapter = mVersionAdapter;
-		if (versionAdapter == null) {
-			throw new RuntimeException("MonumentaRedisSync is not enabled yet");
-		}
-		return versionAdapter;
+		return mVersionAdapter.get();
 	}
 
 	private BukkitConfig loadConfig() {

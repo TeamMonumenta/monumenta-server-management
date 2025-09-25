@@ -46,7 +46,7 @@ public interface VersionAdapter {
 
 	SaveData extractSaveData(Object nbtObj, @Nullable ReturnParams returnParams) throws IOException;
 
-	void savePlayer(Player player) throws Exception;
+	void savePlayer(Player player);
 
 	Object upgradePlayerData(Object nbtTagCompound);
 

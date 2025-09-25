@@ -15,7 +15,7 @@ dependencies {
 	implementation(libs.commons)
 	compileOnly(libs.commandapi)
 	compileOnly(project(":network-relay"))
-	compileOnly(project(":redis-sync:redissync"))
+	compileOnly(project(":redis-sync:plugin"))
 	compileOnly(libs.lettuce)
 	compileOnly(libs.placeholderapi)
 	compileOnly(libs.protocollib)
