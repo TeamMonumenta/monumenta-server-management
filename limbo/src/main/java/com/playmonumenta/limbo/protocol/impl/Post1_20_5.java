@@ -54,7 +54,7 @@ public class Post1_20_5 implements ProtocolHandler {
         .registry("painting_variant", "alban")
         .registry("wolf_variant", "ashen")
         .registry("damage_type", "campfire")
-        .registry("minecraft:worldgen/biome", "minecraft:snowy_taiga");;
+        .registry("minecraft:worldgen/biome", "minecraft:snowy_taiga");
 
     private final Data data;
 

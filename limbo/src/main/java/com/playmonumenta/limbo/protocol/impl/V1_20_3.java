@@ -57,11 +57,11 @@ public class V1_20_3 implements ProtocolHandler {
 
 	@Override
 	public final void handlePlayPacket(int id, PacketReader reader) {
-
+		// NOOP
 	}
 
 	@Override
 	public void sendKeepAlive() {
-
+		// NOOP
 	}
 }
