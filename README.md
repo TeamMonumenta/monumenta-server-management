@@ -1,59 +1,47 @@
 # Monumenta Server Management
 
 This is the new home for the plugins that [Monumenta](https://www.playmonumenta.com/) develops and encourages other
-servers to take advantage of. Here's a summary of what each one does:
+servers to take advantage of. Monumenta is a free, community-developed Complete-The-Monument MMORPG Minecraft server.
 
-Monumenta is a free community developed Complete-The-Monument MMORPG Minecraft server.
+This project consists of several modules, which are independent plugins:
 
-## Monumenta Network Relay
+| Module                                                   | Description                                |
+|----------------------------------------------------------|--------------------------------------------|
+| [Network Relay](./network-relay/README.md)               | A cross-server message plugin w/ RabbitMQ. |
+| [Redis Sync](./redis-sync/README.md)                     | Redis backend for playerdata.              |
+| [Network Chat](./network-chat/README.md)                 | A cross-server chat plugin.                |
+| [Structure Management](./structure-management/README.md) | Monumenta's respawning POI w/ FAWE.        |
+| [World Management](./world-management/README.md)         | Tools for managing worlds.                 |
 
-This allows Minecraft servers and proxies to send each other messages over RabbitMQ.
+## Downloading
 
-Hard Dependencies:
+Dependencies available on [maven](https://maven.playmonumenta.com/#/).
 
-- CommandAPI
-  Optional Dependencies:
-- PlaceholderAPI
-- ViaVersion
+**Maven**
 
-## Monumenta Redis Sync
+```xml
 
-This allows Minecraft servers to communicate with Redis, storing both player files and arbitrary plugin data.
+<repository>
+	<id>monumenta</id>
+	<name>Monumenta Maven Repo</name>
+	<url>https://maven.playmonumenta.com/releases</url>
+</repository>
+```
 
-Hard Dependencies:
+**Gradle (groovy)**
 
-- CommandAPI
-- MonumentaNetworkRelay
+```groovy
+maven {
+	name "monumenta"
+	url "https://maven.playmonumenta.com/releases"
+}
+```
 
-## Monumenta Network Chat
+**Gradle (kotlin)**
 
-This is a cross-server chat plugin, with customizable chat filters and moderation support.
-
-Hard Dependencies:
-
-- CommandAPI
-- MonumentaNetworkRelay
-- MonumentaRedisSync
-- PlaceholderAPI
-- ProtocolLib
-  Optional Dependencies:
-- ViaVersion
-
-## Monumenta Structure Management
-
-This provides the backbone of Monumenta's respawning Point-of-Interest system using FastAsyncWorldEdit (FAWE).
-
-Hard Dependencies:
-
-- CommandAPI
-- FastAsyncWorldEdit
-- ScriptedQuests
-
-## monumenta-world-management
-
-This provides tools for loading, unloading, copying, and moving players between worlds.
-
-Hard Dependencies:
-
-- CommandAPI
-- MonumentaRedisSync
+```groovy
+maven {
+	name = "monumenta"
+	url = uri("https://maven.playmonumenta.com/releases")
+}
+```
