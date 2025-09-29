@@ -1,6 +1,9 @@
 package com.playmonumenta.redissync.adapters;
 
-import com.google.gson.JsonObject;
+import com.google.common.collect.ImmutableMap;
+import com.playmonumenta.redissync.player.PlayerPos;
+import com.playmonumenta.redissync.player.WorldData;
+import it.unimi.dsi.fastutil.Pair;
 import java.io.IOException;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -38,13 +41,13 @@ public interface VersionAdapter {
 		}
 	}
 
-	JsonObject getPlayerScoresAsJson(String playerName, Scoreboard scoreboard);
+	ImmutableMap<String, Integer> getPlayerScores(String playerName, Scoreboard scoreboard);
 
 	void resetPlayerScores(String playerName, Scoreboard scoreboard);
 
-	Object retrieveSaveData(byte[] data, JsonObject shardData) throws IOException;
+	Object retrieveSaveData(byte[] data, WorldData shardData) throws IOException;
 
-	SaveData extractSaveData(Object nbtObj, @Nullable ReturnParams returnParams) throws IOException;
+	Pair<byte[], WorldData> extractSaveData(Object nbtObj) throws IOException;
 
 	void savePlayer(Player player);
 

@@ -12,6 +12,7 @@ import com.playmonumenta.redissync.commands.Stash;
 import com.playmonumenta.redissync.commands.TransferServer;
 import com.playmonumenta.redissync.commands.UpgradeAllPlayers;
 import com.playmonumenta.redissync.config.BukkitConfig;
+import com.playmonumenta.redissync.utils.PluginScheduler;
 import com.playmonumenta.redissync.utils.VersionAdapterHolder;
 import java.io.File;
 import java.util.Locale;
@@ -24,7 +25,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class MonumentaRedisSync extends JavaPlugin implements MonumentaRedisSyncInterface {
+public class MonumentaRedisSync extends JavaPlugin implements MonumentaRedisSyncInterface, PluginScheduler {
 	private static @Nullable MonumentaRedisSync INSTANCE = null;
 	private @Nullable RedisAPI mRedisAPI = null;
 	private final VersionAdapterHolder<VersionAdapter> mVersionAdapter = new VersionAdapterHolder<>(

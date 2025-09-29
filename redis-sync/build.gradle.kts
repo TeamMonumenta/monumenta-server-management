@@ -9,7 +9,15 @@ val mixinapi = libs.mixinapi
 monumenta {
 	id("MonumentaRedisSync")
 	name("RedisSync")
-	versionAdapterApi("adapter_api", paper = "1.18.2")
+	versionAdapterApi("adapter_api", paper = "1.18.2") {
+		repositories {
+			mavenLocal()
+		}
+
+		dependencies {
+			api(project(":redis-sync:plugin"))
+		}
+	}
 	versionAdapter("adapter_v1_20_R3", "1.20.4") {
 		dependencies {
 			compileOnly(mixinapi)

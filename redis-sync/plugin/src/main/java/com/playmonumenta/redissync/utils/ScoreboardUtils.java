@@ -1,5 +1,6 @@
 package com.playmonumenta.redissync.utils;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.playmonumenta.redissync.MonumentaRedisSync;
@@ -28,12 +29,12 @@ public class ScoreboardUtils {
 		return data;
 	}
 
-	public static void loadFromJsonObject(Player player, JsonObject data) {
+	public static void loadFromJsonObject(Player player, ImmutableMap<String, Integer> data) {
 		Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
 
-		for (Map.Entry<String, JsonElement> entry : data.entrySet()) {
+		for (final var entry : data.entrySet()) {
 			String name = entry.getKey();
-			int scoreVal = entry.getValue().getAsInt();
+			int scoreVal = entry.getValue();
 
 			Objective objective = scoreboard.getObjective(name);
 			if (objective == null) {

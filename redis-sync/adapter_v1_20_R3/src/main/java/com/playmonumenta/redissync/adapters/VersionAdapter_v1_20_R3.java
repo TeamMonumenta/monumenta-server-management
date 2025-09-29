@@ -6,6 +6,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.playmonumenta.mixinapi.v1.RedisSyncIO;
+import com.playmonumenta.redissync.player.WorldData;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -34,7 +35,7 @@ public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 	}
 
 	@Override
-	public JsonObject getPlayerScoresAsJson(String playerName, org.bukkit.scoreboard.Scoreboard scoreboard) {
+	public JsonObject getPlayerScores(String playerName, org.bukkit.scoreboard.Scoreboard scoreboard) {
 		return RedisSyncIO.getInstance().getPlayerScoresAsJson(playerName, scoreboard);
 	}
 
@@ -45,8 +46,8 @@ public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 	}
 
 	@Override
-	public Object retrieveSaveData(byte[] data, JsonObject shardData) throws IOException {
-		ByteArrayInputStream inBytes = new ByteArrayInputStream(data);
+	public Object retrieveSaveData(byte[] data, WorldData shardData) throws IOException {
+		final var inBytes = new ByteArrayInputStream(data);
 		CompoundTag nbt = NbtIo.readCompressed(inBytes, NbtAccounter.unlimitedHeap());
 
 		applyInt(shardData, nbt, "SpawnX");

@@ -1,4 +1,4 @@
-package com.playmonumenta.redissync.playerdata;
+package com.playmonumenta.redissync.player;
 
 import com.floweytf.coro.Co;
 import com.floweytf.coro.annotations.Coroutine;
@@ -9,8 +9,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import com.playmonumenta.redissync.MonumentaRedisSync;
 import com.playmonumenta.redissync.RedisAPI;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -43,25 +41,48 @@ public class LocalRedisPlayer {
 	// the source-data is indexed by some K, which is what profile will be loaded/stored to
 	// source: K
 
-	private record HistoryEntry(UUID id) {
+	public record HistoryEntry(UUID id) {
 	}
 
 	private final UUID mUuid;
-	private final Set<UUID> mRemotePlayerDataBlobs = new HashSet<>();
-	private final Map<String, UUID> mStashes = new HashMap<>();
-	private final Map<String, UUID> mProfiles = new HashMap<>();
+	private final Set<UUID> mRemotePlayerDataBlobs;
+	private final Map<String, UUID> mStashes;
+	private final Map<String, UUID> mProfiles;
 	private String mCurrentProfile;
-	private final List<HistoryEntry> mHistory = new ArrayList<>();
-	private CachedPlayerData mActivePlayerData;
+	private final List<HistoryEntry> mHistory;
+	private PlayerData mActivePlayerData;
+	private boolean mDisableSaving;
 
 	private @Nullable Task<Void> lastestTask;
 
 	@Nullable
 	private Runnable queuedOp;
 
-	public LocalRedisPlayer(UUID mUuid, CachedPlayerData activePlayerData) {
-		this.mUuid = mUuid;
-		this.mActivePlayerData = activePlayerData;
+	/**
+	 * WARNING: this is blocking
+	 */
+	LocalRedisPlayer(UUID uuid) {
+		this.mUuid = uuid;
+		final var key = "%s:playerdata:%s".formatted("TODO", uuid);
+		final var metadata = RedisAPI.getInstance().async().get(key).toCompletableFuture().join();
+		final var json = PlayerDataManager.GSON.fromJson(metadata, PlayerGlobalData.class);
+		// build the maps
+		this.mStashes = json.stashes();
+		this.mProfiles = json.profiles();
+		this.mCurrentProfile = json.currentProfile();
+		this.mHistory = json.history();
+		this.mRemotePlayerDataBlobs = computeGcRoots();
+		final var id = mProfiles.get(mCurrentProfile);
+		Preconditions.checkState(id != null);
+		this.mActivePlayerData = Co.launchBlocking(() -> Co.ret(Co.await(PlayerData.load("TODO", uuid, id))));
+	}
+
+	private Set<UUID> computeGcRoots() {
+		final var gcRoots = new HashSet<UUID>();
+		gcRoots.addAll(mStashes.values());
+		gcRoots.addAll(mProfiles.values());
+		mHistory.stream().map(HistoryEntry::id).forEach(gcRoots::add);
+		return gcRoots;
 	}
 
 	private Awaitable<Void> runRedisTask(@MakeCoro Supplier<Task<Void>> task) {
@@ -81,6 +102,14 @@ public class LocalRedisPlayer {
 		queuedOp = op;
 
 		// TODO: notify the proxy to send the player to the correct target
+	}
+
+	public void disableSaving() {
+		mDisableSaving = true;
+	}
+
+	public boolean isSavingDisabled() {
+		return mDisableSaving;
 	}
 
 	public void switchProfile(String newProfile) {
@@ -109,17 +138,17 @@ public class LocalRedisPlayer {
 		enqueuePlayerDataOperation(() -> mProfiles.put(mCurrentProfile, id));
 	}
 
-	public CachedPlayerData currentPlayerData() {
+	public PlayerData currentPlayerData() {
 		Preconditions.checkState(Bukkit.isPrimaryThread());
 		return mActivePlayerData;
 	}
 
-	public void currentPlayerData(CachedPlayerData data) {
+	public void currentPlayerData(PlayerData data) {
 		Preconditions.checkState(Bukkit.isPrimaryThread());
 		mActivePlayerData = data;
 	}
 
-	public void currentPlayerData(UnaryOperator<CachedPlayerData> transform) {
+	public void currentPlayerData(UnaryOperator<PlayerData> transform) {
 		Preconditions.checkState(Bukkit.isPrimaryThread());
 		mActivePlayerData = transform.apply(mActivePlayerData);
 	}
@@ -132,7 +161,10 @@ public class LocalRedisPlayer {
 		Preconditions.checkState(storeId != null);
 
 		Co.await(runRedisTask(() -> {
+			RedisAPI.getInstance().async().multi();
 			Co.await(data.store("TODO", mUuid, storeId));
+
+
 			return Co.ret();
 		}));
 
@@ -157,7 +189,7 @@ public class LocalRedisPlayer {
 			Co.await(stashData.store("TODO", mUuid, stashStoreId));
 
 			// important: run on main
-			Co.await(); /* TODO switch to main thread*/
+			Co.await(MonumentaRedisSync.getInstance()); /* TODO switch to main thread*/
 			mRemotePlayerDataBlobs.add(stashStoreId);
 			mStashes.put(stash, stashStoreId);
 			return Co.ret();
@@ -170,10 +202,7 @@ public class LocalRedisPlayer {
 	public Task<Void> collectGarbage() {
 		Preconditions.checkState(Bukkit.isPrimaryThread(), "collectGarbage() called off-main");
 
-		final var gcRoots = new HashSet<UUID>();
-		gcRoots.addAll(mStashes.values());
-		gcRoots.addAll(mProfiles.values());
-		mHistory.stream().map(HistoryEntry::id).forEach(gcRoots::add);
+		final var gcRoots = computeGcRoots();
 		final var toDelete = Sets.difference(mRemotePlayerDataBlobs, gcRoots)
 			.stream()
 			.map(UUID::toString) // TODO: fix this key

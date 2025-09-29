@@ -706,7 +706,7 @@ public class DataEventListener implements Listener {
 			mLogger.fine("Saving scoreboard data for player=" + player.getName());
 			long scoreStartTime = System.currentTimeMillis();
 
-			String scoreboardData = mGson.toJson(mAdapter.getPlayerScoresAsJson(player.getName(), Bukkit.getScoreboardManager().getMainScoreboard()));
+			String scoreboardData = mGson.toJson(mAdapter.getPlayerScores(player.getName(), Bukkit.getScoreboardManager().getMainScoreboard()));
 			mLogger.fine(() -> "Scoreboard saving took " + (System.currentTimeMillis() - scoreStartTime) + " " + "milliseconds on main thread");
 			mLogger.finest(() -> "Data:" + scoreboardData);
 			String scorePath = MonumentaRedisSyncAPI.getRedisScoresPath(player);
