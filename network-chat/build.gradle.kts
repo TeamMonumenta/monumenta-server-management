@@ -6,6 +6,7 @@ plugins {
 
 repositories {
 	mavenCentral()
+	mavenLocal()
 	maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
 	maven("https://repo.viaversion.com")
 }

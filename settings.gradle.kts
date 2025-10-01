@@ -21,3 +21,5 @@ include("redis-sync:velocity")
 
 include("limbo")
 include("examples:redis-sync")
+
+includeBuild("gradle-plugin")

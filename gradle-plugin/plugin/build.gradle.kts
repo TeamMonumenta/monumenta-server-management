@@ -58,8 +58,14 @@ val shadowJarTask = tasks.named<ShadowJar>("shadowJar") {
     }
 }
 
-tasks.named("jar").configure {
-    enabled = false
+artifacts {
+	add("archives", shadowJarTask)
+}
+
+// stupid hack
+tasks.named<Jar>("jar") {
+	enabled = false
+	dependsOn(shadowJarTask)
 }
 
 tasks.whenTaskAdded {
