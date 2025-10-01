@@ -26,6 +26,7 @@ server network spanning 20+ servers and hundreds of players. It is still a
 little rough around the edges, missing some nice-to-have features.
 
 Here's a list of currently supported things:
+
 - Save playerdata, advancements, and scoreboard data to/from Redis
 - Function & command block accessible /transferserver command to move players
   between servers on the same bungeecord network
@@ -49,6 +50,7 @@ Here's a list of currently supported things:
   from both bungeecord and minecraft servers simultaneously.
 
 Planned features:
+
 - Automatic config file creation
 - Storage of player stats data
 
@@ -82,45 +84,45 @@ could be easily supported, just ask.
 
 ## Maven dependency
 
-## Maven dependency
 ```xml
+
 <repository>
 	<id>monumenta</id>
 	<name>Monumenta Maven Repo</name>
 	<url>https://maven.playmonumenta.com/releases</url>
 </repository>
 <dependencies>
-	<dependency>
-		<groupId>com.playmonumenta</groupId>
-		<artifactId>redissync</artifactId>
-		<version>4.1</version>
-		<scope>provided</scope>
-	</dependency>
+<dependency>
+	<groupId>com.playmonumenta</groupId>
+	<artifactId>redissync</artifactId>
+	<version>4.1</version>
+	<scope>provided</scope>
+</dependency>
 </dependencies>
 ```
+
 Gradle (kotlin):
+
 ```kts
 maven {
-    name = "monumenta"
-    url = uri("https://maven.playmonumenta.com/releases")
+	name = "monumenta"
+	url = uri("https://maven.playmonumenta.com/releases")
 }
 
 dependencies {
 	compileOnly("com.playmonumenta:redissync:4.1")
 }
 ```
+
 Gradle (groovy):
+
 ```groovy
 maven {
-    name "monumenta"
-    url "https://maven.playmonumenta.com/releases"
+	name "monumenta"
+	url "https://maven.playmonumenta.com/releases"
 }
 
 dependencies {
 	compileOnly "com.playmonumenta:redissync:4.1"
 }
 ```
-
-## Download
-
-You can download the Monumenta Redis Sync plugin from [GitHub Packages](https://github.com/TeamMonumenta/monumenta-redis-sync/packages).
