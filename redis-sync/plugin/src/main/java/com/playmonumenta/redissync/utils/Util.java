@@ -5,9 +5,9 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 public class Util {
 	public static <K, V> ImmutableMap<K, V> extend(ImmutableMap<K, V> map, K key, V value) {
-		final var hm = new Object2ObjectOpenHashMap<>(map.size() + 1);
+		final var hm = new Object2ObjectOpenHashMap<K, V>(map.size() + 1);
 		hm.putAll(map);
 		hm.put(key, value);
-		return ImmutableMap.builder().putAll(hm).build();
+		return ImmutableMap.<K, V>builder().putAll(hm).build();
 	}
 }

@@ -2,6 +2,7 @@ package com.playmonumenta.redissync.adapters;
 
 import ca.spottedleaf.dataconverter.minecraft.MCDataConverter;
 import ca.spottedleaf.dataconverter.minecraft.datatypes.MCTypeRegistry;
+import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -35,7 +36,7 @@ public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 	}
 
 	@Override
-	public JsonObject getPlayerScores(String playerName, org.bukkit.scoreboard.Scoreboard scoreboard) {
+	public ImmutableMap<String, Integer> getPlayerScores(String playerName, org.bukkit.scoreboard.Scoreboard scoreboard) {
 		return RedisSyncIO.getInstance().getPlayerScoresAsJson(playerName, scoreboard);
 	}
 

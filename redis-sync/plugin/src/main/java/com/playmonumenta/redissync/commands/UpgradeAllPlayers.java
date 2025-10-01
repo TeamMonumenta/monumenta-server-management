@@ -2,7 +2,6 @@ package com.playmonumenta.redissync.commands;
 
 import com.playmonumenta.redissync.MonumentaRedisSync;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
-import com.playmonumenta.redissync.MonumentaRedisSyncAPI.RedisPlayerData;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import java.util.Iterator;

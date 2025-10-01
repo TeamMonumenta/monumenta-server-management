@@ -1,6 +1,5 @@
 package com.playmonumenta.redissync;
 
-import com.playmonumenta.redissync.config.CommonConfig;
 import io.lettuce.core.api.async.RedisAsyncCommands;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -14,7 +13,7 @@ public class RBoardAPI {
 		if (!name.matches("^[-_0-9A-Za-z$]+$")) {
 			throw new IllegalArgumentException("Name '" + name + "' contains illegal characters, must match '^[-_$0-9A-Za-z$]+'");
 		}
-		return String.format("%s:rboard:%s", CommonConfig.getServerDomain(), name);
+		return String.format("%s:rboard:%s", MonumentaRedisSync.config().getServerDomain(), name);
 	}
 
 	/* ******************* Set ******************* */
@@ -28,7 +27,7 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
+		RedisAsyncCommands<String, String> commands = MonumentaRedisSync.redisApi().async();
 		return commands.hset(redisPath, data).toCompletableFuture();
 	}
 
@@ -49,7 +48,7 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
+		RedisAsyncCommands<String, String> commands = MonumentaRedisSync.redisApi().async();
 		return commands.hincrby(redisPath, key, amount).toCompletableFuture();
 	}
 
@@ -64,7 +63,7 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
+		RedisAsyncCommands<String, String> commands = MonumentaRedisSync.redisApi().async();
 		commands.multi();
 		for (String key : keys) {
 			commands.hincrby(redisPath, key, 0);
@@ -100,7 +99,7 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
+		RedisAsyncCommands<String, String> commands = MonumentaRedisSync.redisApi().async();
 		commands.multi();
 		CompletableFuture<Map<String, String>> retVal = commands.hmget(redisPath, keys).toCompletableFuture().thenApply(list -> {
 			Map<String, String> transformed = new LinkedHashMap<>();
@@ -123,7 +122,7 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
+		RedisAsyncCommands<String, String> commands = MonumentaRedisSync.redisApi().async();
 		return commands.hkeys(redisPath).toCompletableFuture();
 	}
 
@@ -138,7 +137,7 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
+		RedisAsyncCommands<String, String> commands = MonumentaRedisSync.redisApi().async();
 		return commands.hgetall(redisPath).toCompletableFuture();
 	}
 
@@ -153,7 +152,7 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
+		RedisAsyncCommands<String, String> commands = MonumentaRedisSync.redisApi().async();
 		return commands.hdel(redisPath, keys).toCompletableFuture();
 	}
 
@@ -168,7 +167,7 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
+		RedisAsyncCommands<String, String> commands = MonumentaRedisSync.redisApi().async();
 		return commands.del(redisPath).toCompletableFuture();
 	}
 }

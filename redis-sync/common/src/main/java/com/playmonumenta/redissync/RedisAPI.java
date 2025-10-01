@@ -6,9 +6,7 @@ import io.lettuce.core.RedisFuture;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.async.RedisAsyncCommands;
-import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.codec.RedisCodec;
-import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.resource.ClientResources;
 import io.lettuce.core.resource.NettyCustomizer;
 import io.netty.bootstrap.Bootstrap;
@@ -22,6 +20,8 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.logging.Logger;
 
 public class RedisAPI {
 	private static final class StringByteCodec implements RedisCodec<String, byte[]> {
@@ -60,13 +60,11 @@ public class RedisAPI {
 		}
 	}
 
-	public static final RedisCodec<String, String> STRING_STRING_CODEC = StringCodec.UTF8;
 	public static final RedisCodec<String, byte[]> STRING_BYTE_CODEC = StringByteCodec.INSTANCE;
 
-	@SuppressWarnings("NullAway") // Required to avoid many null checks, this class will always be instantiated if this plugin is loaded
-	private static RedisAPI INSTANCE = null;
-
-	private final MonumentaRedisSyncInterface mServer;
+	private final Logger mLogger;
+	private final RedisConfig mRedisConfig;
+	private final Executor mScheduler;
 	private final RedisClient mRedisClient;
 	private final ClientResources mClientResources;
 	private final StatefulRedisConnection<String, String> mConnection;
@@ -76,8 +74,10 @@ public class RedisAPI {
 	private final ConcurrentHashMap<Long, StatefulRedisConnection<String, byte[]>> mThreadStringByteConnections
 		= new ConcurrentHashMap<>();
 
-	protected RedisAPI(MonumentaRedisSyncInterface server, String hostname, int port) {
-		mServer = server;
+	public RedisAPI(Logger logger, RedisConfig redisConfig, Executor scheduler) {
+		mLogger = logger;
+		mRedisConfig = redisConfig;
+		mScheduler = scheduler;
 		// OutOfDirectMemoryError workaround: https://github.com/redis/lettuce/issues/2590#issuecomment-1888683541
 		mClientResources = ClientResources.builder()
 			.nettyCustomizer(new NettyCustomizer() {
@@ -86,7 +86,9 @@ public class RedisAPI {
 					bootstrap.option(ChannelOption.ALLOCATOR, new PooledByteBufAllocator(false));
 				}
 			}).build();
-		mRedisClient = RedisClient.create(mClientResources, RedisURI.Builder.redis(hostname, port).build());
+		mRedisClient = RedisClient.create(mClientResources, RedisURI.Builder.redis(
+			redisConfig.getRedisHost(), redisConfig.getRedisPort()
+		).build());
 		mConnection = mRedisClient.connect();
 		mStringByteConnection = mRedisClient.connect(StringByteCodec.INSTANCE);
 
@@ -94,34 +96,30 @@ public class RedisAPI {
 		long threadId = thread.getId();
 		mThreadStringStringConnections.put(threadId, mConnection);
 		mThreadStringByteConnections.put(threadId, mStringByteConnection);
-
-		INSTANCE = this;
 	}
 
-	protected void shutdown() {
+	public void shutdown() {
 		mConnection.close();
 		mStringByteConnection.close();
 		mRedisClient.shutdown();
 		mClientResources.shutdown();
 	}
 
-	public static RedisAPI getInstance() {
-		return INSTANCE;
-	}
-
 	/**
 	 * Opens a new autoClosable connection regardless of open connections
 	 * Your code is responsible for closing this when it is done, ideally using a try with resources block
+	 *
 	 * @return A new connection that you are responsible for closing
 	 */
 	public <K, V> StatefulRedisConnection<K, V> openConnection(RedisCodec<K, V> codec) {
 		Thread thread = Thread.currentThread();
-		MonumentaRedisSync.getInstance().getLogger().info("Creating a new autocloseable connection on thread " + thread.getId());
+		mLogger.info("Creating a new autocloseable connection on thread " + thread.getId());
 		return mRedisClient.connect(codec);
 	}
 
 	/**
 	 * Asynchronously waits for all specified task futures to complete, then closes the specified connection
+	 *
 	 * @param connection         A connection to be closed when all tasks are complete
 	 * @param redisFutures       A collection of RedisFuture that must complete before closing the connection
 	 * @param completableFutures A collection of CompletableFuture that must complete before closing the connection
@@ -131,7 +129,7 @@ public class RedisAPI {
 		Collection<RedisFuture<?>> redisFutures,
 		Collection<CompletableFuture<?>> completableFutures
 	) {
-		mServer.runAsync(() -> {
+		mScheduler.execute(() -> {
 			for (CompletableFuture<?> future : completableFutures) {
 				try {
 					future.join();
@@ -156,21 +154,24 @@ public class RedisAPI {
 	 * Provides a connection that closes automagically when the executing thread terminates.
 	 * If the current thread already has an open connection, that is returned instead.
 	 * The main thread may be used as well, and is closed when the plugin is disabled.
+	 *
 	 * @return A connection associated with the current thread
 	 */
 	@Deprecated
 	public StatefulRedisConnection<String, String> getMagicallyClosingStringStringConnection() {
 		Thread thread = Thread.currentThread();
 		long threadId = thread.getId();
-		MonumentaRedisSync.getInstance().getLogger().info("Magically closing connection request from thread " + thread.getId());
+		mLogger.info("Magically closing connection request from thread " + thread.getId());
 		return mThreadStringStringConnections.computeIfAbsent(threadId, k -> {
 			StatefulRedisConnection<String, String> connection = mRedisClient.connect();
-			MonumentaRedisSync.getInstance().getLogger().info("Created new magically closing connection request from thread " + thread.getId());
-			mServer.runAsync(() -> {
+			mLogger.info("Created new magically closing connection request from " +
+				"thread " + thread.getId());
+			mScheduler.execute(() -> {
 				Uninterruptibles.joinUninterruptibly(thread);
 				mThreadStringStringConnections.remove(k, connection);
 				connection.close();
-				MonumentaRedisSync.getInstance().getLogger().info("Closed magically closing connection request from thread " + thread.getId());
+				mLogger.info("Closed magically closing connection request from " +
+					"thread " + thread.getId());
 			});
 			return connection;
 		});
@@ -180,6 +181,7 @@ public class RedisAPI {
 	 * Provides a connection that closes automagically when the executing thread terminates.
 	 * If the current thread already has an open connection, that is returned instead.
 	 * The main thread may be used as well, and is closed when the plugin is disabled.
+	 *
 	 * @return A connection associated with the current thread
 	 */
 	@Deprecated
@@ -188,7 +190,7 @@ public class RedisAPI {
 		long threadId = thread.getId();
 		return mThreadStringByteConnections.computeIfAbsent(threadId, k -> {
 			StatefulRedisConnection<String, byte[]> connection = mRedisClient.connect(STRING_BYTE_CODEC);
-			mServer.runAsync(() -> {
+			mScheduler.execute(() -> {
 				Uninterruptibles.joinUninterruptibly(thread);
 				mThreadStringByteConnections.remove(k, connection);
 				connection.close();
@@ -197,18 +199,8 @@ public class RedisAPI {
 		});
 	}
 
-	@Deprecated
-	public RedisCommands<String, String> sync() {
-		return mConnection.sync();
-	}
-
 	public RedisAsyncCommands<String, String> async() {
 		return mConnection.async();
-	}
-
-	@Deprecated
-	public RedisCommands<String, byte[]> syncStringBytes() {
-		return mStringByteConnection.sync();
 	}
 
 	public RedisAsyncCommands<String, byte[]> asyncStringBytes() {
@@ -217,5 +209,9 @@ public class RedisAPI {
 
 	public boolean isReady() {
 		return mConnection.isOpen() && mStringByteConnection.isOpen();
+	}
+
+	public RedisConfig getRedisConfig() {
+		return mRedisConfig;
 	}
 }

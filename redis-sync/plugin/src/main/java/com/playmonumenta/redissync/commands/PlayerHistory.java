@@ -1,5 +1,6 @@
 package com.playmonumenta.redissync.commands;
 
+import com.playmonumenta.redissync.MonumentaRedisSync;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.RedisAPI;
 import dev.jorel.commandapi.CommandAPI;
@@ -34,7 +35,7 @@ public class PlayerHistory {
 	private static void playerHistory(Plugin plugin, CommandSender sender, Player target) {
 		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
 			// ASYNC
-			RedisAPI api = RedisAPI.getInstance();
+			RedisAPI api = MonumentaRedisSync.redisApi();
 			List<String> history = api.async().lrange(MonumentaRedisSyncAPI.getRedisHistoryPath(target), 0, -1).toCompletableFuture().join();
 
 			Bukkit.getScheduler().runTask(plugin, () -> {

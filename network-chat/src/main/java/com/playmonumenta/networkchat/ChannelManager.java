@@ -87,7 +87,7 @@ public class ChannelManager implements Listener {
 	public static void reload() {
 		mForceLoadedChannels.clear();
 
-		RedisAPI.getInstance().async().hget(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_DEFAULT_CHANNELS_KEY)
+		MonumentaRedisSync.getRedisApiInstance().async().hget(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_DEFAULT_CHANNELS_KEY)
 			.thenApply(dataStr -> {
 			if (dataStr != null) {
 				Gson gson = new Gson();
@@ -98,13 +98,13 @@ public class ChannelManager implements Listener {
 		});
 
 		ValueStreamingChannel<String> forceloadStreamingChannel = new ForceloadStreamingChannel();
-		RedisAPI.getInstance().async().smembers(forceloadStreamingChannel, REDIS_FORCELOADED_CHANNEL_PATH);
+		MonumentaRedisSync.getRedisApiInstance().async().smembers(forceloadStreamingChannel, REDIS_FORCELOADED_CHANNEL_PATH);
 	}
 
 	public static void saveDefaultChannels() {
 		JsonObject defaultChannelsJson = mDefaultChannels.toJson();
 
-		RedisAPI.getInstance().async().hset(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_DEFAULT_CHANNELS_KEY, defaultChannelsJson.toString());
+		MonumentaRedisSync.getRedisApiInstance().async().hset(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_DEFAULT_CHANNELS_KEY, defaultChannelsJson.toString());
 
 		JsonObject wrappedConfigJson = new JsonObject();
 		wrappedConfigJson.add(REDIS_DEFAULT_CHANNELS_KEY, defaultChannelsJson);
@@ -258,7 +258,7 @@ public class ChannelManager implements Listener {
 			throw CommandUtils.fail(sender, "Channel " + channelName + " already exists!");
 		}
 		UUID channelId = channel.getUniqueId();
-		RedisAPI.getInstance().async().hset(REDIS_CHANNEL_NAME_TO_UUID_PATH, channelName, channelId.toString());
+		MonumentaRedisSync.getRedisApiInstance().async().hset(REDIS_CHANNEL_NAME_TO_UUID_PATH, channelName, channelId.toString());
 		mChannelNames.put(channelId, channelName);
 		mChannelIdsByName.put(channelName, channelId);
 		mChannels.put(channelId, channel);
@@ -363,7 +363,7 @@ public class ChannelManager implements Listener {
 				String channelIdStr = channelId.toString();
 
 				// Update Redis
-				RedisAsyncCommands<String, String> redisAsync = RedisAPI.getInstance().async();
+				RedisAsyncCommands<String, String> redisAsync = MonumentaRedisSync.getRedisApiInstance().async();
 				redisAsync.hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, newName);
 				redisAsync.hdel(REDIS_CHANNELS_PATH, channelIdStr);
 				redisAsync.srem(REDIS_FORCELOADED_CHANNEL_PATH, channelIdStr);
@@ -388,7 +388,7 @@ public class ChannelManager implements Listener {
 		mChannelNames.put(channel.getUniqueId(), newName);
 
 		saveChannel(channel);
-		RedisAPI.getInstance().async().hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, oldName);
+		MonumentaRedisSync.getRedisApiInstance().async().hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, oldName);
 	}
 
 	public static void renameChannel(String oldName, String newName) throws WrapperCommandSyntaxException {
@@ -414,7 +414,7 @@ public class ChannelManager implements Listener {
 		mChannelNames.put(channel.getUniqueId(), newName);
 
 		saveChannel(channel);
-		RedisAPI.getInstance().async().hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, oldName);
+		MonumentaRedisSync.getRedisApiInstance().async().hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, oldName);
 	}
 
 	public static void changeChannelDescription(String newChannelDescription, String channelName) throws WrapperCommandSyntaxException {
@@ -444,7 +444,7 @@ public class ChannelManager implements Listener {
 		String channelIdStr = channelId.toString();
 
 		// Update Redis
-		RedisAsyncCommands<String, String> redisAsync = RedisAPI.getInstance().async();
+		RedisAsyncCommands<String, String> redisAsync = MonumentaRedisSync.getRedisApiInstance().async();
 		redisAsync.hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, channelName);
 		redisAsync.hdel(REDIS_CHANNELS_PATH, channelIdStr);
 		redisAsync.srem(REDIS_FORCELOADED_CHANNEL_PATH, channelIdStr);
@@ -480,7 +480,7 @@ public class ChannelManager implements Listener {
 	}
 
 	private static void forceLoadChannel(Channel channel) {
-		RedisAPI.getInstance().async().sadd(REDIS_FORCELOADED_CHANNEL_PATH, channel.getUniqueId().toString());
+		MonumentaRedisSync.getRedisApiInstance().async().sadd(REDIS_FORCELOADED_CHANNEL_PATH, channel.getUniqueId().toString());
 		mForceLoadedChannels.add(channel.getUniqueId());
 	}
 
@@ -499,7 +499,7 @@ public class ChannelManager implements Listener {
 
 		// Get the channel from Redis async
 		String channelIdStr = channelId.toString();
-		RedisFuture<String> channelDataFuture = RedisAPI.getInstance().async().hget(REDIS_CHANNELS_PATH, channelIdStr);
+		RedisFuture<String> channelDataFuture = MonumentaRedisSync.getRedisApiInstance().async().hget(REDIS_CHANNELS_PATH, channelIdStr);
 		channelDataFuture.thenApply(channelData -> {
 			loadChannelApply(channelId, channelData);
 			return channelData;
@@ -605,7 +605,7 @@ public class ChannelManager implements Listener {
 		String channelJsonStr = channelJson.toString();
 
 		MMLog.finer("Saving channel " + channelIdStr + ".");
-		RedisAsyncCommands<String, String> redisAsync = RedisAPI.getInstance().async();
+		RedisAsyncCommands<String, String> redisAsync = MonumentaRedisSync.getRedisApiInstance().async();
 		redisAsync.hset(REDIS_CHANNEL_NAME_TO_UUID_PATH, channelName, channelIdStr);
 		redisAsync.hset(REDIS_CHANNELS_PATH, channelIdStr, channelJsonStr);
 
@@ -648,7 +648,7 @@ public class ChannelManager implements Listener {
 	}
 
 	private static void loadAllChannelNames() {
-		RedisFuture<Map<String, String>> channelDataFuture = RedisAPI.getInstance().async().hgetall(REDIS_CHANNEL_NAME_TO_UUID_PATH);
+		RedisFuture<Map<String, String>> channelDataFuture = MonumentaRedisSync.getRedisApiInstance().async().hgetall(REDIS_CHANNEL_NAME_TO_UUID_PATH);
 		channelDataFuture.thenApply(channelStrIdsByName -> {
 			mChannelIdsByName.clear();
 			mChannelNames.clear();

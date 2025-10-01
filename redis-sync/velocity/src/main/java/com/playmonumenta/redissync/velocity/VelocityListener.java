@@ -1,6 +1,5 @@
-package com.playmonumenta.redissync;
+package com.playmonumenta.redissync.velocity;
 
-import com.playmonumenta.redissync.config.CommonConfig;
 import com.playmonumenta.redissync.config.ProxyConfig;
 import com.velocitypowered.api.event.PostOrder;
 import com.velocitypowered.api.event.Subscribe;
@@ -35,7 +34,7 @@ public class VelocityListener {
 		@Nullable String storedServerName = null;
 
 		try {
-			storedServerName = RedisAPI.getInstance().async().hget(locationsKey(), player.getUniqueId().toString()).get(6, TimeUnit.SECONDS);
+			storedServerName = MonumentaRedisSync.redisApi().async().hget(locationsKey(), player.getUniqueId().toString()).get(6, TimeUnit.SECONDS);
 		} catch (Exception ex) {
 			mPlugin.mLogger.warn("Exception while getting player location for '{}': {}", player.getUsername(), ex.getMessage(), ex);
 		}
@@ -90,7 +89,7 @@ public class VelocityListener {
 		if (reconnectServer == null || ProxyConfig.getExcludedServers().contains(reconnectServer)) {
 			return;
 		}
-		RedisAPI.getInstance().async().hset(locationsKey(), player.getUniqueId().toString(), reconnectServer);
+		MonumentaRedisSync.redisApi().async().hset(locationsKey(), player.getUniqueId().toString(), reconnectServer);
 	}
 
 	@Subscribe
@@ -100,7 +99,7 @@ public class VelocityListener {
 		String name = player.getUsername();
 		UUID uuid = player.getUniqueId();
 
-		RedisAsyncCommands<String, String> async = RedisAPI.getInstance().async();
+		RedisAsyncCommands<String, String> async = MonumentaRedisSync.redisApi().async();
 		async.multi();
 		async.hset(uuidToNamePath, uuid.toString(), name);
 		async.hset(nameToUUIDPath, name, uuid.toString());
@@ -108,6 +107,6 @@ public class VelocityListener {
 	}
 
 	private String locationsKey() {
-		return String.format("%s:bungee:locations", CommonConfig.getServerDomain());
+		return String.format("%s:bungee:locations", RedisConfig.getServerDomain());
 	}
 }

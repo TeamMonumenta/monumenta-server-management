@@ -5,7 +5,7 @@ repositories {
 dependencies {
 	compileOnly(project(":network-relay"))
 	compileOnly(libs.commandapi)
-	implementation(project(":redis-sync:core"))
+	implementation(project(":redis-sync:common"))
 	annotationProcessor("com.floweytf.coro:ap:0.0.1-SNAPSHOT")
 	implementation("com.floweytf.coro:coro:0.0.1-SNAPSHOT")
 }

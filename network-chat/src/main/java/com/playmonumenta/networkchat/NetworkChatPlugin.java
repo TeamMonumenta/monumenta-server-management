@@ -139,7 +139,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 		getServer().getPluginManager().registerEvents(PlayerStateManager.getInstance(), this);
 		getServer().getPluginManager().registerEvents(this, this);
 
-		RedisAPI.getInstance().async().hget(REDIS_CONFIG_PATH, REDIS_MESSAGE_COLORS_KEY)
+		MonumentaRedisSync.getRedisApiInstance().async().hget(REDIS_CONFIG_PATH, REDIS_MESSAGE_COLORS_KEY)
 			.thenApply(dataStr -> {
 			if (dataStr != null) {
 				Gson gson = new Gson();
@@ -149,7 +149,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			return dataStr;
 		});
 
-		RedisAPI.getInstance().async().hget(REDIS_CONFIG_PATH, REDIS_MESSAGE_FORMATS_KEY)
+		MonumentaRedisSync.getRedisApiInstance().async().hget(REDIS_CONFIG_PATH, REDIS_MESSAGE_FORMATS_KEY)
 			.thenApply(dataStr -> {
 			if (dataStr != null) {
 				Gson gson = new Gson();
@@ -168,7 +168,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			return dataStr;
 		});
 
-		RedisAPI.getInstance().async().hget(REDIS_CONFIG_PATH, REDIS_CHAT_FILTERS_KEY)
+		MonumentaRedisSync.getRedisApiInstance().async().hget(REDIS_CONFIG_PATH, REDIS_CHAT_FILTERS_KEY)
 			.thenApply(dataStr -> {
 			if (dataStr != null) {
 				Gson gson = new Gson();
@@ -179,7 +179,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			return dataStr;
 		});
 
-		RedisAPI.getInstance().async().hget(REDIS_CONFIG_PATH, REDIS_CHAT_MOD_LOG_KEY)
+		MonumentaRedisSync.getRedisApiInstance().async().hget(REDIS_CONFIG_PATH, REDIS_CHAT_MOD_LOG_KEY)
 			.thenApply(dataStr -> {
 				if (dataStr != null) {
 					Bukkit.getServer().getScheduler().runTask(INSTANCE,
@@ -244,7 +244,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			dataJson.addProperty(id, MessagingUtils.colorToString(color));
 		}
 
-		RedisAPI.getInstance().async().hset(REDIS_CONFIG_PATH, REDIS_MESSAGE_COLORS_KEY, dataJson.toString());
+		MonumentaRedisSync.getRedisApiInstance().async().hset(REDIS_CONFIG_PATH, REDIS_MESSAGE_COLORS_KEY, dataJson.toString());
 
 		JsonObject wrappedConfigJson = new JsonObject();
 		wrappedConfigJson.add(REDIS_MESSAGE_COLORS_KEY, dataJson);
@@ -287,7 +287,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			dataJson.addProperty(id, format);
 		}
 
-		RedisAPI.getInstance().async().hset(REDIS_CONFIG_PATH, REDIS_MESSAGE_FORMATS_KEY, dataJson.toString());
+		MonumentaRedisSync.getRedisApiInstance().async().hset(REDIS_CONFIG_PATH, REDIS_MESSAGE_FORMATS_KEY, dataJson.toString());
 
 		JsonObject wrappedConfigJson = new JsonObject();
 		wrappedConfigJson.add(REDIS_MESSAGE_FORMATS_KEY, dataJson);
@@ -343,7 +343,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 	public static void saveGlobalFilter() {
 		JsonObject dataJson = mGlobalChatFilter.toJson();
 
-		RedisAPI.getInstance().async().hset(REDIS_CONFIG_PATH, REDIS_CHAT_FILTERS_KEY, dataJson.toString());
+		MonumentaRedisSync.getRedisApiInstance().async().hset(REDIS_CONFIG_PATH, REDIS_CHAT_FILTERS_KEY, dataJson.toString());
 
 		JsonObject wrappedConfigJson = new JsonObject();
 		wrappedConfigJson.add(REDIS_CHAT_FILTERS_KEY, dataJson);

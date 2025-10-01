@@ -1,7 +1,6 @@
 package com.playmonumenta.redissync.adapters;
 
 import com.google.common.collect.ImmutableMap;
-import com.playmonumenta.redissync.player.PlayerPos;
 import com.playmonumenta.redissync.player.WorldData;
 import it.unimi.dsi.fastutil.Pair;
 import java.io.IOException;

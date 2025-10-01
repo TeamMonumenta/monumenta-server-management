@@ -3,11 +3,8 @@ package com.playmonumenta.redissync;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
 import com.google.gson.Gson;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
-import com.playmonumenta.redissync.config.CommonConfig;
 import com.playmonumenta.redissync.event.PlayerServerTransferEvent;
 import com.playmonumenta.redissync.utils.Trie;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
@@ -16,7 +13,6 @@ import io.lettuce.core.LettuceFutures;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.TransactionResult;
 import io.lettuce.core.api.async.RedisAsyncCommands;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -41,77 +37,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Score;
-import org.bukkit.util.Vector;
 import org.jetbrains.annotations.Nullable;
 
 public class MonumentaRedisSyncAPI {
-	public static class RedisPlayerData {
-		private final UUID mUUID;
-		private Object mNbtTagCompoundData;
-		private String mAdvancements;
-		private String mScores;
-		private String mPluginData;
-		private String mHistory;
-
-		public RedisPlayerData(UUID uuid, Object nbtTagCompoundData, String advancements,
-		                       String scores, String pluginData, String history) {
-			mUUID = uuid;
-			mNbtTagCompoundData = nbtTagCompoundData;
-			mAdvancements = advancements;
-			mScores = scores;
-			mPluginData = pluginData;
-			mHistory = history;
-		}
-
-		public UUID getUniqueId() {
-			return mUUID;
-		}
-
-		public Object getNbtTagCompoundData() {
-			return mNbtTagCompoundData;
-		}
-
-		public String getAdvancements() {
-			return mAdvancements;
-		}
-
-		public String getScores() {
-			return mScores;
-		}
-
-		public String getPluginData() {
-			return mPluginData;
-		}
-
-		public String getHistory() {
-			return mHistory;
-		}
-
-		public UUID getmUUID() {
-			return mUUID;
-		}
-
-		public void setNbtTagCompoundData(Object nbtTagCompoundData) {
-			this.mNbtTagCompoundData = nbtTagCompoundData;
-		}
-
-		public void setAdvancements(String advancements) {
-			this.mAdvancements = advancements;
-		}
-
-		public void setScores(String scores) {
-			this.mScores = scores;
-		}
-
-		public void setPluginData(String pluginData) {
-			this.mPluginData = pluginData;
-		}
-
-		public void setHistory(String history) {
-			this.mHistory = history;
-		}
-	}
-
 	public static final int TIMEOUT_SECONDS = 10;
 	public static final ArgumentSuggestions<CommandSender> SUGGESTIONS_ALL_CACHED_PLAYER_NAMES = ArgumentSuggestions.strings((info) ->
 		getAllCachedPlayerNames().toArray(String[]::new));
@@ -130,20 +58,20 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static CompletableFuture<String> uuidToName(UUID uuid) {
-		return RedisAPI.getInstance().async().hget("uuid2name", uuid.toString()).toCompletableFuture();
+		return MonumentaRedisSync.redisApi().async().hget("uuid2name", uuid.toString()).toCompletableFuture();
 	}
 
 	public static CompletableFuture<UUID> nameToUUID(String name) {
-		return RedisAPI.getInstance().async().hget("name2uuid", name).thenApply((uuid) -> (uuid == null || uuid.isEmpty()) ? null : UUID.fromString(uuid)).toCompletableFuture();
+		return MonumentaRedisSync.redisApi().async().hget("name2uuid", name).thenApply((uuid) -> (uuid == null || uuid.isEmpty()) ? null : UUID.fromString(uuid)).toCompletableFuture();
 	}
 
 	public static CompletableFuture<Set<String>> getAllPlayerNames() {
-		RedisFuture<Map<String, String>> future = RedisAPI.getInstance().async().hgetall("name2uuid");
+		RedisFuture<Map<String, String>> future = MonumentaRedisSync.redisApi().async().hgetall("name2uuid");
 		return future.thenApply(Map::keySet).toCompletableFuture();
 	}
 
 	public static CompletableFuture<Set<UUID>> getAllPlayerUUIDs() {
-		RedisFuture<Map<String, String>> future = RedisAPI.getInstance().async().hgetall("uuid2name");
+		RedisFuture<Map<String, String>> future = MonumentaRedisSync.redisApi().async().hgetall("uuid2name");
 		return future.thenApply((data) -> data.keySet().stream().map(UUID::fromString).collect(Collectors.toSet())).toCompletableFuture();
 	}
 
@@ -183,10 +111,6 @@ public class MonumentaRedisSyncAPI {
 		return mNameToUuidTrie.suggestions(currentInput, maxSuggestions);
 	}
 
-	public static boolean isPlayerTransferring(Player player) {
-		return DataEventListener.isPlayerTransferring(player);
-	}
-
 	public static void sendPlayer(Player player, String target) throws Exception {
 		sendPlayer(player, target, null);
 	}
@@ -209,7 +133,7 @@ public class MonumentaRedisSyncAPI {
 
 		long startTime = System.currentTimeMillis();
 
-		if (target.equalsIgnoreCase(CommonConfig.getShardName())) {
+		if (target.equalsIgnoreCase(MonumentaRedisSync.config().getShardName())) {
 			player.sendMessage(Component.text("Can not transfer to the same server you are already on", NamedTextColor.RED));
 			return;
 		}
@@ -254,7 +178,7 @@ public class MonumentaRedisSyncAPI {
 		DataEventListener.waitForPlayerToSaveThenAsync(player, () -> {
 			List<RedisFuture<?>> futures = new ArrayList<>();
 
-			RedisAPI api = RedisAPI.getInstance();
+			RedisAPI api = MonumentaRedisSync.redisApi();
 
 			String saveName = name;
 			if (saveName == null) {
@@ -308,7 +232,7 @@ public class MonumentaRedisSyncAPI {
 		DataEventListener.waitForPlayerToSaveThenAsync(player, () -> {
 			List<RedisFuture<?>> futures = new ArrayList<>();
 
-			RedisAPI api = RedisAPI.getInstance();
+			RedisAPI api = MonumentaRedisSync.redisApi();
 
 			String saveName = name;
 			if (saveName == null) {
@@ -359,7 +283,7 @@ public class MonumentaRedisSyncAPI {
 	public static void stashInfo(Player player, @Nullable String name) throws Exception {
 		MonumentaRedisSync mrs = MonumentaRedisSync.getInstance();
 
-		RedisAPI api = RedisAPI.getInstance();
+		RedisAPI api = MonumentaRedisSync.redisApi();
 
 		String saveName;
 		if (name != null) {
@@ -414,7 +338,7 @@ public class MonumentaRedisSyncAPI {
 		DataEventListener.waitForPlayerToSaveThenAsync(player, () -> {
 			List<RedisFuture<?>> futures = new ArrayList<>();
 
-			RedisAPI api = RedisAPI.getInstance();
+			RedisAPI api = MonumentaRedisSync.redisApi();
 
 			try {
 				/* Read the history element and push it to the player's data */
@@ -471,7 +395,7 @@ public class MonumentaRedisSyncAPI {
 		DataEventListener.waitForPlayerToSaveThenAsync(loadTo, () -> {
 			List<RedisFuture<?>> futures = new ArrayList<>();
 
-			RedisAPI api = RedisAPI.getInstance();
+			RedisAPI api = MonumentaRedisSync.redisApi();
 
 			try {
 				/* Read the history element and push it to the player's data */
@@ -510,96 +434,12 @@ public class MonumentaRedisSyncAPI {
 		});
 	}
 
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<String> getRemoteData(UUID uuid, String key) throws Exception {
-		return RemoteDataAPI.get(uuid, key);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Boolean> setRemoteData(UUID uuid, String key, String value) throws Exception {
-		return RemoteDataAPI.set(uuid, key, value);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Long> incrementRemoteData(UUID uuid, String key, int incBy) throws Exception {
-		return RemoteDataAPI.increment(uuid, key, incBy);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Boolean> delRemoteData(UUID uuid, String key) throws Exception {
-		return RemoteDataAPI.del(uuid, key);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, String>> getAllRemoteData(UUID uuid) throws Exception {
-		return remoteDataGetAll(uuid);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<String> remoteDataGet(UUID uuid, String key) {
-		return RemoteDataAPI.get(uuid, key);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, String>> remoteDataGetMulti(UUID uuid, String... keys) {
-		return RemoteDataAPI.getMulti(uuid, keys);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Boolean> remoteDataSet(UUID uuid, String key, String value) {
-		return RemoteDataAPI.set(uuid, key, value);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Long> remoteDataIncrement(UUID uuid, String key, int incBy) {
-		return RemoteDataAPI.increment(uuid, key, incBy);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Boolean> remoteDataDel(UUID uuid, String key) {
-		return RemoteDataAPI.del(uuid, key);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, String>> remoteDataGetAll(UUID uuid) {
-		return RemoteDataAPI.getAll(uuid);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static String getRedisRemoteDataPath(Player player) {
-		return RemoteDataAPI.getRedisPath(player.getUniqueId());
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static String getRedisRemoteDataPath(UUID uuid) {
-		return RemoteDataAPI.getRedisPath(uuid);
-	}
-
-	/** @deprecated - use ConfigAPI */
-	@Deprecated
-	public static String getServerDomain() {
-		return CommonConfig.getServerDomain();
-	}
-
 	public static String getRedisDataPath(Player player) {
 		return getRedisDataPath(player.getUniqueId());
 	}
 
 	public static String getRedisDataPath(UUID uuid) {
-		return String.format("%s:playerdata:%s:data", CommonConfig.getServerDomain(), uuid.toString());
+		return String.format("%s:playerdata:%s:data", MonumentaRedisSync.config().getServerDomain(), uuid.toString());
 	}
 
 	public static String getRedisHistoryPath(Player player) {
@@ -607,7 +447,7 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static String getRedisHistoryPath(UUID uuid) {
-		return String.format("%s:playerdata:%s:history", CommonConfig.getServerDomain(), uuid.toString());
+		return String.format("%s:playerdata:%s:history", MonumentaRedisSync.config().getServerDomain(), uuid.toString());
 	}
 
 	public static String getRedisPerShardDataPath(Player player) {
@@ -615,7 +455,7 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static String getRedisPerShardDataPath(UUID uuid) {
-		return String.format("%s:playerdata:%s:sharddata", CommonConfig.getServerDomain(), uuid.toString());
+		return String.format("%s:playerdata:%s:sharddata", MonumentaRedisSync.config().getServerDomain(), uuid.toString());
 	}
 
 	public static String getRedisPerShardDataWorldKey(World world) {
@@ -632,7 +472,7 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static String getRedisPluginDataPath(UUID uuid) {
-		return String.format("%s:playerdata:%s:plugins", CommonConfig.getServerDomain(), uuid.toString());
+		return String.format("%s:playerdata:%s:plugins", MonumentaRedisSync.config().getServerDomain(), uuid.toString());
 	}
 
 	public static String getRedisAdvancementsPath(Player player) {
@@ -640,7 +480,7 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static String getRedisAdvancementsPath(UUID uuid) {
-		return String.format("%s:playerdata:%s:advancements", CommonConfig.getServerDomain(), uuid.toString());
+		return String.format("%s:playerdata:%s:advancements", MonumentaRedisSync.config().getServerDomain(), uuid.toString());
 	}
 
 	public static String getRedisScoresPath(Player player) {
@@ -648,15 +488,15 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static String getRedisScoresPath(UUID uuid) {
-		return String.format("%s:playerdata:%s:scores", CommonConfig.getServerDomain(), uuid.toString());
+		return String.format("%s:playerdata:%s:scores", MonumentaRedisSync.config().getServerDomain(), uuid.toString());
 	}
 
 	public static String getStashPath() {
-		return String.format("%s:stash", CommonConfig.getServerDomain());
+		return String.format("%s:stash", MonumentaRedisSync.config().getServerDomain());
 	}
 
 	public static String getStashListPath() {
-		return String.format("%s:stashlist", CommonConfig.getServerDomain());
+		return String.format("%s:stashlist", MonumentaRedisSync.config().getServerDomain());
 	}
 
 	public static String getTimeDifferenceSince(long compareTime) {
@@ -753,243 +593,6 @@ public class MonumentaRedisSyncAPI {
 		return pluginDataElement.getAsJsonObject();
 	}
 
-	public static class PlayerWorldData {
-		// Other sharddata fields that are not returned here: {"SpawnDimension":"minecraft:overworld","Dimension":0,"Paper.Origin":[-1450.0,241.0,-1498.0]}"}
-		// Note: This list might be out of date
-
-		private final Location mSpawnLoc; // {"SpawnX":-1450,"SpawnY":241,"SpawnZ":-1498,"SpawnAngle":0.0}
-		private final Location mPlayerLoc; // {"Pos":[-1280.5,95.0,5369.7001953125],"Rotation":[-358.9,2.1]}
-		private final Vector mMotion; // {"Motion":[0.0,-0.0784000015258789,0.0]}
-		private final boolean mSpawnForced; // {"SpawnForced":true}
-		private final boolean mFlying; // {"flying":false}
-		private final boolean mFallFlying; // {"FallFlying":false}
-		private final float mFallDistance; // {"FallDistance":0.0}
-		private final boolean mOnGround; // {"OnGround":true}
-
-		private PlayerWorldData(Location spawnLoc, Location playerLoc, Vector motion, boolean spawnForced, boolean flying, boolean fallFlying, float fallDistance, boolean onGround) {
-			mSpawnLoc = spawnLoc;
-			mPlayerLoc = playerLoc;
-			mMotion = motion;
-			mSpawnForced = spawnForced;
-			mFlying = flying;
-			mFallFlying = fallFlying;
-			mFallDistance = fallDistance;
-			mOnGround = onGround;
-		}
-
-		public Location getSpawnLoc() {
-			return mSpawnLoc;
-		}
-
-		public Location getPlayerLoc() {
-			return mPlayerLoc;
-		}
-
-		public Vector getMotion() {
-			return mMotion;
-		}
-
-		public boolean getFallFlying() {
-			return mFallFlying;
-		}
-
-		public double getFallDistance() {
-			return mFallDistance;
-		}
-
-		public boolean getOnGround() {
-			return mOnGround;
-		}
-
-		public void applyToPlayer(Player player) {
-			player.teleport(mPlayerLoc);
-			player.setVelocity(mMotion);
-			player.setFlying(mFlying && player.getAllowFlight());
-			player.setGliding(mFallFlying);
-			player.setFallDistance(mFallDistance);
-			player.setBedSpawnLocation(mSpawnLoc, mSpawnForced);
-		}
-
-		private static PlayerWorldData fromJson(@Nullable String jsonStr, World world) {
-			// Defaults to world spawn
-			Location spawnLoc = world.getSpawnLocation();
-			Location playerLoc = spawnLoc.clone();
-			Vector motion = new Vector(0, 0, 0);
-			boolean spawnForced = true;
-			boolean flying = false;
-			boolean fallFlying = false;
-			float fallDistance = 0;
-			boolean onGround = true;
-
-			if (jsonStr != null && !jsonStr.isEmpty()) {
-				try {
-					JsonObject obj = new Gson().fromJson(jsonStr, JsonObject.class);
-					if (obj.has("SpawnX")) {
-						spawnLoc.setX(obj.get("SpawnX").getAsDouble());
-					}
-					if (obj.has("SpawnY")) {
-						spawnLoc.setY(obj.get("SpawnY").getAsDouble());
-					}
-					if (obj.has("SpawnZ")) {
-						spawnLoc.setZ(obj.get("SpawnZ").getAsDouble());
-					}
-					if (obj.has("Pos")) {
-						JsonArray arr = obj.get("Pos").getAsJsonArray();
-						playerLoc.setX(arr.get(0).getAsDouble());
-						playerLoc.setY(arr.get(1).getAsDouble());
-						playerLoc.setZ(arr.get(2).getAsDouble());
-					}
-					if (obj.has("Rotation")) {
-						JsonArray arr = obj.get("Rotation").getAsJsonArray();
-						playerLoc.setYaw(arr.get(0).getAsFloat());
-						playerLoc.setPitch(arr.get(1).getAsFloat());
-					}
-					if (obj.has("Motion")) {
-						JsonArray arr = obj.get("Motion").getAsJsonArray();
-						motion = new Vector(arr.get(0).getAsDouble(), arr.get(1).getAsDouble(), arr.get(2).getAsDouble());
-					}
-					if (obj.has("SpawnForced")) {
-						spawnForced = obj.get("SpawnForced").getAsBoolean();
-					}
-					if (obj.has("flying")) {
-						flying = obj.get("flying").getAsBoolean();
-					}
-					if (obj.has("FallFlying")) {
-						fallFlying = obj.get("FallFlying").getAsBoolean();
-					}
-					if (obj.has("FallDistance")) {
-						fallDistance = obj.get("FallDistance").getAsFloat();
-					}
-					if (obj.has("OnGround")) {
-						onGround = obj.get("OnGround").getAsBoolean();
-					}
-				} catch (Exception ex) {
-					ex.printStackTrace();
-				}
-			}
-
-			return new PlayerWorldData(spawnLoc, playerLoc, motion, spawnForced, flying, fallFlying, fallDistance, onGround);
-		}
-	}
-
-	/**
-	 * Gets player location data for a world
-	 * <p>
-	 * Only valid if the player is currently on this shard.
-	 *
-	 * @param player  Player's to get data for
-	 * @param world   World to get data for
-	 *
-	 * @return plugin data for this identifier (or null if it doesn't exist or player isn't online)
-	 */
-	public static PlayerWorldData getPlayerWorldData(Player player, World world) {
-		Map<String, String> shardData = DataEventListener.getPlayerShardData(player.getUniqueId());
-		if (shardData == null || shardData.isEmpty()) {
-			return PlayerWorldData.fromJson(null, world);
-		}
-
-		String worldShardData = shardData.get(getRedisPerShardDataWorldKey(world));
-		if (worldShardData == null || worldShardData.isEmpty()) {
-			return PlayerWorldData.fromJson(null, world);
-		}
-
-		return PlayerWorldData.fromJson(worldShardData, world);
-	}
-
-	/** @deprecated - use LeaderboardAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, Integer>> getLeaderboard(String objective, long start, long stop, boolean ascending) {
-		return LeaderboardAPI.get(objective, start, stop, ascending);
-	}
-
-	/** @deprecated - use LeaderboardAPI */
-	@Deprecated
-	public static void updateLeaderboardAsync(String objective, String name, long value) {
-		LeaderboardAPI.updateAsync(objective, name, value);
-	}
-
-	/** @deprecated - use LeaderboardAPI */
-	@Deprecated
-	public static String getRedisLeaderboardPath(String objective) {
-		return LeaderboardAPI.getRedisPath(objective);
-	}
-
-	/** Future returns non-null if successfully loaded data, null on error */
-	@Nullable
-	private static RedisPlayerData transformPlayerData(MonumentaRedisSync mrs, UUID uuid, TransactionResult result) {
-		if (result.isEmpty() || result.get(0) == null) {
-			mrs.getLogger().warning("Failed to retrieve player data; likely player didn't make it past the tutorial");
-			return null;
-		}
-
-		if (result.size() != 5) {
-			mrs.getLogger().severe("Failed to retrieve player data; only " + result.size() + " / 5 expected data elements retrieved");
-			return null;
-		}
-
-		try {
-			String advancements;
-			String scores;
-			String pluginData;
-			String history;
-
-			byte[] data = result.get(0);
-
-			if (result.get(1) == null) {
-				mrs.getLogger().severe("Player advancements data was missing or corrupted and has been reset");
-				advancements = "{}";
-			} else {
-				advancements = new String(result.get(1), StandardCharsets.UTF_8);
-			}
-
-			if (result.get(2) == null) {
-				mrs.getLogger().severe("Player scores data was missing or corrupted and has been reset");
-				scores = "{}";
-			} else {
-				scores = new String(result.get(2), StandardCharsets.UTF_8);
-			}
-
-			if (result.get(3) == null) {
-				mrs.getLogger().warning("Player pluginData was missing or corrupted and has been reset");
-				pluginData = "{}";
-			} else {
-				pluginData = new String(result.get(3), StandardCharsets.UTF_8);
-			}
-
-			if (result.get(4) == null) {
-				mrs.getLogger().warning("Player history data was missing or corrupted and has been reset");
-				history = "UpdateAllPlayers|" + System.currentTimeMillis() + "|unknown";
-			} else {
-				history = new String(result.get(4), StandardCharsets.UTF_8);
-			}
-
-			return new RedisPlayerData(uuid, mrs.getVersionAdapter().retrieveSaveData(data, new JsonObject()), advancements, scores, pluginData, history);
-		} catch (Exception e) {
-			mrs.getLogger().severe("Failed to parse player data: " + e.getMessage());
-			e.printStackTrace();
-			return null;
-		}
-	}
-
-	public static CompletableFuture<RedisPlayerData> getOfflinePlayerData(UUID uuid) throws Exception {
-		if (Bukkit.getPlayer(uuid) != null) {
-			throw new Exception("Player " + uuid + " is online");
-		}
-
-		MonumentaRedisSync mrs = MonumentaRedisSync.getInstance();
-
-		RedisAsyncCommands<String, byte[]> commands = RedisAPI.getInstance().asyncStringBytes();
-		commands.multi();
-
-		commands.lindex(getRedisDataPath(uuid), 0);
-		commands.lindex(getRedisAdvancementsPath(uuid), 0);
-		commands.lindex(getRedisScoresPath(uuid), 0);
-		commands.lindex(getRedisPluginDataPath(uuid), 0);
-		commands.lindex(getRedisHistoryPath(uuid), 0);
-
-		return commands.exec().thenApply((TransactionResult result) -> transformPlayerData(mrs, uuid, result)).toCompletableFuture();
-	}
-
 	/**
 	 * Gets a map of all player scoreboard values.
 	 * <p>
@@ -1015,7 +618,7 @@ public class MonumentaRedisSyncAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
+		RedisAsyncCommands<String, String> commands = MonumentaRedisSync.redisApi().async();
 
 		commands.lindex(getRedisScoresPath(uuid), 0)
 			.thenApply(
@@ -1040,85 +643,6 @@ public class MonumentaRedisSyncAPI {
 
 		return true;
 	}
-
-	/** Future returns true if successfully committed, false if not */
-	public static CompletableFuture<Boolean> saveOfflinePlayerData(RedisPlayerData data) throws Exception {
-		MonumentaRedisSync mrs = MonumentaRedisSync.getInstance();
-
-		RedisAsyncCommands<String, byte[]> commands = RedisAPI.getInstance().asyncStringBytes();
-		commands.multi();
-
-		SaveData splitData = mrs.getVersionAdapter().extractSaveData(data.getNbtTagCompoundData(), null);
-		commands.lpush(getRedisDataPath(data.getUniqueId()), splitData.getData());
-		commands.lpush(getRedisAdvancementsPath(data.getUniqueId()), data.getAdvancements().getBytes(StandardCharsets.UTF_8));
-		commands.lpush(getRedisScoresPath(data.getUniqueId()), data.getScores().getBytes(StandardCharsets.UTF_8));
-		commands.lpush(getRedisPluginDataPath(data.getUniqueId()), data.getPluginData().getBytes(StandardCharsets.UTF_8));
-		commands.lpush(getRedisHistoryPath(data.getUniqueId()), data.getHistory().getBytes(StandardCharsets.UTF_8));
-
-		return commands.exec().thenApply((TransactionResult result) -> transformPlayerSaveResult(mrs, result)).toCompletableFuture();
-	}
-
-	/* *******************************************************************************
-	 * rboard API
-	 */
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static String getRedisRboardPath(String name) throws Exception {
-		return RBoardAPI.getRedisPath(name);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Long> rboardSet(String name, Map<String, String> data) throws Exception {
-		return RBoardAPI.set(name, data);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Long> rboardAdd(String name, String key, long amount) throws Exception {
-		return RBoardAPI.add(name, key, amount);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, String>> rboardGet(String name, String... keys) throws Exception {
-		return RBoardAPI.get(name, keys);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, String>> rboardGetAndReset(String name, String... keys) throws Exception {
-		return RBoardAPI.getAndReset(name, keys);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<List<String>> rboardGetKeys(String name) throws Exception {
-		return RBoardAPI.getKeys(name);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, String>> rboardGetAll(String name) throws Exception {
-		return RBoardAPI.getAll(name);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Long> rboardReset(String name, String... keys) throws Exception {
-		return RBoardAPI.reset(name, keys);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Long> rboardResetAll(String name) throws Exception {
-		return RBoardAPI.resetAll(name);
-	}
-
-	/*
-	 * rboard API
-	 *********************************************************************************/
 
 	/**
 	 * If MonumentaNetworkRelay is installed, returns a list of all other shard names

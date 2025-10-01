@@ -5,6 +5,7 @@ import com.destroystokyo.paper.event.player.PlayerAdvancementDataSaveEvent;
 import com.destroystokyo.paper.event.player.PlayerDataLoadEvent;
 import com.destroystokyo.paper.event.player.PlayerDataSaveEvent;
 import com.google.common.collect.ImmutableMap;
+import com.playmonumenta.redissync.MonumentaRedisSync;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.config.BukkitConfig;
@@ -25,17 +26,19 @@ class PlayerDataListener implements Listener {
 	private final Logger mLogger;
 	private final PlayerDataManager mPlayerDataManager;
 	private final VersionAdapter mVersionAdapter;
+	private final BukkitConfig mConfig;
 
-	PlayerDataListener(Logger logger, PlayerDataManager mPlayerDataManager, VersionAdapter mVersionAdapter) {
+	PlayerDataListener(Logger logger, PlayerDataManager manager, MonumentaRedisSync plugin) {
 		this.mLogger = logger;
-		this.mPlayerDataManager = mPlayerDataManager;
-		this.mVersionAdapter = mVersionAdapter;
+		this.mPlayerDataManager = manager;
+		this.mVersionAdapter = plugin.getVersionAdapter();
+		this.mConfig = plugin.getBukkitConfig();
 	}
 
 	private void handleDataEventCommon(PlayerEvent event, Consumer<LocalRedisPlayer> handler) {
 		Player player = event.getPlayer();
 
-		if (BukkitConfig.getSavingDisabled()) {
+		if (mConfig.isSavingDisabled()) {
 			return;
 		}
 
@@ -98,7 +101,7 @@ class PlayerDataListener implements Listener {
 				mVersionAdapter.resetPlayerScores(player.getName(), Bukkit.getScoreboardManager().getMainScoreboard());
 				ScoreboardUtils.loadFromJsonObject(player, data.scoreData());
 
-				ShardData shardData = data.shardData().get(BukkitConfig.getShardName());
+				ShardData shardData = data.shardData().get(mConfig.getShardName());
 
 				if (shardData == null) {
 					mLogger.fine("Player '%s' has never been to this shard before".formatted(player.getName()));
@@ -131,7 +134,7 @@ class PlayerDataListener implements Listener {
 
 				event.setData(mVersionAdapter.retrieveSaveData(data.playerData(), worldData));
 				localRedisPlayer.currentPlayerData(
-					data.withShardData(BukkitConfig.getShardName(), shardData.withWorld(playerWorld, worldData))
+					data.withShardData(mConfig.getShardName(), shardData.withWorld(playerWorld, worldData))
 				);
 				localRedisPlayer.savePlayerData().begin();
 			} catch (Exception e) {
@@ -162,7 +165,7 @@ class PlayerDataListener implements Listener {
 				// save playerdata
 				final var playerData = mVersionAdapter.extractSaveData(event.getData());
 
-				var shardData = localRedisPlayer.currentPlayerData().shardData().get(BukkitConfig.getShardName());
+				var shardData = localRedisPlayer.currentPlayerData().shardData().get(mConfig.getShardName());
 
 				if (shardData == null) {
 					mLogger.warning("player %s missing shard data at save".formatted(player.getName()));
@@ -174,7 +177,7 @@ class PlayerDataListener implements Listener {
 				final var finalShardData = shardData;
 				localRedisPlayer.currentPlayerData(data ->
 					data.withPlayerData(playerData.first())
-						.withShardData(BukkitConfig.getShardName(), finalShardData)
+						.withShardData(mConfig.getShardName(), finalShardData)
 						.withScores(scores)
 				);
 

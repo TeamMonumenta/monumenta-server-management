@@ -2,21 +2,20 @@ package com.playmonumenta.redissync.player;
 
 import com.floweytf.coro.Co;
 import com.floweytf.coro.annotations.Coroutine;
+import com.floweytf.coro.concepts.Awaitable;
 import com.floweytf.coro.concepts.Task;
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
-import com.playmonumenta.redissync.RedisAPI;
 import com.playmonumenta.redissync.utils.Util;
+import io.lettuce.core.api.async.RedisAsyncCommands;
 import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-
-import static com.floweytf.coro.support.Awaitables.awaitable;
 
 /**
  * @param playerData   Read-only view of player data
@@ -34,7 +33,7 @@ public record PlayerData(
 ) {
 	private static JsonObject bytesToJson(byte[] data) {
 		return PlayerDataManager.GSON.fromJson(new InputStreamReader(new ByteArrayInputStream(data)),
-            JsonObject.class);
+			JsonObject.class);
 	}
 
 	private static <T> T bytesToJson(byte[] data, TypeToken<T> token) {
@@ -66,9 +65,9 @@ public record PlayerData(
 	}
 
 	@Coroutine
-	static Task<PlayerData> load(String namespace, UUID uuid, UUID blobId) {
-		final var key = "%s:playerdata:%s:%s".formatted(namespace, uuid, blobId);
-		final var result = Co.await(awaitable(RedisAPI.getInstance().asyncStringBytes().hgetall(key)));
+	static Task<PlayerData> load(RedisAsyncCommands<String, byte[]> redis, String ns, UUID uuid, UUID blobId) {
+		final var key = "%s:playerdata:%s:%s".formatted(ns, uuid, blobId);
+		final var result = Co.await(Awaitable.from(redis.hgetall(key)));
 
 		final var playerData = Objects.requireNonNull(result.get("player"));
 		final var pluginData = Objects.requireNonNull(result.get("plugin"));
@@ -89,11 +88,11 @@ public record PlayerData(
 	}
 
 	@Coroutine
-	Task<Void> store(String namespace, UUID uuid, UUID blobId) {
-		final var key = "%s:playerdata:%s:%s".formatted(namespace, uuid, blobId);
+	Task<Void> store(RedisAsyncCommands<String, byte[]> redis, String ns, UUID uuid, UUID blobId) {
+		final var key = "%s:playerdata:%s:%s".formatted(ns, uuid, blobId);
 
 		Co.await(
-			awaitable(RedisAPI.getInstance().asyncStringBytes().hset(key, Map.of(
+			Awaitable.from(redis.hset(key, Map.of(
 				"player", playerData,
 				"plugin", jsonToBytes(playerData),
 				"scores", jsonToBytes(scoreData),

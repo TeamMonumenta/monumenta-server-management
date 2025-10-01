@@ -8,7 +8,7 @@ import com.floweytf.coro.concepts.Task;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import com.playmonumenta.redissync.MonumentaRedisSync;
-import com.playmonumenta.redissync.RedisAPI;
+import io.lettuce.core.api.async.RedisAsyncCommands;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -18,8 +18,6 @@ import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import org.bukkit.Bukkit;
 import org.jetbrains.annotations.Nullable;
-
-import static com.floweytf.coro.support.Awaitables.awaitable;
 
 /**
  * Represents the info for a specific player.
@@ -53,7 +51,9 @@ public class LocalRedisPlayer {
 	private PlayerData mActivePlayerData;
 	private boolean mDisableSaving;
 
-	private @Nullable Task<Void> lastestTask;
+	// TODO: group this somewhere sane
+	private @Nullable Task<Void> mCurrentTask;
+	private final RedisAsyncCommands<String, byte[]> mCommands;
 
 	@Nullable
 	private Runnable queuedOp;
@@ -61,10 +61,11 @@ public class LocalRedisPlayer {
 	/**
 	 * WARNING: this is blocking
 	 */
-	LocalRedisPlayer(UUID uuid) {
+	LocalRedisPlayer(UUID uuid, RedisAsyncCommands<String, byte[]> redisAsyncCommands) {
 		this.mUuid = uuid;
+		this.mCommands = redisAsyncCommands;
 		final var key = "%s:playerdata:%s".formatted("TODO", uuid);
-		final var metadata = RedisAPI.getInstance().async().get(key).toCompletableFuture().join();
+		final var metadata = MonumentaRedisSync.redisApi().async().get(key).toCompletableFuture().join();
 		final var json = PlayerDataManager.GSON.fromJson(metadata, PlayerGlobalData.class);
 		// build the maps
 		this.mStashes = json.stashes();
@@ -74,7 +75,7 @@ public class LocalRedisPlayer {
 		this.mRemotePlayerDataBlobs = computeGcRoots();
 		final var id = mProfiles.get(mCurrentProfile);
 		Preconditions.checkState(id != null);
-		this.mActivePlayerData = Co.launchBlocking(() -> Co.ret(Co.await(PlayerData.load("TODO", uuid, id))));
+		this.mActivePlayerData = Co.launchBlocking(() -> Co.ret(Co.await(PlayerData.load(mCommands, "TODO", uuid, id))));
 	}
 
 	private Set<UUID> computeGcRoots() {
@@ -88,8 +89,8 @@ public class LocalRedisPlayer {
 	private Awaitable<Void> runRedisTask(@MakeCoro Supplier<Task<Void>> task) {
 		final var newTask = task.get();
 
-		return lastestTask = Co.launch(() -> {
-			Co.await(lastestTask);
+		return mCurrentTask = Co.launch(() -> {
+			Co.await(mCurrentTask);
 			Co.await(newTask);
 			return Co.ret();
 		});
@@ -161,10 +162,8 @@ public class LocalRedisPlayer {
 		Preconditions.checkState(storeId != null);
 
 		Co.await(runRedisTask(() -> {
-			RedisAPI.getInstance().async().multi();
-			Co.await(data.store("TODO", mUuid, storeId));
-
-
+			MonumentaRedisSync.redisApi().async().multi();
+			Co.await(data.store(mCommands, "TODO", mUuid, storeId));
 			return Co.ret();
 		}));
 
@@ -186,7 +185,7 @@ public class LocalRedisPlayer {
 		// actually save the stash to redis
 		Co.await(runRedisTask(() -> {
 			// store data to redis
-			Co.await(stashData.store("TODO", mUuid, stashStoreId));
+			Co.await(stashData.store(mCommands, "TODO", mUuid, stashStoreId));
 
 			// important: run on main
 			Co.await(MonumentaRedisSync.getInstance()); /* TODO switch to main thread*/
@@ -211,7 +210,7 @@ public class LocalRedisPlayer {
 		mRemotePlayerDataBlobs.addAll(gcRoots);
 
 		Co.await(runRedisTask(() -> {
-			Co.await(awaitable(RedisAPI.getInstance().asyncStringBytes().del(toDelete)));
+			Co.await(Awaitable.from(MonumentaRedisSync.redisApi().asyncStringBytes().del(toDelete)));
 			return Co.ret();
 		}));
 
