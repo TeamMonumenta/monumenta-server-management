@@ -46,6 +46,12 @@ internal fun Project.addImplementation(deps: Any) {
     }
 }
 
+internal fun Project.addRuntimeOnly(deps: Any) {
+    with(project.dependencies) {
+        add(JavaPlugin.RUNTIME_ONLY_CONFIGURATION_NAME, deps)
+    }
+}
+
 internal fun Project.charset(name: String) {
     tasks.withType<_, JavaCompile> {
         options.encoding = name

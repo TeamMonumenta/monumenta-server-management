@@ -104,7 +104,7 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean) {
     project.version = target.version
 
     with(project.extensions.getByType(JavaPluginExtension::class.java)) {
-        if(javadoc) {
+        if (javadoc) {
             withJavadocJar()
         }
 
@@ -290,6 +290,10 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
     }
 
     private fun configureVersionAdapterWithApi(project: Project) {
+        if (project == pluginProject) {
+            return
+        }
+
         if (adapterApiPaperDep != null) {
             project.addCompileOnly("io.papermc.paper:paper-api:$adapterApiPaperDep-R0.1-SNAPSHOT")
         }
@@ -310,7 +314,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
         project.dependencies.extensions.getByType(PaperweightUserDependenciesExtension::class.java)
             .paperDevBundle("${devBundle}-R0.1-SNAPSHOT")
 
-        pluginProject.addImplementation(
+        pluginProject.addRuntimeOnly(
             pluginProject.dependencies.project(
                 mapOf(
                     "path" to project.path,
@@ -377,7 +381,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
 
         deferActions.forEach { it() }
 
-        if(!disableMaven) {
+        if (!disableMaven) {
             with(pluginProject.extensions.getByType(PublishingExtension::class.java)) {
                 publications { container ->
                     container.create("maven", MavenPublication::class.java) {
