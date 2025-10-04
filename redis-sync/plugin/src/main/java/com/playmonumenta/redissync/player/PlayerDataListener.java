@@ -2,6 +2,7 @@ package com.playmonumenta.redissync.player;
 
 import com.destroystokyo.paper.event.player.PlayerAdvancementDataLoadEvent;
 import com.destroystokyo.paper.event.player.PlayerAdvancementDataSaveEvent;
+import com.destroystokyo.paper.event.player.PlayerConnectionCloseEvent;
 import com.destroystokyo.paper.event.player.PlayerDataLoadEvent;
 import com.destroystokyo.paper.event.player.PlayerDataSaveEvent;
 import com.google.common.collect.ImmutableMap;
@@ -122,10 +123,10 @@ class PlayerDataListener implements Listener {
 				}
 
 				event.setData(mVersionAdapter.retrieveSaveData(data.playerData(), worldData));
-				localRedisPlayer.currentPlayerData(
-					data.withShardData(mConfig.getShardName(), shardData.withWorld(playerWorld, worldData))
-				);
-				localRedisPlayer.savePlayer().begin();
+				data = data.withShardData(mConfig.getShardName(), shardData.withWorld(playerWorld, worldData));
+
+				// save the current player data
+				localRedisPlayer.savePlayer(data).begin();
 			} catch (Exception e) {
 				// TODO: handle here
 				localRedisPlayer.disableSaving();
@@ -140,6 +141,11 @@ class PlayerDataListener implements Listener {
 		}
 
 		this.mPlayerDataManager.savePlayerDataWithHistory(event.getPlayer(), Reason.DISCONNECT.create()).begin();
+	}
+
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void playerConnectionCloseEvent(PlayerConnectionCloseEvent event) {
+		this.mPlayerDataManager.onDisconnect(event.getPlayerUniqueId());
 	}
 
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)

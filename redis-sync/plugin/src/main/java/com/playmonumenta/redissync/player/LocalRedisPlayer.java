@@ -2,111 +2,76 @@ package com.playmonumenta.redissync.player;
 
 import com.floweytf.coro.Co;
 import com.floweytf.coro.annotations.Coroutine;
-import com.floweytf.coro.annotations.MakeCoro;
 import com.floweytf.coro.concepts.Awaitable;
 import com.floweytf.coro.concepts.Task;
 import com.google.common.base.Preconditions;
-import com.playmonumenta.redissync.MonumentaRedisSync;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Supplier;
-import java.util.function.UnaryOperator;
 import org.bukkit.Bukkit;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Represents the local, cached info for a specific player that is online or in the process of joining the server.
+ * <p>
+ * This class handles most of the actual logic for storing/loading player data from redis, as well as logic required
+ * to transfer the player to various shards.
+ * </p>
  */
 public class LocalRedisPlayer {
-	// we represent playerdata as an abstract set of "blobs," indexed by some key K, so we have a
-	// blob: K -> PlayerData
-	//
-	// we can consider the set of "stashes" that the player has to be simply a map
-	// stashes: String -> K, indexed by the name
-	//
-	// a player profile, similarly, is implemented as such:
-	// profiles: String -> K
-	// current_profile: String
-	//
-	// now, to handle player history, we will also have an array
-	// history: (K, HistoryMeta)[]
-	//
-	// the source-data is indexed by some K, which is what profile will be loaded/stored to
-	// source: K
-
 	public record HistoryEntry(UUID id, HistoryMetaData metaData) {
 	}
 
 	private final UUID mPlayerUuid;
+
+	// global player data
+	private String mCurrentProfile;
 	private final Map<String, UUID> mStashes;
 	private final Map<String, UUID> mProfiles;
-	private String mCurrentProfile;
 	private final List<HistoryEntry> mHistory;
+
 	private PlayerData mActivePlayerData;
+
 	private boolean mDisableSaving;
 
-	// TODO: group this somewhere sane
-	private @Nullable Task<Void> mCurrentTask;
 	private final RedisHandler mRedisHandler;
 
-	@Nullable
-	private Runnable queuedOp;
+	private boolean mHasQueuedTransfer;
+	private boolean mHasDisconnected = false;
 
-	/**
-	 * WARNING: this is blocking
-	 */
-	LocalRedisPlayer(UUID uuid, RedisHandler redisHandler) {
+	private @Nullable Task<Void> postDisconnectOps;
+
+	private LocalRedisPlayer(UUID uuid, RedisHandler redisHandler, PlayerGlobalData metadata, PlayerData activeData) {
 		this.mPlayerUuid = uuid;
 		this.mRedisHandler = redisHandler;
-		final var key = redisHandler.globalPlayerDataKey(uuid);
-		final var metadata = redisHandler.commands().get(key).toCompletableFuture().join();
-		final var globalPlayerData = PlayerDataManager.GSON.fromJson(
-			new String(metadata, StandardCharsets.UTF_8),
-			PlayerGlobalData.class
-		);
-
-		// build the maps
-		this.mStashes = globalPlayerData.stashes();
-		this.mProfiles = globalPlayerData.profiles();
-		this.mCurrentProfile = globalPlayerData.currentProfile();
-		this.mHistory = globalPlayerData.history();
-
-		final var profileId = mProfiles.get(mCurrentProfile);
-		Preconditions.checkState(profileId != null);
-
-		// fetch the active player data
-		this.mActivePlayerData = PlayerData.fromRedisData(
-			redisHandler.commands()
-				.hgetall(redisHandler.playerDataKey(uuid, profileId))
-				.toCompletableFuture()
-				.join()
-		);
+		this.mCurrentProfile = metadata.currentProfile();
+		this.mStashes = metadata.stashes();
+		this.mProfiles = metadata.profiles();
+		this.mHistory = metadata.history();
+		this.mActivePlayerData = activeData;
 	}
 
-	/**
-	 * Runs a redis task, synchronizing execution to the *current* player. This means that no concurrent redis
-	 * operations can be run on the same player, effectively making this a per-player redis mutex.
-	 *
-	 * @param task the task.
-	 * @return the awaitable.
-	 */
-	private Awaitable<Void> runRedisTask(@MakeCoro Supplier<Task<Void>> task) {
-		return mCurrentTask = Co.launch(() -> {
-			Co.await(mCurrentTask);
-			Co.await(task.get());
-			return Co.ret();
-		});
-	}
+	@Coroutine
+	static Task<LocalRedisPlayer> fetch(UUID uuid, RedisHandler redisHandler) {
+		Co.await(redisHandler.syncRedis());
 
-	private void enqueueTransferOperation(Runnable op) {
-		final var player = Bukkit.getPlayer(mPlayerUuid);
-		Preconditions.checkState(player != null, "attempted to transfer non-online player");
-		Preconditions.checkState(queuedOp == null, "currently queued player data operation exists");
-		queuedOp = op;
-		player.sendPluginMessage(MonumentaRedisSync.getInstance(), "redissync:transfer",
-			"TODO_FIND_TARGET".getBytes());
+		final var commands = redisHandler.commands();
+
+		commands.multi();
+		final var metadata = commands.get(redisHandler.playerMetaDataKey(uuid));
+		final var activeData = commands.hgetall(redisHandler.playerActiveDataKey(uuid));
+		Co.await(Awaitable.from(commands.exec()));
+
+		// the join() calls should not block, since we already awaited for the multi/exec
+		return Co.ret(new LocalRedisPlayer(
+			uuid,
+			redisHandler,
+			PlayerDataManager.GSON.fromJson(
+				new String(metadata.toCompletableFuture().join()),
+				PlayerGlobalData.class
+			),
+			PlayerData.fromRedisData(activeData.toCompletableFuture().join())
+		));
 	}
 
 	// getters
@@ -124,31 +89,67 @@ public class LocalRedisPlayer {
 		return mActivePlayerData;
 	}
 
-	public void currentPlayerData(PlayerData data) {
-		Preconditions.checkState(Bukkit.isPrimaryThread());
-		mActivePlayerData = data;
-	}
+	void onDisconnect() {
+		mHasDisconnected = true;
 
-	public void currentPlayerData(UnaryOperator<PlayerData> transform) {
-		Preconditions.checkState(Bukkit.isPrimaryThread());
-		mActivePlayerData = transform.apply(mActivePlayerData);
+		if (postDisconnectOps != null) {
+			postDisconnectOps.begin();
+		}
 	}
 
 	// switching operations
 
+	private void checkAndSetTransfer() {
+		Preconditions.checkState(!mHasQueuedTransfer, "currently transfer operation exists");
+		mHasQueuedTransfer = true;
+	}
+
+	/**
+	 * Loads some player data into the active player data set.
+	 *
+	 * @param blobId
+	 */
+	@Coroutine
+	private Task<Void> loadPlayerData(UUID blobId) {
+		Preconditions.checkState(Bukkit.isPrimaryThread(), "loadPlayerData called off-main");
+		final var player = Bukkit.getPlayer(mPlayerUuid);
+		Preconditions.checkState(player != null, "attempted to transfer non-online player");
+		checkAndSetTransfer();
+
+		// load the player data from the blob
+		Co.await(mRedisHandler.syncRedis());
+		final var data = PlayerData.fromRedisData(
+			Co.await(Awaitable.from(mRedisHandler.commands().hgetall(mRedisHandler.storageKey(blobId))))
+		);
+
+		// TODO: actually initiate the disconnect!
+
+		// we need to run these tasks *after* disconnect
+		postDisconnectOps = Co.makeTask(() -> {
+			Co.await(storeProfile0(data, mCurrentProfile));
+			Co.await(mRedisHandler.syncRedis());
+			Co.await(Awaitable.from(mRedisHandler.commands().hset(
+				mRedisHandler.playerActiveDataKey(mPlayerUuid),
+				data.toRedisData())
+			));
+			return Co.ret();
+		});
+
+		return Co.ret();
+	}
+
 	public void switchProfile(String newProfile) {
 		Preconditions.checkState(Bukkit.isPrimaryThread(), "switchProfile called off-main");
-		Preconditions.checkArgument(mProfiles.containsKey(newProfile), "unknown profile '%s'", newProfile);
-
-		enqueueTransferOperation(() -> mCurrentProfile = newProfile);
+		final var blobId = mProfiles.get(newProfile);
+		Preconditions.checkArgument(blobId != null, "unknown profile '%s'", newProfile);
+		loadPlayerData(blobId).begin();
 	}
 
 	public void loadStash(String stash) {
 		Preconditions.checkState(Bukkit.isPrimaryThread(), "loadStash called off-main");
-		final var stashId = mStashes.get(stash);
-		Preconditions.checkArgument(stashId != null, "unknown stash '%s'", stash);
-
-		enqueueTransferOperation(() -> mProfiles.put(mCurrentProfile, stashId));
+		final var blobId = mStashes.get(stash);
+		Preconditions.checkArgument(blobId != null, "unknown stash '%s'", stash);
+		loadPlayerData(blobId).begin();
 	}
 
 	public void loadHistory(int historyIndex) {
@@ -157,44 +158,75 @@ public class LocalRedisPlayer {
 			historyIndex >= 0 && historyIndex < mHistory.size(),
 			"bad history index: '%s'", historyIndex
 		);
-		final var id = mHistory.get(historyIndex).id;
-
-		enqueueTransferOperation(() -> mProfiles.put(mCurrentProfile, id));
+		final var blobId = mHistory.get(historyIndex).id;
+		loadPlayerData(blobId).begin();
 	}
 
 	// player data saving operations
 
 	// remember that it is very important each of these operations are transactional, so we must
-	// use multi() for stuff (remember to use main thread!)
+	// use multi() for stuff (remember to use redis thread!)
 
-	private UUID currentProfileId() {
-		final var id = mProfiles.get(mCurrentProfile);
-		Preconditions.checkState(id != null);
-		return id;
-	}
-
+	/**
+	 * Saves the current player data to the active player data on redis.
+	 *
+	 * @return the task
+	 */
 	@Coroutine
-	Task<Void> savePlayer() {
+	Task<Void> savePlayer(PlayerData newData) {
 		Preconditions.checkState(Bukkit.isPrimaryThread());
-		final var id = currentProfileId();
-		final var key = mRedisHandler.playerDataKey(mPlayerUuid, id);
+		Preconditions.checkState(!mHasDisconnected);
 
-		final var currentData = this.mActivePlayerData;
+		final var currentData = this.mActivePlayerData = newData;
+		final var key = mRedisHandler.playerActiveDataKey(mPlayerUuid);
 
-		Co.await(runRedisTask(() -> {
-			Co.await(Awaitable.from(mRedisHandler.commands().hset(key, currentData.toRedisData())));
-			return Co.ret();
-		}));
+		Co.await(mRedisHandler.syncRedis());
+		Co.await(Awaitable.from(mRedisHandler.commands().hset(key, currentData.toRedisData())));
 
 		return Co.ret();
 	}
 
-	@Coroutine
-	Task<UUID> pushHistoryEntry(PlayerData newData, HistoryMetaData historyMetaData, int maxHistorySize) {
-		Preconditions.checkState(Bukkit.isPrimaryThread());
-		final var id = UUID.randomUUID();
+	private Task<Void> storeBlob(PlayerData data, UUID blobAdded, @Nullable UUID blobDeleted) {
+		final var newGlobalData = PlayerDataManager.GSON.toJson(
+			new PlayerGlobalData(
+				mStashes,
+				mProfiles,
+				mCurrentProfile,
+				mHistory
+			)
+		);
 
-		mHistory.add(new HistoryEntry(id, historyMetaData));
+		Co.await(mRedisHandler.syncRedis());
+		final var commands = mRedisHandler.commands();
+
+		// put the new data to redis
+		commands.multi();
+		commands.set(mRedisHandler.playerMetaDataKey(mPlayerUuid), newGlobalData.getBytes());
+		if (blobDeleted != null) {
+			commands.del(mRedisHandler.storageKey(blobDeleted));
+		}
+		commands.hset(mRedisHandler.playerActiveDataKey(blobAdded), data.toRedisData());
+		Co.await(Awaitable.from(commands.exec()));
+
+		return Co.ret();
+	}
+
+	/**
+	 * Saves a history entry to redis.
+	 *
+	 * @param data            The history data.
+	 * @param historyMetaData The history metadata.
+	 * @param maxHistorySize  The maximum number of history entries to retain.
+	 * @return the task
+	 */
+	@Coroutine
+	Task<UUID> pushHistoryEntry(PlayerData data, HistoryMetaData historyMetaData, int maxHistorySize) {
+		Preconditions.checkState(Bukkit.isPrimaryThread());
+		Preconditions.checkState(!mHasDisconnected);
+
+		final var blobId = UUID.randomUUID();
+
+		mHistory.add(new HistoryEntry(blobId, historyMetaData));
 
 		final @Nullable HistoryEntry removed;
 
@@ -204,56 +236,44 @@ public class LocalRedisPlayer {
 			removed = null;
 		}
 
-		final var newGlobalData = PlayerDataManager.GSON.toJson(
-			new PlayerGlobalData(
-				mStashes,
-				mProfiles,
-				mCurrentProfile,
-				mHistory
-			)
-		);
+		Co.await(storeBlob(data, blobId, removed == null ? null : removed.id));
+		return Co.ret(blobId);
+	}
 
-		// put the new data to redis
-		Co.await(runRedisTask(() -> {
-			final var cmd = mRedisHandler.commands();
-			cmd.multi();
-			cmd.set(mRedisHandler.globalPlayerDataKey(mPlayerUuid), newGlobalData.getBytes());
-			if (removed != null) {
-				cmd.del(mRedisHandler.playerDataKey(mPlayerUuid, removed.id));
-			}
-			cmd.hset(mRedisHandler.playerDataKey(mPlayerUuid, id), newData.toRedisData());
-			Co.await(Awaitable.from(cmd.exec()));
-			return Co.ret();
-		}));
+	/**
+	 * Stores a stash to redis.
+	 *
+	 * @param data      The stash data.
+	 * @param stashName The name of the stash.
+	 * @return the task.
+	 */
+	@Coroutine
+	Task<UUID> storeStash(PlayerData data, String stashName) {
+		Preconditions.checkState(Bukkit.isPrimaryThread());
+		Preconditions.checkArgument(!mStashes.containsKey(stashName));
 
-		return Co.ret(id);
+		final var blobId = UUID.randomUUID();
+
+		mStashes.put(stashName, blobId);
+
+		Co.await(storeBlob(data, blobId, null));
+		return Co.ret(blobId);
 	}
 
 	@Coroutine
-	Task<UUID> storeStash(PlayerData newData, String stashName) {
+	private Task<UUID> storeProfile0(PlayerData data, String profileName) {
+		final var blobId = UUID.randomUUID();
+
+		final var removed = mProfiles.put(profileName, blobId);
+
+		Co.await(storeBlob(data, blobId, removed));
+		return Co.ret(blobId);
+	}
+
+	@Coroutine
+	Task<UUID> storeProfile(PlayerData data, String profileName) {
 		Preconditions.checkState(Bukkit.isPrimaryThread());
-		Preconditions.checkState(!mStashes.containsKey(stashName));
-		final var id = UUID.randomUUID();
-		mStashes.put(stashName, id);
-
-		final var newGlobalData = PlayerDataManager.GSON.toJson(
-			new PlayerGlobalData(
-				mStashes,
-				mProfiles,
-				mCurrentProfile,
-				mHistory
-			)
-		);
-
-		Co.await(runRedisTask(() -> {
-			final var cmd = mRedisHandler.commands();
-			cmd.multi();
-			cmd.set(mRedisHandler.globalPlayerDataKey(mPlayerUuid), newGlobalData.getBytes());
-			cmd.hset(mRedisHandler.playerDataKey(mPlayerUuid, id), newData.toRedisData());
-			Co.await(Awaitable.from(cmd.exec()));
-			return Co.ret();
-		}));
-
-		return Co.ret(id);
+		Preconditions.checkArgument(!mProfiles.containsKey(profileName));
+		return Co.ret(Co.await(storeProfile0(data, profileName)));
 	}
 }

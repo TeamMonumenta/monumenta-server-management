@@ -3,6 +3,7 @@ package com.playmonumenta.redissync.player;
 import com.floweytf.coro.Co;
 import com.floweytf.coro.annotations.Coroutine;
 import com.floweytf.coro.concepts.Task;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
 import com.playmonumenta.redissync.MonumentaRedisSync;
@@ -15,6 +16,7 @@ import java.util.UUID;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class PlayerDataManager {
@@ -40,16 +42,13 @@ public class PlayerDataManager {
 		this.mRedisHandler = new RedisHandler(plugin);
 	}
 
-	/**
-	 * @param uuid
-	 */
 	public void preloadPlayerData(UUID uuid) {
 		if (mOnlinePlayerCache.containsKey(uuid)) {
 			// TODO: BAD BAD BAD
 			return;
 		}
 
-		mOnlinePlayerCache.put(uuid, new LocalRedisPlayer(uuid, mRedisHandler));
+		mOnlinePlayerCache.put(uuid, Co.launchBlocking(() -> LocalRedisPlayer.fetch(uuid, mRedisHandler)));
 	}
 
 	public LocalRedisPlayer getLocalPlayerData(UUID uuid) {
@@ -89,6 +88,8 @@ public class PlayerDataManager {
 
 	@Coroutine
 	public Task<Void> savePlayerDataWithHistory(Player player, @Nullable HistoryMetaData historyMetaData) {
+		Preconditions.checkState(Bukkit.isPrimaryThread());
+
 		final var localRedisPlayer = getLocalPlayerData(player.getUniqueId());
 
 		if (localRedisPlayer == null) {
@@ -106,13 +107,16 @@ public class PlayerDataManager {
 			player
 		);
 
+		localRedisPlayer.savePlayer(newData).begin();
+
 		if (historyMetaData != null) {
-			Co.await(localRedisPlayer.pushHistoryEntry(newData, historyMetaData, mConfig.getMaxHistorySize()));
-		} else {
-			localRedisPlayer.currentPlayerData(newData);
-			Co.await(localRedisPlayer.savePlayer());
+			localRedisPlayer.pushHistoryEntry(newData, historyMetaData, mConfig.getHistoryAmount()).begin();
 		}
 
 		return Co.ret();
+	}
+
+	public void onDisconnect(@NotNull UUID playerUniqueId) {
+		mOnlinePlayerCache.remove(playerUniqueId).onDisconnect();
 	}
 }
