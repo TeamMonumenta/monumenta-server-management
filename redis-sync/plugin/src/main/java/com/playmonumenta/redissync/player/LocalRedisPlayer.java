@@ -105,12 +105,14 @@ public class LocalRedisPlayer {
 	}
 
 	/**
-	 * Loads some player data into the active player data set.
+	 * Performs a "pseudo transfer" to reload player data from some specified blob.
 	 *
 	 * @param blobId
+	 * @param extraAction
+	 * @return
 	 */
 	@Coroutine
-	private Task<Void> loadPlayerData(UUID blobId) {
+	private Task<Void> setPlayerData(UUID blobId, @Nullable Runnable extraAction) {
 		Preconditions.checkState(Bukkit.isPrimaryThread(), "loadPlayerData called off-main");
 		final var player = Bukkit.getPlayer(mPlayerUuid);
 		Preconditions.checkState(player != null, "attempted to transfer non-online player");
@@ -126,12 +128,39 @@ public class LocalRedisPlayer {
 
 		// we need to run these tasks *after* disconnect
 		postDisconnectOps = Co.makeTask(() -> {
-			Co.await(storeProfile0(data, mCurrentProfile));
+			Preconditions.checkState(Bukkit.isPrimaryThread(), "loadPlayerData called off-main");
+
+			final var newProfileId = UUID.randomUUID();
+			final var oldProfileId = mProfiles.put(mCurrentProfile, newProfileId);
+
+			if (extraAction != null) {
+				extraAction.run();
+			}
+
+			final var globalData = packGlobalData();
+
 			Co.await(mRedisHandler.syncRedis());
-			Co.await(Awaitable.from(mRedisHandler.commands().hset(
+
+			// run redis commands
+			final var commands = mRedisHandler.commands();
+
+			commands.multi();
+			commands.del(mRedisHandler.storageKey(oldProfileId));
+			commands.hset(
+				mRedisHandler.storageKey(oldProfileId),
+				data.toRedisData()
+			);
+			commands.hset(
 				mRedisHandler.playerActiveDataKey(mPlayerUuid),
-				data.toRedisData())
-			));
+				data.toRedisData()
+			);
+			commands.set(
+				mRedisHandler.playerMetaDataKey(mPlayerUuid),
+				globalData
+			);
+
+			Co.await(Awaitable.from(commands.exec()));
+
 			return Co.ret();
 		});
 
@@ -142,14 +171,14 @@ public class LocalRedisPlayer {
 		Preconditions.checkState(Bukkit.isPrimaryThread(), "switchProfile called off-main");
 		final var blobId = mProfiles.get(newProfile);
 		Preconditions.checkArgument(blobId != null, "unknown profile '%s'", newProfile);
-		loadPlayerData(blobId).begin();
+		setPlayerData(blobId, () -> mCurrentProfile = newProfile).begin();
 	}
 
 	public void loadStash(String stash) {
 		Preconditions.checkState(Bukkit.isPrimaryThread(), "loadStash called off-main");
 		final var blobId = mStashes.get(stash);
 		Preconditions.checkArgument(blobId != null, "unknown stash '%s'", stash);
-		loadPlayerData(blobId).begin();
+		setPlayerData(blobId, null).begin();
 	}
 
 	public void loadHistory(int historyIndex) {
@@ -159,7 +188,7 @@ public class LocalRedisPlayer {
 			"bad history index: '%s'", historyIndex
 		);
 		final var blobId = mHistory.get(historyIndex).id;
-		loadPlayerData(blobId).begin();
+		setPlayerData(blobId, null).begin();
 	}
 
 	// player data saving operations
@@ -181,27 +210,34 @@ public class LocalRedisPlayer {
 		final var key = mRedisHandler.playerActiveDataKey(mPlayerUuid);
 
 		Co.await(mRedisHandler.syncRedis());
-		Co.await(Awaitable.from(mRedisHandler.commands().hset(key, currentData.toRedisData())));
+		Co.await(Awaitable.from(mRedisHandler.commands().hset(
+			mRedisHandler.playerActiveDataKey(mPlayerUuid),
+			currentData.toRedisData())
+		));
 
 		return Co.ret();
 	}
 
-	private Task<Void> storeBlob(PlayerData data, UUID blobAdded, @Nullable UUID blobDeleted) {
-		final var newGlobalData = PlayerDataManager.GSON.toJson(
+	private byte[] packGlobalData() {
+		return PlayerDataManager.GSON.toJson(
 			new PlayerGlobalData(
 				mStashes,
 				mProfiles,
 				mCurrentProfile,
 				mHistory
 			)
-		);
+		).getBytes();
+	}
+
+	private Task<Void> storeBlob(PlayerData data, UUID blobAdded, @Nullable UUID blobDeleted) {
+		final var newGlobalData = packGlobalData();
 
 		Co.await(mRedisHandler.syncRedis());
 		final var commands = mRedisHandler.commands();
 
 		// put the new data to redis
 		commands.multi();
-		commands.set(mRedisHandler.playerMetaDataKey(mPlayerUuid), newGlobalData.getBytes());
+		commands.set(mRedisHandler.playerMetaDataKey(mPlayerUuid), newGlobalData);
 		if (blobDeleted != null) {
 			commands.del(mRedisHandler.storageKey(blobDeleted));
 		}
@@ -261,19 +297,13 @@ public class LocalRedisPlayer {
 	}
 
 	@Coroutine
-	private Task<UUID> storeProfile0(PlayerData data, String profileName) {
-		final var blobId = UUID.randomUUID();
-
-		final var removed = mProfiles.put(profileName, blobId);
-
-		Co.await(storeBlob(data, blobId, removed));
-		return Co.ret(blobId);
-	}
-
-	@Coroutine
 	Task<UUID> storeProfile(PlayerData data, String profileName) {
 		Preconditions.checkState(Bukkit.isPrimaryThread());
 		Preconditions.checkArgument(!mProfiles.containsKey(profileName));
-		return Co.ret(Co.await(storeProfile0(data, profileName)));
+
+		final var blobId = UUID.randomUUID();
+
+		Co.await(storeBlob(data, blobId, null));
+		return Co.ret(blobId);
 	}
 }
