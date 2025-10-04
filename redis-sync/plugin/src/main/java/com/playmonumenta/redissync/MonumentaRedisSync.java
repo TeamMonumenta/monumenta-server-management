@@ -142,6 +142,7 @@ public class MonumentaRedisSync extends JavaPlugin implements PluginScheduler {
 
 		int historyAmount = config.getInt("history_amount", 20);
 		int ticksPerPlayerAutosave = config.getInt("ticks_per_player_autosave", 6060);
+
 		boolean savingDisabled = config.getBoolean("saving_disabled", false);
 		boolean scoreboardCleanupEnabled = config.getBoolean("scoreboard_cleanup_enabled", true);
 

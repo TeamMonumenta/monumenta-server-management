@@ -25,7 +25,6 @@ import java.util.logging.Logger;
 
 public class RedisAPI {
 	private static final class StringByteCodec implements RedisCodec<String, byte[]> {
-		private static final StringByteCodec INSTANCE = new StringByteCodec();
 		private static final byte[] EMPTY = new byte[0];
 		private final Charset mCharset = StandardCharsets.UTF_8;
 
@@ -60,7 +59,7 @@ public class RedisAPI {
 		}
 	}
 
-	public static final RedisCodec<String, byte[]> STRING_BYTE_CODEC = StringByteCodec.INSTANCE;
+	public static final RedisCodec<String, byte[]> STRING_BYTE_CODEC = new StringByteCodec();
 
 	private final Logger mLogger;
 	private final RedisConfig mRedisConfig;
@@ -90,7 +89,7 @@ public class RedisAPI {
 			redisConfig.getRedisHost(), redisConfig.getRedisPort()
 		).build());
 		mConnection = mRedisClient.connect();
-		mStringByteConnection = mRedisClient.connect(StringByteCodec.INSTANCE);
+		mStringByteConnection = mRedisClient.connect(STRING_BYTE_CODEC);
 
 		Thread thread = Thread.currentThread();
 		long threadId = thread.getId();

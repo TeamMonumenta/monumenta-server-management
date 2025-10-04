@@ -4,6 +4,10 @@ plugins {
 	alias(libs.plugins.gradle.config)
 }
 
+repositories {
+	mavenLocal()
+}
+
 dependencies {
 	compileOnly(libs.commandapi)
 	compileOnly(project(":redis-sync:plugin"))

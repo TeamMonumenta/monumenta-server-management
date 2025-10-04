@@ -29,7 +29,6 @@ public class MonumentaRedisSyncVelocity {
 		mServer = server;
 		mLogger = logger;
 
-
 		/* Needed to tell Netty where it moved to */
 		System.setProperty("com.playmonumenta.redissync.internal.netty", "com.playmonumenta.redissync.internal");
 
@@ -42,7 +41,7 @@ public class MonumentaRedisSyncVelocity {
 		mServer.getEventManager().register(this, new VelocityListener(this));
 	}
 
-	// we use ProxyShutdownEvent because ListenerClosEvent might fire too early
+	// we use ProxyShutdownEvent because ListenerCloseEvent might fire too early
 	@Subscribe(order = PostOrder.LATE)
 	public void onDisable(ProxyShutdownEvent event) {
 		mRedisAPI.shutdown();

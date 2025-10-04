@@ -6,10 +6,10 @@ import com.destroystokyo.paper.event.player.PlayerDataLoadEvent;
 import com.destroystokyo.paper.event.player.PlayerDataSaveEvent;
 import com.google.common.collect.ImmutableMap;
 import com.playmonumenta.redissync.MonumentaRedisSync;
-import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.config.BukkitConfig;
 import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
+import com.playmonumenta.redissync.player.HistoryMetaData.Reason;
 import com.playmonumenta.redissync.utils.ScoreboardUtils;
 import io.papermc.paper.event.server.ServerResourcesReloadedEvent;
 import java.util.function.Consumer;
@@ -21,6 +21,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 
 class PlayerDataListener implements Listener {
 	private final Logger mLogger;
@@ -54,7 +55,7 @@ class PlayerDataListener implements Listener {
 
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	public void asyncPlayerPreLoginEvent(AsyncPlayerPreLoginEvent event) {
-
+		mPlayerDataManager.preloadPlayerData(event.getUniqueId());
 	}
 
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -63,7 +64,7 @@ class PlayerDataListener implements Listener {
 		for (Player player : Bukkit.getOnlinePlayers()) {
 			mLogger.finer("Saving player " + player.getName() + " due to datapack reload");
 			try {
-				MonumentaRedisSyncAPI.savePlayer(player);
+				mPlayerDataManager.savePlayerDataWithHistory(player, Reason.ADVANCEMENT_RELOAD.create()).begin();
 			} catch (Exception ex) {
 				mLogger.severe("Failed to save player '" + player.getName() + "': " + ex.getMessage());
 				ex.printStackTrace();
@@ -76,18 +77,6 @@ class PlayerDataListener implements Listener {
 		handleDataEventCommon(event, localRedisPlayer -> {
 			final var data = localRedisPlayer.currentPlayerData();
 			event.setJsonData(data.advancements());
-		});
-	}
-
-	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-	public void playerAdvancementDataSaveEvent(PlayerAdvancementDataSaveEvent event) {
-		handleDataEventCommon(event, localRedisPlayer -> {
-			if (localRedisPlayer.isSavingDisabled()) {
-				return;
-			}
-
-			localRedisPlayer.currentPlayerData(data -> data.withAdvancements(event.getJsonData()));
-			event.setCancelled(true);
 		});
 	}
 
@@ -136,7 +125,7 @@ class PlayerDataListener implements Listener {
 				localRedisPlayer.currentPlayerData(
 					data.withShardData(mConfig.getShardName(), shardData.withWorld(playerWorld, worldData))
 				);
-				localRedisPlayer.savePlayerData().begin();
+				localRedisPlayer.savePlayer().begin();
 			} catch (Exception e) {
 				// TODO: handle here
 				localRedisPlayer.disableSaving();
@@ -145,47 +134,21 @@ class PlayerDataListener implements Listener {
 	}
 
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void playerQuitEvent(PlayerQuitEvent event) {
+		if (mConfig.isSavingDisabled()) {
+			return;
+		}
+
+		this.mPlayerDataManager.savePlayerDataWithHistory(event.getPlayer(), Reason.DISCONNECT.create()).begin();
+	}
+
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void playerAdvancementDataSaveEvent(PlayerAdvancementDataSaveEvent event) {
+		event.setCancelled(true);
+	}
+
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
 	public void playerDataSaveEvent(PlayerDataSaveEvent event) {
 		event.setCancelled(true);
-		handleDataEventCommon(event, localRedisPlayer -> {
-			try {
-				final var player = event.getPlayer();
-				final var playerWorld = player.getWorld();
-
-				if (localRedisPlayer.isSavingDisabled()) {
-					return;
-				}
-
-				// save scoreboard
-				final var scores = mVersionAdapter.getPlayerScores(
-					player.getName(),
-					Bukkit.getScoreboardManager().getMainScoreboard()
-				);
-
-				// save playerdata
-				final var playerData = mVersionAdapter.extractSaveData(event.getData());
-
-				var shardData = localRedisPlayer.currentPlayerData().shardData().get(mConfig.getShardName());
-
-				if (shardData == null) {
-					mLogger.warning("player %s missing shard data at save".formatted(player.getName()));
-					shardData = new ShardData(playerWorld.getUID(), playerWorld.getName(), ImmutableMap.of());
-				}
-
-				shardData = shardData.withWorld(playerWorld, playerData.right());
-
-				final var finalShardData = shardData;
-				localRedisPlayer.currentPlayerData(data ->
-					data.withPlayerData(playerData.first())
-						.withShardData(mConfig.getShardName(), finalShardData)
-						.withScores(scores)
-				);
-
-				localRedisPlayer.savePlayerData().begin();
-			} catch (Exception e) {
-				mLogger.severe("failed to save player data!");
-				e.printStackTrace();
-			}
-		});
 	}
 }
