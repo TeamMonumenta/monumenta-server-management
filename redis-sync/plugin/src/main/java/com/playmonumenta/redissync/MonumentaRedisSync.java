@@ -1,5 +1,6 @@
 package com.playmonumenta.redissync;
 
+import com.google.common.base.Preconditions;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.commands.ChangeLogLevel;
 import com.playmonumenta.redissync.commands.PlayerHistory;
@@ -12,6 +13,8 @@ import com.playmonumenta.redissync.commands.Stash;
 import com.playmonumenta.redissync.commands.TransferServer;
 import com.playmonumenta.redissync.commands.UpgradeAllPlayers;
 import com.playmonumenta.redissync.config.BukkitConfig;
+import com.playmonumenta.redissync.utils.PluginScheduler;
+import com.playmonumenta.redissync.utils.VersionAdapterHolder;
 import java.io.File;
 import java.util.Locale;
 import java.util.logging.Level;
@@ -23,36 +26,21 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class MonumentaRedisSync extends JavaPlugin implements MonumentaRedisSyncInterface {
+public class MonumentaRedisSync extends JavaPlugin implements PluginScheduler {
 	private static @Nullable MonumentaRedisSync INSTANCE = null;
+	private final VersionAdapterHolder<VersionAdapter> mVersionAdapter = new VersionAdapterHolder<>(
+		VersionAdapter.class,
+		this
+	);
+
 	private @Nullable RedisAPI mRedisAPI = null;
-	private @Nullable VersionAdapter mVersionAdapter = null;
 	private @Nullable CustomLogger mLogger = null;
-
-	private void loadVersionAdapter() {
-		/* From https://github.com/mbax/AbstractionExamplePlugin */
-
-		String packageName = this.getServer().getClass().getPackage().getName();
-		String version = packageName.substring(packageName.lastIndexOf('.') + 1);
-
-		try {
-			final Class<?> clazz = Class.forName("com.playmonumenta.redissync.adapters.VersionAdapter_" + version);
-			// Check if we have a valid adapter class at that location.
-			if (VersionAdapter.class.isAssignableFrom(clazz)) {
-				mVersionAdapter = (VersionAdapter) clazz.getConstructor(Logger.class).newInstance(this.getLogger());
-			}
-		} catch (final Exception e) {
-			e.printStackTrace();
-			getLogger().severe("Server version " + version + " is not supported!");
-			return;
-		}
-		getLogger().info("Loading support for " + version);
-	}
+	private @Nullable BukkitConfig mConfig = null;
 
 	@Override
 	public void onLoad() {
-		loadVersionAdapter();
-
+		// pre-load adapter
+		mVersionAdapter.get();
 		/*
 		 * CommandAPI commands which register directly and are usable in functions
 		 *
@@ -91,14 +79,10 @@ public class MonumentaRedisSync extends JavaPlugin implements MonumentaRedisSync
 			}
 		}
 
-		loadConfig();
-		mRedisAPI = new RedisAPI(this, BukkitConfig.getRedisHost(), BukkitConfig.getRedisPort());
-		getServer().getPluginManager().registerEvents(new DataEventListener(this.getLogger(), mVersionAdapter), this);
-		getServer().getPluginManager().registerEvents(new ScoreboardCleanupListener(this, this.getLogger(), mVersionAdapter), this);
+		mRedisAPI = new RedisAPI(getLogger(), mConfig = loadConfig(), this::runAsync);
+		getServer().getPluginManager().registerEvents(new ScoreboardCleanupListener(this, this.getLogger(),
+			mVersionAdapter.get()), this);
 		getServer().getPluginManager().registerEvents(AccountTransferManager.getInstance(), this);
-		if (BukkitConfig.getTicksPerPlayerAutosave() > 0) {
-			getServer().getPluginManager().registerEvents(new AutoSaveListener(this, mVersionAdapter), this);
-		}
 
 		this.getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
 	}
@@ -115,19 +99,30 @@ public class MonumentaRedisSync extends JavaPlugin implements MonumentaRedisSync
 	}
 
 	public static MonumentaRedisSync getInstance() {
-		MonumentaRedisSync instance = INSTANCE;
-		if (instance == null) {
-			throw new RuntimeException("MonumentaRedisSync is not enabled yet");
-		}
-		return instance;
+		Preconditions.checkState(INSTANCE != null, "MonumentaRedisSync is not enabled yet");
+		return INSTANCE;
+	}
+
+	public static RedisAPI redisApi() {
+		return getInstance().getRedisApi();
+	}
+
+	public static BukkitConfig config() {
+		return getInstance().getBukkitConfig();
+	}
+
+	public RedisAPI getRedisApi() {
+		Preconditions.checkState(mRedisAPI != null, "MonumentaRedisSync is not enabled yet");
+		return mRedisAPI;
+	}
+
+	public BukkitConfig getBukkitConfig() {
+		Preconditions.checkState(mConfig != null, "MonumentaRedisSync is not enabled yet");
+		return mConfig;
 	}
 
 	public VersionAdapter getVersionAdapter() {
-		VersionAdapter versionAdapter = mVersionAdapter;
-		if (versionAdapter == null) {
-			throw new RuntimeException("MonumentaRedisSync is not enabled yet");
-		}
-		return versionAdapter;
+		return mVersionAdapter.get();
 	}
 
 	private BukkitConfig loadConfig() {
@@ -147,25 +142,27 @@ public class MonumentaRedisSync extends JavaPlugin implements MonumentaRedisSync
 
 		int historyAmount = config.getInt("history_amount", 20);
 		int ticksPerPlayerAutosave = config.getInt("ticks_per_player_autosave", 6060);
+
 		boolean savingDisabled = config.getBoolean("saving_disabled", false);
 		boolean scoreboardCleanupEnabled = config.getBoolean("scoreboard_cleanup_enabled", true);
 
 		String level = config.getString("log_level", "INFO").toLowerCase(Locale.ENGLISH);
 		switch (level) {
-			case "finest":
-				setLogLevel(Level.FINEST);
-				break;
-			case "finer":
-				setLogLevel(Level.FINER);
-				break;
-			case "fine":
-				setLogLevel(Level.FINE);
-				break;
-			default:
-				setLogLevel(Level.INFO);
+		case "finest":
+			setLogLevel(Level.FINEST);
+			break;
+		case "finer":
+			setLogLevel(Level.FINER);
+			break;
+		case "fine":
+			setLogLevel(Level.FINE);
+			break;
+		default:
+			setLogLevel(Level.INFO);
 		}
 
-		 return new BukkitConfig(getLogger(), redisHost, redisPort, serverDomain, shardName, historyAmount, ticksPerPlayerAutosave, savingDisabled, scoreboardCleanupEnabled);
+		return new BukkitConfig(redisHost, redisPort, serverDomain, shardName, historyAmount,
+			ticksPerPlayerAutosave, savingDisabled, scoreboardCleanupEnabled);
 	}
 
 	public void setLogLevel(Level level) {
@@ -181,8 +178,7 @@ public class MonumentaRedisSync extends JavaPlugin implements MonumentaRedisSync
 		return mLogger;
 	}
 
-	@Override
-	public void runAsync(Runnable runnable) {
+	private void runAsync(Runnable runnable) {
 		Bukkit.getScheduler().runTaskAsynchronously(this, runnable);
 	}
 }

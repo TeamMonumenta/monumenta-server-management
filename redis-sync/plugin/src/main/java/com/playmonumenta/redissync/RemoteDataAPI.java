@@ -1,6 +1,5 @@
 package com.playmonumenta.redissync;
 
-import com.playmonumenta.redissync.config.CommonConfig;
 import io.lettuce.core.KeyValue;
 import io.lettuce.core.Value;
 import java.util.Map;
@@ -18,7 +17,7 @@ public class RemoteDataAPI {
 	 * @return null if no entry was present, String otherwise
 	 */
 	public static CompletableFuture<String> get(UUID uuid, String key) {
-		RedisAPI api = RedisAPI.getInstance();
+		RedisAPI api = MonumentaRedisSync.redisApi();
 		if (api == null) {
 			CompletableFuture<String> future = new CompletableFuture<>();
 			future.completeExceptionally(new Exception("MonumentaRedisSync is not loaded!"));
@@ -37,7 +36,7 @@ public class RemoteDataAPI {
 	 * @return null if no entry was present, String otherwise
 	 */
 	public static CompletableFuture<Map<String, String>> getMulti(UUID uuid, String... keys) {
-		RedisAPI api = RedisAPI.getInstance();
+		RedisAPI api = MonumentaRedisSync.redisApi();
 		if (api == null) {
 			CompletableFuture<Map<String, String>> future = new CompletableFuture<>();
 			future.completeExceptionally(new Exception("MonumentaRedisSync is not loaded!"));
@@ -56,7 +55,7 @@ public class RemoteDataAPI {
 	 * @return True if an entry was set, False otherwise
 	 */
 	public static CompletableFuture<Boolean> set(UUID uuid, String key, String value) {
-		RedisAPI api = RedisAPI.getInstance();
+		RedisAPI api = MonumentaRedisSync.redisApi();
 		if (api == null) {
 			CompletableFuture<Boolean> future = new CompletableFuture<>();
 			future.completeExceptionally(new Exception("MonumentaRedisSync is not loaded!"));
@@ -77,7 +76,7 @@ public class RemoteDataAPI {
 	 * @return Resulting value
 	 */
 	public static CompletableFuture<Long> increment(UUID uuid, String key, int incBy) {
-		RedisAPI api = RedisAPI.getInstance();
+		RedisAPI api = MonumentaRedisSync.redisApi();
 		if (api == null) {
 			CompletableFuture<Long> future = new CompletableFuture<>();
 			future.completeExceptionally(new Exception("MonumentaRedisSync is not loaded!"));
@@ -96,7 +95,7 @@ public class RemoteDataAPI {
 	 * @return True if an entry was present and was deleted, False if no entry was present to begin with
 	 */
 	public static CompletableFuture<Boolean> del(UUID uuid, String key) {
-		RedisAPI api = RedisAPI.getInstance();
+		RedisAPI api = MonumentaRedisSync.redisApi();
 		if (api == null) {
 			CompletableFuture<Boolean> future = new CompletableFuture<>();
 			future.completeExceptionally(new Exception("MonumentaRedisSync is not loaded!"));
@@ -115,7 +114,7 @@ public class RemoteDataAPI {
 	 * @return Non-null map of keys:values. If no data, will return an empty map
 	 */
 	public static CompletableFuture<Map<String, String>> getAll(UUID uuid) {
-		RedisAPI api = RedisAPI.getInstance();
+		RedisAPI api = MonumentaRedisSync.redisApi();
 		if (api == null) {
 			CompletableFuture<Map<String, String>> future = new CompletableFuture<>();
 			future.completeExceptionally(new Exception("MonumentaRedisSync is not loaded!"));
@@ -126,6 +125,6 @@ public class RemoteDataAPI {
 	}
 
 	public static String getRedisPath(UUID uuid) {
-		return String.format("%s:playerdata:%s:remotedata", CommonConfig.getServerDomain(), uuid.toString());
+		return String.format("%s:playerdata:%s:remotedata", MonumentaRedisSync.config().getServerDomain(), uuid.toString());
 	}
 }

@@ -93,7 +93,7 @@ public class PlayerStateManager implements Listener {
 	}
 
 	public static void reload() {
-		RedisAPI.getInstance().async().hget(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_PLAYER_EVENT_SETTINGS_KEY)
+		MonumentaRedisSync.getRedisApiInstance().async().hget(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_PLAYER_EVENT_SETTINGS_KEY)
 			.thenApply(dataStr -> {
 				if (dataStr != null) {
 					Gson gson = new Gson();
@@ -116,7 +116,7 @@ public class PlayerStateManager implements Listener {
 		playerEventSettingsJson.add("message_visibility", mMessageVisibility.toJson());
 		playerEventSettingsJson.addProperty("is_default_chat", mIsDefaultChatPlugin);
 
-		RedisAPI.getInstance().async().hset(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_PLAYER_EVENT_SETTINGS_KEY, playerEventSettingsJson.toString());
+		MonumentaRedisSync.getRedisApiInstance().async().hset(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_PLAYER_EVENT_SETTINGS_KEY, playerEventSettingsJson.toString());
 
 		JsonObject wrappedConfigJson = new JsonObject();
 		wrappedConfigJson.add(REDIS_PLAYER_EVENT_SETTINGS_KEY, playerEventSettingsJson);

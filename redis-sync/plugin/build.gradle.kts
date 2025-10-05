@@ -1,15 +1,18 @@
+repositories {
+	mavenLocal()
+}
+
 dependencies {
-	implementation(libs.lettuce)
 	compileOnly(project(":network-relay"))
 	compileOnly(libs.commandapi)
-
-	// velocity dependencies
-	compileOnly(libs.velocity)
-	annotationProcessor(libs.velocity)
+	implementation(project(":redis-sync:common"))
+	annotationProcessor("com.floweytf.coro:ap:0.0.1-SNAPSHOT")
+	implementation("com.floweytf.coro:coro:0.0.1-SNAPSHOT")
 }
 
 tasks {
 	shadowJar {
 		exclude("META-INF/**/*")
+		relocate("com.floweytf.coro", "com.playmonumenta.redissync.shadow.coro")
 	}
 }

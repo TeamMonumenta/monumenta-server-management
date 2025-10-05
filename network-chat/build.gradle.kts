@@ -6,6 +6,7 @@ plugins {
 
 repositories {
 	mavenCentral()
+	mavenLocal()
 	maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
 	maven("https://repo.viaversion.com")
 }
@@ -15,7 +16,7 @@ dependencies {
 	implementation(libs.commons)
 	compileOnly(libs.commandapi)
 	compileOnly(project(":network-relay"))
-	compileOnly(project(":redis-sync:redissync"))
+	compileOnly(project(":redis-sync:plugin"))
 	compileOnly(libs.lettuce)
 	compileOnly(libs.placeholderapi)
 	compileOnly(libs.protocollib)

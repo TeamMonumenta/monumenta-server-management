@@ -3,84 +3,49 @@ package com.playmonumenta.redissync;
 import com.google.gson.JsonObject;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
-public class AccountTransferDetails implements Comparable<AccountTransferDetails> {
-	private final LocalDateTime mTransferTime;
-	private final UUID mOldId;
-	private final UUID mNewId;
-	private final String mOldName;
-	private final String mNewName;
+public record AccountTransferDetails(
+	LocalDateTime transferTime,
+	UUID oldId,
+	UUID newId,
+	String oldName,
+	String newName
+) implements Comparable<AccountTransferDetails> {
+	private static final Comparator<AccountTransferDetails> COMPARATOR =
+		Comparator.comparing(AccountTransferDetails::transferTime)
+			.thenComparing(AccountTransferDetails::oldId)
+			.thenComparing(AccountTransferDetails::newId)
+			.thenComparing(AccountTransferDetails::oldName)
+			.thenComparing(AccountTransferDetails::newName);
 
 	AccountTransferDetails(JsonObject data) {
-		long timestampMillis = data.getAsJsonPrimitive("timestamp_millis").getAsLong();
-		mTransferTime = AccountTransferManager.EPOCH.plus(timestampMillis, ChronoUnit.MILLIS);
-
-		String oldIdStr = data.getAsJsonPrimitive("old_id").getAsString();
-		mOldId = UUID.fromString(oldIdStr);
-
-		String newIdStr = data.getAsJsonPrimitive("new_id").getAsString();
-		mNewId = UUID.fromString(newIdStr);
-
-		mOldName = data.getAsJsonPrimitive("old_name").getAsString();
-
-		mNewName = data.getAsJsonPrimitive("new_name").getAsString();
+		this(
+			AccountTransferManager.EPOCH.plus(
+				data.getAsJsonPrimitive("timestamp_millis").getAsLong(),
+				ChronoUnit.MILLIS
+			),
+			UUID.fromString(data.getAsJsonPrimitive("old_id").getAsString()),
+			UUID.fromString(data.getAsJsonPrimitive("new_id").getAsString()),
+			data.getAsJsonPrimitive("old_name").getAsString(),
+			data.getAsJsonPrimitive("new_name").getAsString()
+		);
 	}
 
-	// Merge transfers if relevant
 	AccountTransferDetails(AccountTransferDetails oldTransfer, AccountTransferDetails newTransfer) {
-		mTransferTime = newTransfer.mTransferTime;
-		mOldId = oldTransfer.mOldId;
-		mOldName = oldTransfer.mOldName;
-		mNewId = newTransfer.mNewId;
-		mNewName = newTransfer.mNewName;
-	}
-
-	public LocalDateTime transferTime() {
-		return mTransferTime;
-	}
-
-	public UUID oldId() {
-		return mOldId;
-	}
-
-	public UUID newId() {
-		return mNewId;
-	}
-
-	public String oldName() {
-		return mOldName;
-	}
-
-	public String newName() {
-		return mNewName;
+		this(
+			newTransfer.transferTime,
+			oldTransfer.oldId,
+			newTransfer.newId,
+			oldTransfer.oldName,
+			newTransfer.newName
+		);
 	}
 
 	@Override
 	public int compareTo(@NotNull AccountTransferDetails o) {
-		int diff;
-
-		diff = mTransferTime.compareTo(o.mTransferTime);
-		if (diff != 0) {
-			return diff;
-		}
-
-		diff = mOldId.compareTo(o.mOldId);
-		if (diff != 0) {
-			return diff;
-		}
-
-		diff = mNewId.compareTo(o.mNewId);
-		if (diff != 0) {
-			return diff;
-		}
-
-		diff = mOldName.compareTo(o.mOldName);
-		if (diff != 0) {
-			return diff;
-		}
-
-		return mNewName.compareTo(o.mNewName);
+		return COMPARATOR.compare(this, o);
 	}
 }

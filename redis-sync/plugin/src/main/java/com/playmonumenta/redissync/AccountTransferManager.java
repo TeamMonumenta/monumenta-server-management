@@ -144,7 +144,7 @@ public class AccountTransferManager implements Listener {
 		transferDetails.addProperty("new_id", currentPlayerId.toString());
 		transferDetails.addProperty("new_name", currentPlayerName);
 
-		RedisAPI.getInstance().async().zadd(REDIS_KEY, (double) timestampMillis, transferDetails.toString());
+		MonumentaRedisSync.redisApi().async().zadd(REDIS_KEY, (double) timestampMillis, transferDetails.toString());
 	}
 
 	public static CompletableFuture<List<AccountTransferDetails>> getTransfersInRange(
@@ -199,7 +199,7 @@ public class AccountTransferManager implements Listener {
 				}
 
 				// Fetch the list of transfers from Redis
-				List<String> transferJsonStrList = RedisAPI.getInstance().async().zrangebyscore(REDIS_KEY, Range.from(
+				List<String> transferJsonStrList = MonumentaRedisSync.redisApi().async().zrangebyscore(REDIS_KEY, Range.from(
 					startBound,
 					endBound
 				)).toCompletableFuture().join();

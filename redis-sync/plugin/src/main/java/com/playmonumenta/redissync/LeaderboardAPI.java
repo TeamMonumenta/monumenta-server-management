@@ -1,6 +1,5 @@
 package com.playmonumenta.redissync;
 
-import com.playmonumenta.redissync.config.CommonConfig;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.ScoredValue;
 import java.util.LinkedHashMap;
@@ -19,7 +18,7 @@ public class LeaderboardAPI {
 	 * @param ascending If true, leaderboard and results are smallest to largest and vice versa
 	 */
 	public static CompletableFuture<Map<String, Integer>> get(String objective, long start, long stop, boolean ascending) {
-		RedisAPI api = RedisAPI.getInstance();
+		RedisAPI api = MonumentaRedisSync.redisApi();
 		final RedisFuture<List<ScoredValue<String>>> values;
 		if (ascending) {
 			values = api.async().zrangeWithScores(getRedisPath(objective), start, stop);
@@ -47,11 +46,11 @@ public class LeaderboardAPI {
 	 * @param value Leaderboard value
 	 */
 	public static void updateAsync(String objective, String name, long value) {
-		RedisAPI api = RedisAPI.getInstance();
+		RedisAPI api = MonumentaRedisSync.redisApi();
 		api.async().zadd(getRedisPath(objective), (double)value, name);
 	}
 
 	public static String getRedisPath(String objective) {
-		return String.format("%s:leaderboard:%s", CommonConfig.getServerDomain(), objective);
+		return String.format("%s:leaderboard:%s", MonumentaRedisSync.redisApi(), objective);
 	}
 }

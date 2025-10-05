@@ -2,12 +2,13 @@ package com.playmonumenta.redissync.adapters;
 
 import ca.spottedleaf.dataconverter.minecraft.MCDataConverter;
 import ca.spottedleaf.dataconverter.minecraft.datatypes.MCTypeRegistry;
+import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.playmonumenta.mixinapi.v1.RedisSyncIO;
+import com.playmonumenta.redissync.player.WorldData;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -21,7 +22,6 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.scores.Scoreboard;
 import org.bukkit.craftbukkit.v1_20_R3.scoreboard.CraftScoreboard;
 import org.bukkit.entity.Player;
-import org.jetbrains.annotations.Nullable;
 
 public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 	/**
@@ -34,7 +34,7 @@ public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 	}
 
 	@Override
-	public JsonObject getPlayerScoresAsJson(String playerName, org.bukkit.scoreboard.Scoreboard scoreboard) {
+	public ImmutableMap<String, Integer> getPlayerScores(String playerName, org.bukkit.scoreboard.Scoreboard scoreboard) {
 		return RedisSyncIO.getInstance().getPlayerScoresAsJson(playerName, scoreboard);
 	}
 
@@ -45,8 +45,8 @@ public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 	}
 
 	@Override
-	public Object retrieveSaveData(byte[] data, JsonObject shardData) throws IOException {
-		ByteArrayInputStream inBytes = new ByteArrayInputStream(data);
+	public Object retrieveSaveData(byte[] data, WorldData shardData) throws IOException {
+		final var inBytes = new ByteArrayInputStream(data);
 		CompoundTag nbt = NbtIo.readCompressed(inBytes, NbtAccounter.unlimitedHeap());
 
 		applyInt(shardData, nbt, "SpawnX");
@@ -80,57 +80,6 @@ public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 		applyCompoundOfDoubles(shardData, nbt, "enteredNetherPosition");
 
 		return nbt;
-	}
-
-	@Override
-	public VersionAdapter.SaveData extractSaveData(Object nbtObj, @Nullable VersionAdapter.ReturnParams returnParams) throws IOException {
-		CompoundTag nbt = (CompoundTag) nbtObj;
-
-		JsonObject obj = new JsonObject();
-		copyInt(obj, nbt, "SpawnX");
-		copyInt(obj, nbt, "SpawnY");
-		copyInt(obj, nbt, "SpawnZ");
-		copyBool(obj, nbt, "SpawnForced");
-		copyFloat(obj, nbt, "SpawnAngle");
-		copyStr(obj, nbt, "SpawnDimension");
-		// flying is nested in the abilities structure
-		if (nbt.contains("abilities")) {
-			CompoundTag abilities = nbt.getCompound("abilities");
-			copyBool(obj, abilities, "flying");
-		}
-		copyBool(obj, nbt, "FallFlying");
-		copyFloat(obj, nbt, "FallDistance");
-		copyBool(obj, nbt, "OnGround");
-		copyInt(obj, nbt, "Dimension");
-		copyStr(obj, nbt, "world");
-		copyLong(obj, nbt, "WorldUUIDMost");
-		copyLong(obj, nbt, "WorldUUIDLeast");
-		copyDoubleList(obj, nbt, "Pos");
-		copyDoubleList(obj, nbt, "Motion");
-		copyFloatList(obj, nbt, "Rotation");
-		copyDoubleList(obj, nbt, "Paper.Origin");
-		copyCompoundOfDoubles(obj, nbt, "enteredNetherPosition");
-
-		if (returnParams != null && returnParams.mReturnLoc != null) {
-			JsonArray arr = new JsonArray();
-			arr.add(returnParams.mReturnLoc.getX());
-			arr.add(returnParams.mReturnLoc.getY());
-			arr.add(returnParams.mReturnLoc.getZ());
-			obj.remove("Pos");
-			obj.add("Pos", arr);
-		}
-
-		if (returnParams != null && returnParams.mReturnPitch != null && returnParams.mReturnYaw != null) {
-			JsonArray arr = new JsonArray();
-			arr.add(returnParams.mReturnYaw);
-			arr.add(returnParams.mReturnPitch);
-			obj.remove("Rotation");
-			obj.add("Rotation", arr);
-		}
-
-		ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
-		NbtIo.writeCompressed(nbt, outBytes);
-		return new VersionAdapter.SaveData(outBytes.toByteArray(), obj.toString());
 	}
 
 	@Override

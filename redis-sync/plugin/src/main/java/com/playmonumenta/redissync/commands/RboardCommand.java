@@ -209,7 +209,7 @@ public class RboardCommand {
 					}
 					sender.sendMessage(
 						Component.text("[", NamedTextColor.WHITE)
-							.append(Component.join(JoinConfiguration.spaces(), entryComponents))
+							.append(Component.join(JoinConfiguration.separator(Component.text(" ")), entryComponents))
 							.append(Component.text("]"))
 					);
 				}
