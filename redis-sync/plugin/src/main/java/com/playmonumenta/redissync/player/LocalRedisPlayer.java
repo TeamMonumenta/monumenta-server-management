@@ -232,7 +232,7 @@ public class LocalRedisPlayer {
 
 		Co.await(mRedisHandler.syncRedis());
 		Co.await(Awaitable.from(mRedisHandler.commands().hset(
-			mRedisHandler.playerActiveDataKey(mPlayerUuid),
+			key,
 			currentData.toRedisData())
 		));
 
@@ -276,7 +276,7 @@ public class LocalRedisPlayer {
 	}
 
 	/**
-	 * Saves a history entry to redis.
+	 * Saves a history entry to redis, and sets and saves the active player to {@code data}.
 	 *
 	 * @param data            The history data.
 	 * @param historyMetaData The history metadata.

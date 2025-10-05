@@ -11,7 +11,6 @@ import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.config.BukkitConfig;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMaps;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Logger;
@@ -108,19 +107,10 @@ public class PlayerDataManager {
 			player
 		);
 
-		final var tasks = new ArrayList<Task<?>>();
-
-		// launch them in parallel, this way we prevent possible race conditions
-		tasks.add(localRedisPlayer.savePlayer(newData).begin());
-
 		if (historyMetaData != null) {
-			tasks.add(
-				localRedisPlayer.pushHistoryEntry(newData, historyMetaData, mConfig.getHistoryAmount()).begin()
-			);
-		}
-
-		for (final var task : tasks) {
-			Co.await(task);
+			Co.await(localRedisPlayer.pushHistoryEntry(newData, historyMetaData, mConfig.getHistoryAmount()).begin());
+		} else {
+			Co.await(localRedisPlayer.savePlayer(newData).begin());
 		}
 
 		return Co.ret();
