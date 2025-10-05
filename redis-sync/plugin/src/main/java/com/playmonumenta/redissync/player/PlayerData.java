@@ -23,7 +23,8 @@ public record PlayerData(
 	ImmutableMap<String, JsonElement> pluginData,
 	ImmutableMap<String, Integer> scoreData,
 	ImmutableMap<String, ShardData> shardData,
-	String advancements
+	String advancements,
+	String shard
 ) {
 	private static JsonObject bytesToJson(byte[] data) {
 		return PlayerDataManager.GSON.fromJson(new InputStreamReader(new ByteArrayInputStream(data)),
@@ -39,31 +40,31 @@ public record PlayerData(
 	}
 
 	public PlayerData withPlayerData(byte[] playerData) {
-		return new PlayerData(playerData, pluginData, scoreData, shardData, advancements);
+		return new PlayerData(playerData, pluginData, scoreData, shardData, advancements, shard);
 	}
 
 	public PlayerData withAdvancements(String advancements) {
-		return new PlayerData(playerData, pluginData, scoreData, shardData, advancements);
+		return new PlayerData(playerData, pluginData, scoreData, shardData, advancements, shard);
 	}
 
 	public PlayerData withScores(ImmutableMap<String, Integer> scoreData) {
-		return new PlayerData(playerData, pluginData, scoreData, shardData, advancements);
+		return new PlayerData(playerData, pluginData, scoreData, shardData, advancements, shard);
 	}
 
 	public PlayerData withShardData(String shardName, ShardData shardData) {
 		return new PlayerData(
 			playerData, pluginData, scoreData,
 			Util.extend(this.shardData, shardName, shardData),
-			advancements
+			advancements,
+			shard
 		);
 	}
-
-	// internal methods for loading/storing data to redis
 
 	static PlayerData fromRedisData(Map<String, byte[]> data) {
 		final var playerData = Objects.requireNonNull(data.get("player"));
 		final var pluginData = Objects.requireNonNull(data.get("plugin"));
 		final var scores = Objects.requireNonNull(data.get("scores"));
+		final var shardData = Objects.requireNonNull(data.get("shard_data"));
 		final var shard = Objects.requireNonNull(data.get("shard"));
 		final var advancements = Objects.requireNonNull(data.get("advancements"));
 
@@ -73,9 +74,10 @@ public record PlayerData(
 			ImmutableMap.copyOf(bytesToJson(pluginData).asMap()),
 			ImmutableMap.copyOf(bytesToJson(scores, new TypeToken<Map<String, Integer>>() {
 			})),
-			ImmutableMap.copyOf(bytesToJson(shard, new TypeToken<Map<String, ShardData>>() {
+			ImmutableMap.copyOf(bytesToJson(shardData, new TypeToken<Map<String, ShardData>>() {
 			})),
-			new String(advancements, StandardCharsets.UTF_8)
+			new String(advancements, StandardCharsets.UTF_8),
+			new String(shard, StandardCharsets.UTF_8)
 		);
 	}
 
@@ -84,8 +86,12 @@ public record PlayerData(
 			"player", playerData,
 			"plugin", jsonToBytes(playerData),
 			"scores", jsonToBytes(scoreData),
-			"shard", jsonToBytes(shardData),
+			"shard_data", jsonToBytes(shardData),
 			"advancements", advancements.getBytes(StandardCharsets.UTF_8)
 		);
+	}
+
+	public void withShard(String shard) {
+
 	}
 }
