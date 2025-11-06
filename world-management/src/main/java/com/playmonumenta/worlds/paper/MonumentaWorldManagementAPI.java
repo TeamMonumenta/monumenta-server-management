@@ -171,6 +171,11 @@ public class MonumentaWorldManagementAPI {
 
 	public static CompletableFuture<Void> unloadWorld(String worldName) {
 		CompletableFuture<Void> future = new CompletableFuture<>();
+		WorldManagementListener listener = WorldManagementListener.getInstance();
+		if (listener == null) {
+			future.completeExceptionally(new Exception("WorldManagementListener is null"));
+			return future;
+		}
 
 		World world = Bukkit.getWorld(worldName);
 		if (world == null) {
@@ -188,6 +193,14 @@ public class MonumentaWorldManagementAPI {
 		if (!world.getPlayers().isEmpty()) {
 			future.completeExceptionally(new Exception("Can't unload world '" + worldName + "' because there are still players in it"));
 			return future;
+		}
+
+		// FIXME: replace with configuration phase aware code
+		for (final var loadingPlayerWorldName : listener.mHackJoinWorldFix.values()) {
+			if (worldName.equals(loadingPlayerWorldName)) {
+				future.completeExceptionally(new Exception("Can't unload world '" + worldName + "' because players are loading into it"));
+				return future;
+			}
 		}
 
 		world.setKeepSpawnInMemory(false);
