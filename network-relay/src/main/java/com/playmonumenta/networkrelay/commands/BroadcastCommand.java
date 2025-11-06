@@ -1,7 +1,9 @@
-package com.playmonumenta.networkrelay;
+package com.playmonumenta.networkrelay.commands;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import com.playmonumenta.networkrelay.NetworkRelayAPI;
+import com.playmonumenta.networkrelay.NetworkRelayMessageEvent;
 import com.playmonumenta.networkrelay.util.MMLog;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;

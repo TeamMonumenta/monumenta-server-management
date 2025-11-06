@@ -1,5 +1,8 @@
-package com.playmonumenta.networkrelay;
+package com.playmonumenta.networkrelay.commands;
 
+import com.playmonumenta.networkrelay.NetworkRelayAPI;
+import com.playmonumenta.networkrelay.RemotePlayerAPI;
+import com.playmonumenta.networkrelay.RemotePlayerData;
 import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.proxy.Player;
