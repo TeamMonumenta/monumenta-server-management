@@ -195,10 +195,22 @@ public class MonumentaWorldManagementAPI {
 			return future;
 		}
 
+		// Bukkit.getOnlinePlayers() updates the fastest, so it might have a player still loading in
+		for (final var tempPlayer : Bukkit.getOnlinePlayers()) {
+			if (tempPlayer == null) {
+				continue;
+			}
+			final var tempWorld = tempPlayer.getWorld();
+			if (tempWorld.getName() == worldName) {
+				future.completeExceptionally(new Exception("Can't unload world '" + worldName + "' because there are still players in it (getOnlinePlayers check)"));
+				return future;
+			}
+		}
+
 		// FIXME: replace with configuration phase aware code
 		for (final var loadingPlayerWorldName : listener.mHackJoinWorldFix.values()) {
 			if (worldName.equals(loadingPlayerWorldName)) {
-				future.completeExceptionally(new Exception("Can't unload world '" + worldName + "' because players are loading into it"));
+				future.completeExceptionally(new Exception("Can't unload world '" + worldName + "' because there are still players in it (HackJoinWorldFix check)"));
 				return future;
 			}
 		}

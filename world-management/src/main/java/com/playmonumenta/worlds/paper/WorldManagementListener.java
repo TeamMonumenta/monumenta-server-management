@@ -20,6 +20,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.plugin.Plugin;
@@ -162,11 +163,11 @@ public class WorldManagementListener implements Listener {
 		Player player = event.getPlayer();
 		final var uuid = player.getUniqueId();
 		// FIXME: replace with configuration phase aware code
-		Bukkit.getScheduler().runTaskLater(mPlugin, () -> {
+		Bukkit.getScheduler().runTask(mPlugin, () -> {
 			if (Bukkit.getPlayer(uuid) == null) {
 				mHackJoinWorldFix.remove(uuid);
 			}
-		}, 20);
+		});
 		ShardInfo info = WorldManagementPlugin.getShardInfo(player);
 		if (info == null) {
 			return;
@@ -210,6 +211,12 @@ public class WorldManagementListener implements Listener {
 
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
 	public void playerQuitEvent(PlayerQuitEvent event) {
+		final var uuid = event.getPlayer().getUniqueId();
+		mHackJoinWorldFix.remove(uuid);
+	}
+
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void playerKickEvent(PlayerKickEvent event) {
 		final var uuid = event.getPlayer().getUniqueId();
 		mHackJoinWorldFix.remove(uuid);
 	}
