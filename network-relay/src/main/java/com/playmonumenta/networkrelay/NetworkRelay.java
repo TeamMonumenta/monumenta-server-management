@@ -5,6 +5,7 @@ import com.playmonumenta.networkrelay.commands.ChangeLogLevelCommand;
 import com.playmonumenta.networkrelay.commands.DebugHeartbeatCommand;
 import com.playmonumenta.networkrelay.commands.ListShardsCommand;
 import com.playmonumenta.networkrelay.commands.RemotePlayerAPICommand;
+import com.playmonumenta.networkrelay.commands.SendCommand;
 import com.playmonumenta.networkrelay.commands.WhereIsCommand;
 import com.playmonumenta.networkrelay.config.BukkitConfig;
 import com.playmonumenta.networkrelay.shardhealth.ShardHealthManager;
@@ -25,6 +26,7 @@ public class NetworkRelay extends JavaPlugin {
 	@Override
 	public void onLoad() {
 		mBroadcastCommand = new BroadcastCommand(this);
+		new SendCommand(this);
 		ChangeLogLevelCommand.register(this);
 		DebugHeartbeatCommand.registerCommands();
 		ListShardsCommand.register();

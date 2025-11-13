@@ -13,7 +13,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
 
 public class ListShardsCommand {
-	protected static void register() {
+	public static void register() {
 		CommandAPICommand innerCommand = new CommandAPICommand("listShards")
 			.withPermission(CommandPermission.fromString("monumenta.networkrelay.listshards"))
 			.executes((sender, args) -> {
