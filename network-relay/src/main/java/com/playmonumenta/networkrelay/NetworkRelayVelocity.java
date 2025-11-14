@@ -1,6 +1,7 @@
 package com.playmonumenta.networkrelay;
 
 import com.google.inject.Inject;
+import com.playmonumenta.networkrelay.commands.WhereIsCommandVelocity;
 import com.playmonumenta.networkrelay.config.BungeeConfig;
 import com.playmonumenta.networkrelay.config.CommonConfig;
 import com.velocitypowered.api.event.PostOrder;

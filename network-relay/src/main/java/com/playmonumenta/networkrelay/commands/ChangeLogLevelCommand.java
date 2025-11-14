@@ -1,5 +1,6 @@
-package com.playmonumenta.networkrelay;
+package com.playmonumenta.networkrelay.commands;
 
+import com.playmonumenta.networkrelay.NetworkRelay;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import java.util.logging.Level;

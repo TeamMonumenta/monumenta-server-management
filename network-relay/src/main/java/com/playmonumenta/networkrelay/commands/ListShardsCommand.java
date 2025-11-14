@@ -1,5 +1,7 @@
-package com.playmonumenta.networkrelay;
+package com.playmonumenta.networkrelay.commands;
 
+import com.playmonumenta.networkrelay.NetworkRelayAPI;
+import com.playmonumenta.networkrelay.RemotePlayerAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import java.util.ArrayList;
@@ -11,7 +13,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
 
 public class ListShardsCommand {
-	protected static void register() {
+	public static void register() {
 		CommandAPICommand innerCommand = new CommandAPICommand("listShards")
 			.withPermission(CommandPermission.fromString("monumenta.networkrelay.listshards"))
 			.executes((sender, args) -> {
