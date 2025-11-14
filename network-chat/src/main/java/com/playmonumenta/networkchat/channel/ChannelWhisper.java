@@ -446,7 +446,7 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 
 	@Override
 	public void distributeMessage(Message message) {
-		showMessage(Bukkit.getConsoleSender(), message);
+		super.distributeMessage(message);
 
 		JsonObject extraData = message.getExtraData();
 		if (extraData == null) {

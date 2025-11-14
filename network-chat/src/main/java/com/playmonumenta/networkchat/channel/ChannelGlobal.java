@@ -25,7 +25,6 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
@@ -215,7 +214,7 @@ public class ChannelGlobal extends Channel implements ChannelAutoJoin, ChannelPe
 
 	@Override
 	public void distributeMessage(Message message) {
-		showMessage(Bukkit.getConsoleSender(), message);
+		super.distributeMessage(message);
 		for (Map.Entry<UUID, PlayerState> playerStateEntry : PlayerStateManager.getPlayerStates().entrySet()) {
 			PlayerState state = playerStateEntry.getValue();
 			Player player = state.getPlayer();

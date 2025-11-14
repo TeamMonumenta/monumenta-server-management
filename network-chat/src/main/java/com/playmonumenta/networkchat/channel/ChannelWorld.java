@@ -29,7 +29,6 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.BlockCommandSender;
 import org.bukkit.command.CommandSender;
@@ -274,7 +273,7 @@ public class ChannelWorld extends Channel implements ChannelAutoJoin, ChannelPer
 		}
 		fromWorld = fromWorldJsonPrimitive.getAsString();
 
-		showMessage(Bukkit.getConsoleSender(), message);
+		super.distributeMessage(message);
 		for (Map.Entry<UUID, PlayerState> playerStateEntry : PlayerStateManager.getPlayerStates().entrySet()) {
 			PlayerState state = playerStateEntry.getValue();
 			Player player = state.getPlayer();

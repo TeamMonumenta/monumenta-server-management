@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
@@ -279,7 +280,9 @@ public abstract class Channel {
 
 	// Distributes a received message to the appropriate local player chat states. May be local or remote messages.
 	// Note that sending to player chat state allows chat to be paused.
-	public abstract void distributeMessage(Message message);
+	public void distributeMessage(Message message) {
+		Bukkit.getConsoleSender().sendMessage(MessagingUtils.plainText(message.shownMessage()));
+	}
 
 	// Get how the message appears to a given recipient.
 	public abstract Component shownMessage(Message message);
