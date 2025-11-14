@@ -77,7 +77,7 @@ public class MessageManager implements Listener {
 			NamespacedKey senderType = message.getSenderType();
 			String senderTypeStr = (senderType == null) ? "console?" : senderType.toString();
 			String sender = message.getSenderName();
-			String shownMessage = MessagingUtils.plainText(message.shownMessage(moderator));
+			String shownMessage = MessagingUtils.plainText(message.shownMessage());
 
 			NetworkChatPlugin.logModChatAction(
 				moderator.getName(),

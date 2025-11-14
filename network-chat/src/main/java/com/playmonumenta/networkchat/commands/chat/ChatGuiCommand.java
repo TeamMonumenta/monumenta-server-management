@@ -27,7 +27,7 @@ public class ChatGuiCommand extends Gui {
 	final Message mMessage;
 
 	public ChatGuiCommand(Player player, Message message) {
-		super(player, 9, message.shownMessage(player));
+		super(player, 9, message.shownMessage());
 		mMessage = message;
 	}
 

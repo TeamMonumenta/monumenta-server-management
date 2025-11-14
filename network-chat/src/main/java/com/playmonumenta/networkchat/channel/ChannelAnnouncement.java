@@ -237,7 +237,7 @@ public class ChannelAnnouncement extends Channel implements ChannelAutoJoin, Cha
 	}
 
 	@Override
-	public Component shownMessage(CommandSender recipient, Message message) {
+	public Component shownMessage(Message message) {
 		TextColor channelColor;
 		if (mMessageColor != null) {
 			channelColor = mMessageColor;
@@ -260,7 +260,7 @@ public class ChannelAnnouncement extends Channel implements ChannelAutoJoin, Cha
 
 	@Override
 	public void showMessage(CommandSender recipient, Message message) {
-		recipient.sendMessage(shownMessage(recipient, message));
+		recipient.sendMessage(shownMessage(message));
 		if (recipient instanceof Player player) {
 			@Nullable PlayerState playerState = PlayerStateManager.getPlayerState(player);
 			if (playerState == null) {

@@ -282,7 +282,7 @@ public abstract class Channel {
 	public abstract void distributeMessage(Message message);
 
 	// Get how the message appears to a given recipient.
-	public abstract Component shownMessage(CommandSender recipient, Message message);
+	public abstract Component shownMessage(Message message);
 
 	// Show a message to a player immediately; must be called from Message via PlayerState, not directly.
 	public abstract void showMessage(CommandSender recipient, Message message);

@@ -231,7 +231,7 @@ public class ChannelGlobal extends Channel implements ChannelAutoJoin, ChannelPe
 	}
 
 	@Override
-	public Component shownMessage(CommandSender recipient, Message message) {
+	public Component shownMessage(Message message) {
 		TextColor channelColor;
 		if (mMessageColor != null) {
 			channelColor = mMessageColor;
@@ -257,7 +257,7 @@ public class ChannelGlobal extends Channel implements ChannelAutoJoin, ChannelPe
 	@Override
 	public void showMessage(CommandSender recipient, Message message) {
 		UUID senderUuid = message.getSenderId();
-		recipient.sendMessage(shownMessage(recipient, message));
+		recipient.sendMessage(shownMessage(message));
 		if (recipient instanceof Player player && !player.getUniqueId().equals(senderUuid)) {
 			@Nullable PlayerState playerState = PlayerStateManager.getPlayerState(player);
 			if (playerState == null) {
