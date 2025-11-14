@@ -113,7 +113,7 @@ public class SendCommand {
 			}
 		}
 
-		return ArgUtils.quote(result);
+		return ArgUtils.quotedAndUnquoted(result);
 	}
 
 	private static String findCommonPrefix(String a, String b) {

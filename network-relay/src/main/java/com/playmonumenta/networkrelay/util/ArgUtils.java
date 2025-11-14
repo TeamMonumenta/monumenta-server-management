@@ -45,4 +45,15 @@ public class ArgUtils {
 		}
 		return possiblyQuotedArgs;
 	}
+
+	public static Collection<String> quotedAndUnquoted(Collection<String> args) {
+		Collection<String> possiblyQuotedArgs = new ArrayList<>();
+		for (String arg : args) {
+			quote(arg);
+			if (!requiresQuotes(arg)) {
+				possiblyQuotedArgs.add(arg);
+			}
+		}
+		return possiblyQuotedArgs;
+	}
 }
