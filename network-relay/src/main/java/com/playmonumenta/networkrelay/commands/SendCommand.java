@@ -7,6 +7,7 @@ import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import dev.jorel.commandapi.arguments.GreedyStringArgument;
 import dev.jorel.commandapi.arguments.TextArgument;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -23,7 +24,7 @@ import org.bukkit.plugin.Plugin;
 public class SendCommand {
 	public SendCommand(Plugin plugin) {
 		TextArgument targetArg = new TextArgument("target shard(s)");
-		targetArg.replaceSuggestions(ArgumentSuggestions.strings(info -> getTargetSuggestions()));
+		targetArg.replaceSuggestions(ArgumentSuggestions.stringCollection(info -> getTargetSuggestions()));
 
 		GreedyStringArgument commandArg = new GreedyStringArgument("command");
 
@@ -97,7 +98,7 @@ public class SendCommand {
 		return result;
 	}
 
-	private static String[] getTargetSuggestions() {
+	private static Collection<String> getTargetSuggestions() {
 		TreeSet<String> result = new TreeSet<>();
 		List<String> onlineShards = new ArrayList<>(new TreeSet<>(NetworkRelayAPI.getOnlineShardNames()));
 
@@ -112,7 +113,7 @@ public class SendCommand {
 			}
 		}
 
-		return ArgUtils.quoteIfNeeded(result);
+		return ArgUtils.quote(result);
 	}
 
 	private static String findCommonPrefix(String a, String b) {
