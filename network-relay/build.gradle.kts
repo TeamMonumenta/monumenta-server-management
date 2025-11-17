@@ -26,7 +26,7 @@ dependencies {
 
 monumenta {
 	id("MonumentaNetworkRelay")
-	name("NetworkRelay")
+	name("MonumentaNetworkRelay")
 	paper(
 		"com.playmonumenta.networkrelay.NetworkRelay", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20",
 		depends = listOf("CommandAPI"),

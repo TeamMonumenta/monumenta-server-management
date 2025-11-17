@@ -25,7 +25,7 @@ tasks {
 
 monumenta {
 	id("MonumentaStructureManagement")
-	name("StructureManagement")
+	name("MonumentaStructureManagement")
     paper(
         "com.playmonumenta.structures.StructuresPlugin", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20",
         depends = listOf("CommandAPI", "FastAsyncWorldEdit", "ScriptedQuests")

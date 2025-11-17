@@ -15,7 +15,7 @@ tasks {
 
 monumenta {
 	id("MonumentaRedisSync")
-	name("RedisSync")
+	name("MonumentaRedisSync")
 	pluginProject("redissync")
 	paper(
 		"com.playmonumenta.redissync.MonumentaRedisSync", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20",

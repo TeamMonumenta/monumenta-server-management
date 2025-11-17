@@ -24,7 +24,7 @@ dependencies {
 
 monumenta {
 	id("MonumentaNetworkChat")
-	name("NetworkChat")
+	name("MonumentaNetworkChat")
 	paper(
 		"com.playmonumenta.networkchat.NetworkChatPlugin", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.19",
 		depends = listOf(
