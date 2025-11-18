@@ -77,6 +77,7 @@ fun easyConfigureDeployTask(
     }
 }
 
+// usb: not used because Monumenta plugin would delete other symlinks
 fun easyCreateNormalDeploy(
     project: Project,
     shadowJarTask: Jar,
@@ -149,7 +150,7 @@ fun easySetup(project: Project, shadowJarTask: Jar) {
     val projectName = shadowJarTask.archiveBaseName.get()
 
     for (i in 1..4) {
-        easyCreateNormalDeploy(
+        easyCreateSymlinkDeploy(
             project,
             shadowJarTask,
             basicssh,
@@ -160,7 +161,7 @@ fun easySetup(project: Project, shadowJarTask: Jar) {
         )
     }
 
-    easyCreateNormalDeploy(
+    easyCreateSymlinkDeploy(
         project,
         shadowJarTask,
         basicssh,
@@ -170,7 +171,7 @@ fun easySetup(project: Project, shadowJarTask: Jar) {
         "/home/epic/futurama_shard_plugins"
     )
 
-    easyCreateNormalDeploy(
+    easyCreateSymlinkDeploy(
         project,
         shadowJarTask,
         basicssh,
