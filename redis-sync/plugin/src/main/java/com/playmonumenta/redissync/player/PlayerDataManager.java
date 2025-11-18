@@ -52,7 +52,13 @@ public class PlayerDataManager {
 	}
 
 	public LocalRedisPlayer getLocalPlayerData(UUID uuid) {
-		return mOnlinePlayerCache.get(uuid);
+		final var player = mOnlinePlayerCache.get(uuid);
+		Preconditions.checkArgument(player != null, "player '%s' not found", uuid);
+		return player;
+	}
+
+	public LocalRedisPlayer getLocalPlayerData(Player uuid) {
+		return getLocalPlayerData(uuid.getUniqueId());
 	}
 
 	PlayerData loadFromPlayer(PlayerData data, Player player) {

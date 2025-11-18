@@ -31,34 +31,4 @@ public class PlayerHistory {
 				}
 			).register();
 	}
-
-	private static void playerHistory(Plugin plugin, CommandSender sender, Player target) {
-		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-			// ASYNC
-			RedisAPI api = MonumentaRedisSync.redisApi();
-			List<String> history = api.async().lrange(MonumentaRedisSyncAPI.getRedisHistoryPath(target), 0, -1).toCompletableFuture().join();
-
-			Bukkit.getScheduler().runTask(plugin, () -> {
-				// SYNC
-				int idx = 0;
-				for (String hist : history) {
-					String[] split = hist.split("\\|");
-					if (split.length != 3) {
-						sender.sendMessage(Component.text("Got corrupted history with " + split.length + " entries: " + hist, NamedTextColor.RED));
-						continue;
-					}
-
-					sender.sendMessage(
-						Component.text(idx, NamedTextColor.AQUA)
-							.append(Component.space())
-							.append(Component.text(split[0], NamedTextColor.GOLD))
-							.append(Component.space())
-							.append(Component.text(MonumentaRedisSyncAPI.getTimeDifferenceSince(Long.parseLong(split[1])), NamedTextColor.WHITE))
-							.append(Component.text(" ago"))
-					);
-					idx += 1;
-				}
-			});
-		});
-	}
 }

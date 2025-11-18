@@ -20,7 +20,6 @@ import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
-import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -99,53 +98,6 @@ public class MonumentaRedisSyncAPI {
 		return mNameToUuidTrie.suggestions(currentInput, maxSuggestions);
 	}
 
-	public static void stashInfo(Player player, @Nullable String name) throws Exception {
-		MonumentaRedisSync mrs = MonumentaRedisSync.getInstance();
-
-		RedisAPI api = MonumentaRedisSync.redisApi();
-
-		String saveName;
-		if (name != null) {
-			saveName = name;
-		} else {
-			saveName = player.getUniqueId().toString();
-		}
-
-		Bukkit.getScheduler().runTaskAsynchronously(mrs, () -> {
-			String history = api.async().hget(getStashPath(), saveName + "-history").toCompletableFuture().join();
-			Bukkit.getScheduler().runTask(mrs, () -> {
-				if (history == null) {
-					if (name == null) {
-						player.sendMessage(Component.text("You don't have any stash data", NamedTextColor.RED));
-					} else {
-						player.sendMessage(Component.text("No stash data found for '" + name + "'", NamedTextColor.RED));
-					}
-					return;
-				}
-
-				String[] split = history.split("\\|");
-				if (split.length != 3) {
-					player.sendMessage(Component.text("Got corrupted history with " + split.length + " entries: " + history, NamedTextColor.RED));
-					return;
-				}
-
-				if (name == null) {
-					player.sendMessage(Component.text("Stash last saved on " + split[0] + " " + getTimeDifferenceSince(Long.parseLong(split[1])) + " ago", NamedTextColor.GOLD));
-				} else {
-					player.sendMessage(Component.text("Stash '" + name + "' last saved on " + split[0] + " by " + split[2] + " " + getTimeDifferenceSince(Long.parseLong(split[1])) + " ago", NamedTextColor.GOLD));
-				}
-			});
-		});
-	}
-
-	public static String getRedisDataPath(Player player) {
-		return getRedisDataPath(player.getUniqueId());
-	}
-
-	public static String getRedisDataPath(UUID uuid) {
-		return String.format("%s:playerdata:%s:data", MonumentaRedisSync.config().getServerDomain(), uuid.toString());
-	}
-
 	public static String getRedisHistoryPath(Player player) {
 		return getRedisHistoryPath(player.getUniqueId());
 	}
@@ -154,42 +106,6 @@ public class MonumentaRedisSyncAPI {
 		return String.format("%s:playerdata:%s:history", MonumentaRedisSync.config().getServerDomain(), uuid.toString());
 	}
 
-	public static String getRedisPerShardDataPath(Player player) {
-		return getRedisPerShardDataPath(player.getUniqueId());
-	}
-
-	public static String getRedisPerShardDataPath(UUID uuid) {
-		return String.format("%s:playerdata:%s:sharddata", MonumentaRedisSync.config().getServerDomain(), uuid.toString());
-	}
-
-	public static String getRedisPerShardDataWorldKey(World world) {
-		return getRedisPerShardDataWorldKey(world.getUID(), world.getName());
-	}
-
-	public static String getRedisPerShardDataWorldKey(UUID worldUUID, String worldName) {
-		return worldUUID.toString() + ":" + worldName;
-	}
-
-
-	public static String getRedisPluginDataPath(Player player) {
-		return getRedisPluginDataPath(player.getUniqueId());
-	}
-
-	public static String getRedisPluginDataPath(UUID uuid) {
-		return String.format("%s:playerdata:%s:plugins", MonumentaRedisSync.config().getServerDomain(), uuid.toString());
-	}
-
-	public static String getRedisAdvancementsPath(Player player) {
-		return getRedisAdvancementsPath(player.getUniqueId());
-	}
-
-	public static String getRedisAdvancementsPath(UUID uuid) {
-		return String.format("%s:playerdata:%s:advancements", MonumentaRedisSync.config().getServerDomain(), uuid.toString());
-	}
-
-	public static String getRedisScoresPath(Player player) {
-		return getRedisScoresPath(player.getUniqueId());
-	}
 
 	public static String getRedisScoresPath(UUID uuid) {
 		return String.format("%s:playerdata:%s:scores", MonumentaRedisSync.config().getServerDomain(), uuid.toString());
@@ -197,10 +113,6 @@ public class MonumentaRedisSyncAPI {
 
 	public static String getStashPath() {
 		return String.format("%s:stash", MonumentaRedisSync.config().getServerDomain());
-	}
-
-	public static String getStashListPath() {
-		return String.format("%s:stashlist", MonumentaRedisSync.config().getServerDomain());
 	}
 
 	public static String getTimeDifferenceSince(long compareTime) {

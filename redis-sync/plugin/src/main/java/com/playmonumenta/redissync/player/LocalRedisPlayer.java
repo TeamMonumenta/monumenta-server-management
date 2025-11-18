@@ -217,28 +217,6 @@ public class LocalRedisPlayer {
 	// remember that it is very important each of these operations are transactional, so we must
 	// use multi() for stuff (remember to use redis thread!)
 
-	/**
-	 * Saves the current player data to the active player data on redis.
-	 *
-	 * @return the task
-	 */
-	@Coroutine
-	Task<Void> savePlayer(PlayerData newData) {
-		Preconditions.checkState(Bukkit.isPrimaryThread());
-		Preconditions.checkState(!mHasDisconnected);
-
-		final var currentData = this.mActivePlayerData = newData;
-		final var key = mRedisHandler.playerActiveDataKey(mPlayerUuid);
-
-		Co.await(mRedisHandler.syncRedis());
-		Co.await(Awaitable.from(mRedisHandler.commands().hset(
-			key,
-			currentData.toRedisData())
-		));
-
-		return Co.ret();
-	}
-
 	private byte[] packGlobalData() {
 		return PlayerDataManager.GSON.toJson(
 			new PlayerGlobalData(
@@ -271,6 +249,28 @@ public class LocalRedisPlayer {
 		}
 		commands.hset(mRedisHandler.storageKey(blobAdded), data.toRedisData());
 		Co.await(Awaitable.from(commands.exec()));
+
+		return Co.ret();
+	}
+
+	/**
+	 * Saves the current player data to the active player data on redis.
+	 *
+	 * @return the task
+	 */
+	@Coroutine
+	Task<Void> savePlayer(PlayerData newData) {
+		Preconditions.checkState(Bukkit.isPrimaryThread());
+		Preconditions.checkState(!mHasDisconnected);
+
+		final var currentData = this.mActivePlayerData = newData;
+		final var key = mRedisHandler.playerActiveDataKey(mPlayerUuid);
+
+		Co.await(mRedisHandler.syncRedis());
+		Co.await(Awaitable.from(mRedisHandler.commands().hset(
+			key,
+			currentData.toRedisData())
+		));
 
 		return Co.ret();
 	}
