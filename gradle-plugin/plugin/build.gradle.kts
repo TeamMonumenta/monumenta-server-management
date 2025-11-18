@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "com.playmonumenta.gradle-config"
-version = "3.6-SNAPSHOT"
+version = "3.7.1"
 
 repositories {
     mavenCentral()
@@ -34,7 +34,7 @@ dependencies {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
 gradlePlugin {
@@ -100,4 +100,3 @@ afterEvaluate {
         }
     }
 }
-
