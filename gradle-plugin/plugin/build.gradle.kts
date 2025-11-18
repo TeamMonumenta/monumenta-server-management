@@ -6,7 +6,7 @@ plugins {
     `java-gradle-plugin`
     `maven-publish`
     alias(libs.plugins.jvm)
-    id("com.github.johnrengelman.shadow") version "8.+"
+    id("com.gradleup.shadow") version "8.+"
 }
 
 group = "com.playmonumenta.gradle-config"

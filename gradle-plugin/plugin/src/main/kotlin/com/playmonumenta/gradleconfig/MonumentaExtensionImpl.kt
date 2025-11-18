@@ -361,7 +361,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
         }
 
         pluginProject.applyPlugin(
-            "com.github.johnrengelman.shadow",
+            "com.gradleup.shadow",
             "maven-publish"
         )
 
