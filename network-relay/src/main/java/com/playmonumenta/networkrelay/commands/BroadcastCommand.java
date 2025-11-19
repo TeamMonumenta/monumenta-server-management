@@ -1,7 +1,9 @@
-package com.playmonumenta.networkrelay;
+package com.playmonumenta.networkrelay.commands;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import com.playmonumenta.networkrelay.NetworkRelayAPI;
+import com.playmonumenta.networkrelay.NetworkRelayMessageEvent;
 import com.playmonumenta.networkrelay.util.MMLog;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
@@ -25,18 +27,18 @@ public class BroadcastCommand implements Listener {
 		NetworkRelayAPI.ServerType.ALL,
 		NetworkRelayAPI.ServerType.MINECRAFT
 	);
-	private static final CommandPermission BROADCAST_PERMISSION
+	protected static final CommandPermission BROADCAST_PERMISSION
 		= CommandPermission.fromString("monumenta.networkrelay.broadcastcommand");
-	private static final CommandPermission BROADCAST_MINECRAFT_PERMISSION
+	protected static final CommandPermission BROADCAST_MINECRAFT_PERMISSION
 		= CommandPermission.fromString("monumenta.networkrelay.broadcastminecraftcommand");
-	private static final CommandPermission BROADCAST_PROXY_PERMISSION
+	protected static final CommandPermission BROADCAST_PROXY_PERMISSION
 		= CommandPermission.fromString("monumenta.networkrelay.broadcastproxycommand");
 
 	private static boolean ENABLED = false;
 
 	private final Logger mLogger;
 
-	protected BroadcastCommand(Plugin plugin) {
+	public BroadcastCommand(Plugin plugin) {
 		mLogger = plugin.getLogger();
 
 		GreedyStringArgument commandArg = new GreedyStringArgument("command");
@@ -107,7 +109,7 @@ public class BroadcastCommand implements Listener {
 		}
 
 		/* Replace all instances of @S with the player's name */
-		command = command.replaceAll("@S", name);
+		command = command.replace("@S", name);
 
 		String typeStr = switch (serverType) {
 			case PROXY -> "all proxy";
@@ -126,7 +128,11 @@ public class BroadcastCommand implements Listener {
 		}
 	}
 
-	protected static void setEnabled(boolean enabled) {
+	public static boolean isEnabled() {
+		return ENABLED;
+	}
+
+	public static void setEnabled(boolean enabled) {
 		ENABLED = enabled;
 	}
 
