@@ -1,0 +1,6 @@
+name: Publish 2
+on: workflow_dispatch
+jobs:
+  call-build-common:
+    uses: TeamMonumenta/monumenta-automation/.github/workflows/plugin_publish_common.yml@master
+    secrets: inherit
