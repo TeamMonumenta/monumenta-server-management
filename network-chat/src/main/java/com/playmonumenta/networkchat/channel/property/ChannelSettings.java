@@ -10,6 +10,7 @@ import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
 import net.kyori.adventure.text.Component;
@@ -34,7 +35,7 @@ public class ChannelSettings {
 
 		public static @Nullable FlagKey of(String s) {
 			try {
-				return valueOf(s.toUpperCase());
+				return valueOf(s.toUpperCase(Locale.ROOT));
 			} catch (Exception e) {
 				return null;
 			}
@@ -58,7 +59,7 @@ public class ChannelSettings {
 
 		public static @Nullable FlagValue of(String s) {
 			try {
-				return valueOf(s.toUpperCase());
+				return valueOf(s.toUpperCase(Locale.ROOT));
 			} catch (Exception e) {
 				return null;
 			}

@@ -15,7 +15,7 @@ public class ArgUtils {
 		return !RE_ALLOWED_WITHOUT_QUOTES.matcher(arg).matches();
 	}
 
-	public static @Nullable String quote(String arg) {
+	public static @Nullable String quote(@Nullable String arg) {
 		if (arg == null) {
 			return null;
 		}
