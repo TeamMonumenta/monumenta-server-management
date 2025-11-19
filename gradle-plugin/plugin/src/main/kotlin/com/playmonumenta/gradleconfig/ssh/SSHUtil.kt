@@ -94,7 +94,7 @@ fun easyCreateNormalDeploy(
             lockConfig?.doLock(this)
 
             for (path in paths)
-                execute("cd $path && rm -f ${projectName}-*.jar && rm -f ${projectName}.jar")
+                execute("cd $path && rm -f ${projectName}-*.jar ${projectName}.jar")
             for (path in paths)
                 put(shadowJarTask.archiveFile.get().asFile, "${path}/${projectName}-${project.version}.jar")
         }
@@ -103,7 +103,7 @@ fun easyCreateNormalDeploy(
     easyConfigureDeployTask(project, shadowJarTask, "$name-deploy", "Deploy") {
         with(SessionHandler(ssh)) {
             for (path in paths)
-                execute("cd $path && rm -f ${projectName}-*.jar && rm -f ${projectName}.jar")
+                execute("cd $path && rm -f ${projectName}-*.jar ${projectName}.jar")
             for (path in paths)
                 put(shadowJarTask.archiveFile.get().asFile, "${path}/${projectName}-${project.version}.jar")
         }
