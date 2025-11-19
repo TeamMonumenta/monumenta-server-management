@@ -20,3 +20,5 @@ include(":redis-sync:redissync-example")
 include(":redis-sync:redissync")
 project(":redis-sync:redissync-example").projectDir = file("redis-sync/example")
 project(":redis-sync:redissync").projectDir = file("redis-sync/plugin")
+
+includeBuild("gradle-plugin")
