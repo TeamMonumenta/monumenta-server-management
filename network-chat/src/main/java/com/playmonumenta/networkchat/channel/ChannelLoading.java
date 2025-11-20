@@ -117,7 +117,7 @@ public class ChannelLoading extends Channel {
 
 	// The channel is loading - we don't know how to display this message yet!
 	@Override
-	public Component shownMessage(CommandSender recipient, Message message) {
+	public Component shownMessage(Message message) {
 		return message.getMessage();
 	}
 
