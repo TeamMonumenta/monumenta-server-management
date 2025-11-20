@@ -6,6 +6,7 @@ import com.google.gson.JsonPrimitive;
 import com.playmonumenta.networkchat.utils.CommandUtils;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
 import net.kyori.adventure.text.Component;
@@ -28,7 +29,7 @@ public class ChannelAccess {
 
 		public static @Nullable FlagKey of(String s) {
 			try {
-				return valueOf(s.toUpperCase());
+				return valueOf(s.toUpperCase(Locale.ROOT));
 			} catch (Exception e) {
 				return null;
 			}
@@ -52,7 +53,7 @@ public class ChannelAccess {
 
 		public static @Nullable FlagValue of(String s) {
 			try {
-				return valueOf(s.toUpperCase());
+				return valueOf(s.toUpperCase(Locale.ROOT));
 			} catch (Exception e) {
 				return null;
 			}

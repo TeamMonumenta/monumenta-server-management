@@ -201,7 +201,7 @@ public class MonumentaWorldManagementAPI {
 				continue;
 			}
 			final var tempWorld = tempPlayer.getWorld();
-			if (tempWorld.getName() == worldName) {
+			if (tempWorld.getName().equals(worldName)) {
 				future.completeExceptionally(new Exception("Can't unload world '" + worldName + "' because there are still players in it (getOnlinePlayers check)"));
 				return future;
 			}
