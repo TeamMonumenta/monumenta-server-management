@@ -218,7 +218,16 @@ public class ChatFilter {
 					String content = textBuilder.content();
 					String finalContent = content;
 					MMLog.finer(() -> "    <- " + finalContent);
-					content = mPattern.matcher(content).replaceAll(replacer);
+					try {
+						content = mPattern.matcher(content).replaceAll(replacer);
+					} catch (IllegalArgumentException ex) {
+						MMLog.warning("An exception occurred while running the filter " + mId + ": " + ex);
+						MMLog.warning("content=" + content);
+						MMLog.warning("mIsLiteral=" + mIsLiteral);
+						MMLog.warning("mPatternString=`" + patternString() + "`");
+						MMLog.warning("mReplacementMiniMessage=`" + replacementMessage() + "`");
+						throw new RuntimeException("Exception occurred with a replacement; aborting", ex);
+					}
 					String finalContent1 = content;
 					MMLog.finer(() -> "    -- " + finalContent1);
 					Component replacementResult = MessagingUtils.getSenderFmtMinimessage().deserialize(content);
