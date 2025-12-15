@@ -6,11 +6,11 @@ plugins {
     `java-gradle-plugin`
     `maven-publish`
     alias(libs.plugins.jvm)
-    id("com.github.johnrengelman.shadow") version "8.+"
+    id("com.gradleup.shadow") version "8.+"
 }
 
 group = "com.playmonumenta.gradle-config"
-version = "3.6-SNAPSHOT"
+version = "3.7.2"
 
 repositories {
     mavenCentral()
@@ -34,7 +34,7 @@ dependencies {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
 gradlePlugin {
@@ -100,4 +100,3 @@ afterEvaluate {
         }
     }
 }
-

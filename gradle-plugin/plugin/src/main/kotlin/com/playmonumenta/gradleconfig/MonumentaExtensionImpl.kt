@@ -109,8 +109,8 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean) {
         }
 
         withSourcesJar()
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 }
 
@@ -361,7 +361,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
         }
 
         pluginProject.applyPlugin(
-            "com.github.johnrengelman.shadow",
+            "com.gradleup.shadow",
             "maven-publish"
         )
 

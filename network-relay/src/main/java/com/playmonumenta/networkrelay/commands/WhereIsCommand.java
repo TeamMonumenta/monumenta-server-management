@@ -1,5 +1,7 @@
-package com.playmonumenta.networkrelay;
+package com.playmonumenta.networkrelay.commands;
 
+import com.playmonumenta.networkrelay.RemotePlayerAPI;
+import com.playmonumenta.networkrelay.RemotePlayerData;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;

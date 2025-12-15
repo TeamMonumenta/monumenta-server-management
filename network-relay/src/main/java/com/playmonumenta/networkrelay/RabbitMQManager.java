@@ -169,7 +169,7 @@ public class RabbitMQManager {
 		mChannel.exchangeDeclare(BROADCAST_EXCHANGE_NAME, "fanout");
 
 		/* Declare queue arguments */
-		Map<String, Object> queueArgs = new HashMap<String, Object>();
+		Map<String, Object> queueArgs = new HashMap<>();
 		// To prevent messages from piling up while a shard is offline - delete a queue after 5 minutes
 		queueArgs.put("x-expires", 300000); // 5 minutes of inactivity (shard not responding/down) until the queue deletes itself
 		/* Declare the queue for this shard */
@@ -227,8 +227,7 @@ public class RabbitMQManager {
 				/* Check for heartbeat data - online status */
 				boolean isDestShutdown = false;
 				JsonElement onlineJson = root.get("online");
-				if (onlineJson instanceof JsonPrimitive) {
-					JsonPrimitive onlinePrimitive = (JsonPrimitive) onlineJson;
+				if (onlineJson instanceof JsonPrimitive onlinePrimitive) {
 					if (onlinePrimitive.isBoolean() && !onlinePrimitive.getAsBoolean()) {
 						isDestShutdown = true;
 						sendDestOfflineEvent(source);

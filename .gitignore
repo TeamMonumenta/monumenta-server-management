@@ -145,7 +145,6 @@ build
 .gradle
 /*.jar
 
-# VsCode
 .vscode
 .pmdCache
 

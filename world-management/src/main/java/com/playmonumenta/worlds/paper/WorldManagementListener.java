@@ -20,10 +20,13 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerKickEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.Nullable;
+import org.spigotmc.event.player.PlayerSpawnLocationEvent;
 
 public class WorldManagementListener implements Listener {
 	private static final String IDENTIFIER = "MonumentaWorldManagementV1";
@@ -100,6 +103,9 @@ public class WorldManagementListener implements Listener {
 		}
 	}
 
+	public final Map<UUID, String> mHackJoinWorldFix = new HashMap<>();
+
+	// TODO: replace with PlayerSpawnLocationEvent
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
 	public void playerJoinSetWorldEvent(PlayerJoinSetWorldEvent event) {
 		Player player = event.getPlayer();
@@ -137,9 +143,31 @@ public class WorldManagementListener implements Listener {
 		}
 	}
 
+	// FIXME: replace with configuration phase aware code
+	// (Async)PlayerSpawnLocationEvent is the earliest event that you can access the player object
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void playerInitalSpawnEvent(PlayerSpawnLocationEvent event) {
+		// get world
+		final var loc = event.getSpawnLocation();
+		final var world = loc.getWorld();
+		if (world == null) {
+			return;
+		}
+		final var uuid = event.getPlayer().getUniqueId();
+		final var name = world.getName();
+		mHackJoinWorldFix.put(uuid, name);
+	}
+
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
 	public void playerJoinEvent(PlayerJoinEvent event) {
 		Player player = event.getPlayer();
+		final var uuid = player.getUniqueId();
+		// FIXME: replace with configuration phase aware code
+		Bukkit.getScheduler().runTask(mPlugin, () -> {
+			if (Bukkit.getPlayer(uuid) == null) {
+				mHackJoinWorldFix.remove(uuid);
+			}
+		});
 		ShardInfo info = WorldManagementPlugin.getShardInfo(player);
 		if (info == null) {
 			return;
@@ -179,6 +207,18 @@ public class WorldManagementListener implements Listener {
 			mLogger.fine("Running (re)join command on player=" + player.getName() + " thread=" + Thread.currentThread().getName());
 			Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "execute as " + player.getUniqueId() + " at @s run " + command);
 		}
+	}
+
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void playerQuitEvent(PlayerQuitEvent event) {
+		final var uuid = event.getPlayer().getUniqueId();
+		mHackJoinWorldFix.remove(uuid);
+	}
+
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void playerKickEvent(PlayerKickEvent event) {
+		final var uuid = event.getPlayer().getUniqueId();
+		mHackJoinWorldFix.remove(uuid);
 	}
 
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)

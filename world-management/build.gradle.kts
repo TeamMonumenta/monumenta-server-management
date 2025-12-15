@@ -16,11 +16,11 @@ dependencies {
 
 monumenta {
 	id("MonumentaWorldManagement")
-	name("WorldManagement")
+	name("MonumentaWorldManagement")
 	paper(
 		"com.playmonumenta.worlds.paper.WorldManagementPlugin",
 		BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
-		"1.19",
+		"1.20",
 		depends = listOf("CommandAPI", "MonumentaRedisSync"),
 		softDepends = listOf()
 	)
