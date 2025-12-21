@@ -59,7 +59,7 @@ public class CommandUtils {
 			} else {
 				CommandSender callee = ((ProxiedCommandSender) sender).getCallee();
 				callee.sendMessage(Component.text(message, NamedTextColor.RED));
-				return CommandAPI.failWithString(message);
+				return CommandAPI.failWithString("");
 			}
 		}
 		return CommandAPI.failWithString(message);
