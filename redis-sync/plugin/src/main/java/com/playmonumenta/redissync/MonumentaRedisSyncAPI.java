@@ -125,7 +125,7 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	protected static void updateNameToUuid(String name, UUID uuid) {
-		mNameToUuid.put(name, uuid);
+		mNameToUuid.put(name.toLowerCase(java.util.Locale.ROOT), uuid);
 		mNameToUuidTrie.put(name, uuid);
 	}
 
@@ -152,11 +152,11 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static @Nullable UUID cachedNameToUuid(String name) {
-		return mNameToUuid.get(name);
+		return mNameToUuid.get(name.toLowerCase(java.util.Locale.ROOT));
 	}
 
 	public static Set<String> getAllCachedPlayerNames() {
-		return new ConcurrentSkipListSet<>(mNameToUuid.keySet());
+		return new ConcurrentSkipListSet<>(mUuidToName.values());
 	}
 
 	public static Set<UUID> getAllCachedPlayerUuids() {
