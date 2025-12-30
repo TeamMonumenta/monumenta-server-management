@@ -8,3 +8,4 @@ This help message can be overridden by creating <aqua><arg1>/<arg2>/.../<arg#>.t
 - To hide all player chat, pause and press Options -> Chat Settings -> Chat: Commands Only
 - To keep messages from scrolling by, use <gold>/pausechat</gold> or <gold>/pc</gold> - run it again to disable
 - Pausing chat only works on messages sent through NetworkChat for now. This may be changed in the future.
+- /c0 through /c9 are speed-dial chat options configurable by players

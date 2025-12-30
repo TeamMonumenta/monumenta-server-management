@@ -18,7 +18,11 @@ public class ChatPlayerSetDefaultChannelCommand {
 	public static void register() {
 		for (String channelType : DefaultChannels.CHANNEL_TYPES) {
 			Argument<String> channelNameArg;
-			if (channelType.equals("default") || channelType.equals(DefaultChannels.GUILD_CHANNEL)) {
+			if (
+				channelType.equals("default") ||
+				channelType.equals(DefaultChannels.GUILD_CHANNEL) ||
+				DefaultChannels.SPEED_DIAL_CHANNEL_TYPES.contains(channelType)
+			) {
 				channelNameArg = ChannelManager.getChannelNameArgument(ChannelPredicate.MAY_CHAT);
 			} else if (channelType.equals(DefaultChannels.WORLD_CHANNEL)) {
 				channelNameArg = ChannelManager.getChannelNameArgument(ChannelPredicate.MAY_CHAT
@@ -46,7 +50,7 @@ public class ChatPlayerSetDefaultChannelCommand {
 							throw CommandUtils.fail(sender, MessagingUtils.noChatStateStr(target));
 						}
 
-						return state.defaultChannels().command(sender, channelType);
+						return state.defaultChannels().getCommand(sender, channelType);
 					}
 				})
 				.register();
@@ -69,7 +73,7 @@ public class ChatPlayerSetDefaultChannelCommand {
 						if (state == null) {
 							throw CommandUtils.fail(sender, MessagingUtils.noChatStateStr(target));
 						}
-						return state.defaultChannels().command(sender, channelType, args.getByArgument(channelNameArg));
+						return state.defaultChannels().setCommand(sender, channelType, args.getByArgument(channelNameArg));
 					}
 				})
 				.register();

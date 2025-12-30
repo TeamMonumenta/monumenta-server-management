@@ -11,6 +11,7 @@ import com.playmonumenta.networkchat.utils.CommandUtils;
 import com.playmonumenta.networkchat.utils.MMLog;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -26,13 +27,30 @@ public class DefaultChannels {
 	public static final String DEFAULT_CHANNEL = "default";
 	public static final String GUILD_CHANNEL = "guildchat";
 	public static final String WORLD_CHANNEL = "worldchat";
-	public static final Set<String> CHANNEL_TYPES = Set.of(DEFAULT_CHANNEL,
+	public static final String SPEED_DIAL_PREFIX = "c";
+	public static final Set<String> SPEED_DIAL_CHANNEL_TYPES;
+	public static final Set<String> NORMAL_CHANNEL_TYPES = Set.of(
+		DEFAULT_CHANNEL,
 		ChannelAnnouncement.CHANNEL_CLASS_ID,
 		ChannelLocal.CHANNEL_CLASS_ID,
 		ChannelGlobal.CHANNEL_CLASS_ID,
 		ChannelParty.CHANNEL_CLASS_ID,
 		GUILD_CHANNEL,
-		WORLD_CHANNEL);
+		WORLD_CHANNEL
+	);
+	public static final Set<String> CHANNEL_TYPES;
+
+	static {
+		Set<String> speedDialChannelTypes = new HashSet<>();
+		for (int i = 0; i <= 9; i++) {
+			speedDialChannelTypes.add(SPEED_DIAL_PREFIX + i);
+		}
+		SPEED_DIAL_CHANNEL_TYPES = Set.copyOf(speedDialChannelTypes);
+
+		Set<String> channelTypes = new HashSet<>(NORMAL_CHANNEL_TYPES);
+		channelTypes.addAll(SPEED_DIAL_CHANNEL_TYPES);
+		CHANNEL_TYPES = Set.copyOf(channelTypes);
+	}
 
 	private final Map<String, UUID> mDefaultsByType = new HashMap<>();
 
@@ -119,11 +137,11 @@ public class DefaultChannels {
 		}
 	}
 
-	public int command(CommandSender sender, String channelType) throws WrapperCommandSyntaxException {
-		return command(sender, channelType, false);
+	public int getCommand(CommandSender sender, String channelType) throws WrapperCommandSyntaxException {
+		return getCommand(sender, channelType, false);
 	}
 
-	public int command(CommandSender sender, String channelType, boolean isGlobalDefault) throws WrapperCommandSyntaxException {
+	public int getCommand(CommandSender sender, String channelType, boolean isGlobalDefault) throws WrapperCommandSyntaxException {
 		if (CHANNEL_TYPES.contains(channelType)) {
 			UUID channelId = getDefaultId(channelType);
 			if (channelId == null) {
@@ -159,7 +177,7 @@ public class DefaultChannels {
 		throw CommandUtils.fail(sender, "No such channel default: " + channelType);
 	}
 
-	public int command(CommandSender sender, String channelType, String channelName) throws WrapperCommandSyntaxException {
+	public int setCommand(CommandSender sender, String channelType, String channelName) throws WrapperCommandSyntaxException {
 		if (!CHANNEL_TYPES.contains(channelType)) {
 			throw CommandUtils.fail(sender, "No such channel default: " + channelType);
 		}
