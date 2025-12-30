@@ -51,16 +51,15 @@ public class CommandUtils {
 	}
 
 	public static WrapperCommandSyntaxException fail(CommandSender sender, String message) {
-		if (sender instanceof ProxiedCommandSender) {
-			CommandSender caller = ((ProxiedCommandSender) sender).getCaller();
-			if (!sender.getName().equals(caller.getName())) {
-				caller.sendMessage(Component.text(message, NamedTextColor.RED));
-				return CommandAPI.failWithString("");
-			} else {
-				CommandSender callee = ((ProxiedCommandSender) sender).getCallee();
+		if (sender instanceof ProxiedCommandSender proxiedCommandSender) {
+			CommandSender caller = proxiedCommandSender.getCaller();
+			CommandSender callee = proxiedCommandSender.getCallee();
+			if (!callee.equals(caller)) {
+				MMLog.info("caller is " + caller.getClass() + ": " + caller.getName());
+				MMLog.info("callee is " + callee.getClass() + ": " + callee.getName());
 				callee.sendMessage(Component.text(message, NamedTextColor.RED));
-				return CommandAPI.failWithString(message);
 			}
+			return CommandAPI.failWithString(message);
 		}
 		return CommandAPI.failWithString(message);
 	}
