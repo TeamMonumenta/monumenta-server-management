@@ -14,7 +14,7 @@ import dev.jorel.commandapi.arguments.MultiLiteralArgument;
 public class ChatServerSetDefaultChannelCommand {
 	public static void register() {
 		if (NetworkChatProperties.getChatCommandModifyEnabled()) {
-			for (String channelType : DefaultChannels.CHANNEL_TYPES) {
+			for (String channelType : DefaultChannels.NORMAL_CHANNEL_TYPES) {
 				ChatCommand.getBaseCommand()
 					.withArguments(new LiteralArgument("server"))
 					.withArguments(new LiteralArgument("setdefaultchannel"))
@@ -24,7 +24,7 @@ public class ChatServerSetDefaultChannelCommand {
 							throw CommandUtils.fail(sender, "You do not have permission to change server-wide default channels.");
 						}
 
-						return ChannelManager.getDefaultChannels().command(sender, channelType, true);
+						return ChannelManager.getDefaultChannels().getCommand(sender, channelType, true);
 					})
 					.register();
 
@@ -49,7 +49,7 @@ public class ChatServerSetDefaultChannelCommand {
 							throw CommandUtils.fail(sender, "You do not have permission to change server-wide default channels.");
 						}
 
-						int result = ChannelManager.getDefaultChannels().command(sender, channelType, args.getByArgument(channelNameArg));
+						int result = ChannelManager.getDefaultChannels().setCommand(sender, channelType, args.getByArgument(channelNameArg));
 						ChannelManager.saveDefaultChannels();
 						return result;
 					})
