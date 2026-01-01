@@ -55,8 +55,6 @@ public class CommandUtils {
 			CommandSender caller = proxiedCommandSender.getCaller();
 			CommandSender callee = proxiedCommandSender.getCallee();
 			if (!callee.equals(caller)) {
-				MMLog.info("caller is " + caller.getClass() + ": " + caller.getName());
-				MMLog.info("callee is " + callee.getClass() + ": " + callee.getName());
 				callee.sendMessage(Component.text(message, NamedTextColor.RED));
 			}
 			return CommandAPI.failWithString(message);
