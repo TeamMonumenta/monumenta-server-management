@@ -118,7 +118,7 @@ public class MonumentaRedisSyncAPI {
 		getAllCachedPlayerNames().toArray(String[]::new));
 
 	private static final Trie<UUID> mNameToUuidTrie = new Trie<>();
-	private static final Map<String, UUID> mNameToUuid = new ConcurrentHashMap<>();
+	private static final Map<String, UUID> mNameLowercaseToUuid = new ConcurrentHashMap<>();
 	private static final Map<UUID, String> mUuidToName = new ConcurrentHashMap<>();
 
 	protected static void updateUuidToName(UUID uuid, String name) {
@@ -126,7 +126,7 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	protected static void updateNameToUuid(String name, UUID uuid) {
-		mNameToUuid.put(name.toLowerCase(Locale.ROOT), uuid);
+		mNameLowercaseToUuid.put(name.toLowerCase(Locale.ROOT), uuid);
 		mNameToUuidTrie.put(name, uuid);
 	}
 
@@ -153,7 +153,7 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static @Nullable UUID cachedNameToUuid(String name) {
-		return mNameToUuid.get(name.toLowerCase(Locale.ROOT));
+		return mNameLowercaseToUuid.get(name.toLowerCase(Locale.ROOT));
 	}
 
 	public static Set<String> getAllCachedPlayerNames() {
