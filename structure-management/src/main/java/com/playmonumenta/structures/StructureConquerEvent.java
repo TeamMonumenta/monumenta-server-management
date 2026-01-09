@@ -2,6 +2,8 @@ package com.playmonumenta.structures;
 
 import com.playmonumenta.structures.managers.RespawningStructure;
 import java.time.Instant;
+import java.util.List;
+import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 
@@ -23,6 +25,19 @@ public class StructureConquerEvent extends Event {
 
 	public Instant getTimestamp() {
 		return mTimestamp;
+	}
+
+	// Quest components are called for players within the structure
+	public List<Player> getPlayersWithinStructure() {
+		List<Player> players = mStructure.getWorld().getPlayers();
+		players.removeIf(p -> !(mStructure.isWithin(p)));
+		return players;
+	}
+
+	public List<Player> getNearbyPlayers() {
+		List<Player> players = mStructure.getWorld().getPlayers();
+		players.removeIf(p -> !(mStructure.isNearby(p)));
+		return players;
 	}
 
 	// Mandatory Event Methods
