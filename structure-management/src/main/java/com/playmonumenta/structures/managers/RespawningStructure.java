@@ -2,6 +2,7 @@ package com.playmonumenta.structures.managers;
 
 import com.fastasyncworldedit.core.util.collection.BlockSet;
 import com.fastasyncworldedit.core.util.collection.MemBlockSet;
+import com.playmonumenta.structures.StructureConquerEvent;
 import com.playmonumenta.structures.StructuresAPI;
 import com.playmonumenta.structures.StructuresPlugin;
 import com.playmonumenta.structures.utils.MSLog;
@@ -564,6 +565,9 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 
 		int minutesLeft = mTicksLeft / (60 * 20);
 		String minutesPlural = (minutesLeft > 1) ? "s" : "";
+
+		StructureConquerEvent event = new StructureConquerEvent(this);
+		Bukkit.getPluginManager().callEvent(event);
 
 		mConquered = true;
 		for (Player player : mWorld.getPlayers()) {
