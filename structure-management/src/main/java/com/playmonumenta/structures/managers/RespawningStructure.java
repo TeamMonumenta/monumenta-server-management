@@ -554,8 +554,9 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 	}
 
 	public void conquerStructure() {
-		if (mForcedRespawn) {
+		if (mForcedRespawn || mConquered) {
 			// POI was already scheduled to respawn forcibly - conquering does nothing at this point, no reason to increase timer
+			// If it's already been conquered, no point to increase timer
 			return;
 		}
 
