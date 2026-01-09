@@ -8,16 +8,17 @@ import org.bukkit.event.HandlerList;
 public class StructureConquerEvent extends Event {
 	private static final HandlerList handlers = new HandlerList();
 
-	private final RespawningStructure structure;
+	private final RespawningStructure mStructure;
 	private final Instant mTimestamp;
 
+	// TODO: Should some of the methods be protected?
 	public StructureConquerEvent(RespawningStructure structure) {
-		this.structure = structure;
+		this.mStructure = structure;
 		mTimestamp = Instant.now();
 	}
 
 	public RespawningStructure getStructure() {
-		return structure;
+		return mStructure;
 	}
 
 	public Instant getTimestamp() {
