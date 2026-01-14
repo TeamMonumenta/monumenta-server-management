@@ -4,9 +4,11 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.playmonumenta.scriptedquests.quests.QuestContext;
 import com.playmonumenta.scriptedquests.quests.components.QuestComponent;
+import com.playmonumenta.structures.StructureConquerEvent;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
@@ -66,7 +68,7 @@ public class SpawnerBreakTrigger {
 	}
 
 	// Called only when a spawner is broken in this structure
-	public void spawnerBreakEvent(RespawningStructure structure) {
+	public void spawnerBreakEvent(RespawningStructure structure, Location location) {
 		mSpawnerCountRemaining--;
 		if (mSpawnerCountRemaining <= 0) {
 			for (Player player : structure.getWorld().getPlayers()) {
@@ -77,6 +79,9 @@ public class SpawnerBreakTrigger {
 		}
 		if (getSpawnerRatio() <= 0 && !structure.isConquered()) {
 			structure.conquerStructure();
+
+			StructureConquerEvent event = new StructureConquerEvent(structure, location);
+			Bukkit.getPluginManager().callEvent(event);
 		}
 	}
 

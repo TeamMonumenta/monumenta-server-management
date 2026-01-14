@@ -545,7 +545,7 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 	protected void spawnerBreakEvent(Location loc) {
 		// Only care about tracking spawners if there is a trigger
 		if (mSpawnerBreakTrigger != null && mWorld.equals(loc.getWorld()) && mInnerBounds.within(loc.toVector())) {
-			mSpawnerBreakTrigger.spawnerBreakEvent(this);
+			mSpawnerBreakTrigger.spawnerBreakEvent(this, loc);
 		}
 	}
 
@@ -566,9 +566,6 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 
 		int minutesLeft = mTicksLeft / (60 * 20);
 		String minutesPlural = (minutesLeft > 1) ? "s" : "";
-
-		StructureConquerEvent event = new StructureConquerEvent(this);
-		Bukkit.getPluginManager().callEvent(event);
 
 		mConquered = true;
 		for (Player player : mWorld.getPlayers()) {

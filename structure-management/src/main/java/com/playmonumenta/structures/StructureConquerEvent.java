@@ -3,6 +3,7 @@ package com.playmonumenta.structures;
 import com.playmonumenta.structures.managers.RespawningStructure;
 import java.time.Instant;
 import java.util.List;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
@@ -11,11 +12,12 @@ public class StructureConquerEvent extends Event {
 	private static final HandlerList handlers = new HandlerList();
 
 	private final RespawningStructure mStructure;
+	private final Location mLocation;
 	private final Instant mTimestamp;
 
-	// TODO: Should some of the methods be protected?
-	public StructureConquerEvent(RespawningStructure structure) {
-		this.mStructure = structure;
+	public StructureConquerEvent(RespawningStructure structure, Location location) {
+		mStructure = structure;
+		mLocation = location;
 		mTimestamp = Instant.now();
 	}
 
@@ -27,7 +29,13 @@ public class StructureConquerEvent extends Event {
 		return mTimestamp;
 	}
 
+	// The location is the last spawner broken... there has to be better name for this
+	public Location getLocation() {
+		return mLocation;
+	}
+
 	// Quest components are called for players within the structure
+
 	public List<Player> getPlayersWithinStructure() {
 		List<Player> players = mStructure.getWorld().getPlayers();
 		players.removeIf(p -> !(mStructure.isWithin(p)));
