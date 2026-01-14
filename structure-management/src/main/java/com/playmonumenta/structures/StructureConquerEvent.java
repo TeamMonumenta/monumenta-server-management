@@ -1,8 +1,11 @@
 package com.playmonumenta.structures;
 
 import com.playmonumenta.structures.managers.RespawningStructure;
+import com.playmonumenta.structures.managers.SpawnerBreakTrigger;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
