@@ -35,20 +35,6 @@ public class StructureConquerEvent extends Event {
 		return mLocation;
 	}
 
-	// Quest components are called for players within the structure
-
-	public List<Player> getPlayersWithinStructure() {
-		List<Player> players = mStructure.getWorld().getPlayers();
-		players.removeIf(p -> !(mStructure.isWithin(p)));
-		return players;
-	}
-
-	public List<Player> getNearbyPlayers() {
-		List<Player> players = mStructure.getWorld().getPlayers();
-		players.removeIf(p -> !(mStructure.isNearby(p)));
-		return players;
-	}
-
 	// Mandatory Event Methods
 
 	@Override
