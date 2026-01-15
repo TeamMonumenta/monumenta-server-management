@@ -29,7 +29,8 @@ public class StructureConquerEvent extends Event {
 		return mTimestamp;
 	}
 
-	// The location is the last spawner broken... there has to be better name for this
+	// The location is the last spawner broken
+
 	public Location getLocation() {
 		return mLocation;
 	}
