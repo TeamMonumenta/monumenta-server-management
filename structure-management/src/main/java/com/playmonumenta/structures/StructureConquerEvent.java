@@ -32,7 +32,7 @@ public class StructureConquerEvent extends Event {
 	// The location is the last spawner broken
 
 	public Location getLocation() {
-		return mLocation;
+		return mLocation.clone();
 	}
 
 	// Mandatory Event Methods
