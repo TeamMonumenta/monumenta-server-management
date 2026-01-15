@@ -479,7 +479,7 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 		return configMap;
 	}
 
-	protected void tick(int ticks) {
+	public void tick(int ticks) {
 		if (!mName.isEmpty() &&
 				((mTicksLeft >= 2400 && (mTicksLeft - ticks) < 2400) ||
 						(mTicksLeft >= 600 && (mTicksLeft - ticks) < 600))) {
@@ -542,7 +542,7 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 
 	// This event is called every time a spawner is broken anywhere
 	// Have to test that it was within this structure
-	protected void spawnerBreakEvent(Location loc) {
+	public void spawnerBreakEvent(Location loc) {
 		// Only care about tracking spawners if there is a trigger
 		if (mSpawnerBreakTrigger != null && mWorld.equals(loc.getWorld()) && mInnerBounds.within(loc.toVector())) {
 			mSpawnerBreakTrigger.spawnerBreakEvent(this, loc);
@@ -627,7 +627,7 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 		return mConfigLabel;
 	}
 
-	protected void registerZone() {
+	public void registerZone() {
 		RespawnManager respawnManager = StructuresPlugin.getRespawnManager();
 
 		respawnManager.registerRespawningStructureZone(
