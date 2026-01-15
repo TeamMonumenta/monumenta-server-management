@@ -609,6 +609,10 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 		return mSpawnerBreakTrigger != null ? mSpawnerBreakTrigger.mSpawnerCountRemaining : -1;
 	}
 
+	public String getSpawnerInfoString() {
+		return mSpawnerBreakTrigger != null ? mSpawnerBreakTrigger.getInfoString() : "";
+	}
+
 	/**
 	 * The display name of this structure
 	 */
