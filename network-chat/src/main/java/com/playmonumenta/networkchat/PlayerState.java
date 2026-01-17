@@ -535,8 +535,13 @@ public class PlayerState {
 
 		if (mUnwatchedChannelIds.containsKey(channelId)) {
 			return false;
-		} else if (mWatchedChannelIds.containsKey(channelId)) {
-			return true;
+		} else if (!mWatchedChannelIds.containsKey(channelId)) {
+			return false;
+		}
+
+		Boolean channelIsListening = channel.channelSettings().isListening();
+		if (channelIsListening != null) {
+			return channelIsListening;
 		}
 
 		return true;

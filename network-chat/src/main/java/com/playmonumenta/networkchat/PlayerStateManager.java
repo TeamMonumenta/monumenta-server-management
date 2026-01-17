@@ -282,9 +282,6 @@ public class PlayerStateManager implements Listener {
 		for (UUID channelId : playerState.getWatchedChannelIds()) {
 			ChannelManager.loadChannel(channelId, playerState);
 		}
-		for (UUID channelId : playerState.getUnwatchedChannelIds()) {
-			ChannelManager.loadChannel(channelId, playerState);
-		}
 		for (UUID channelId : playerState.getWhisperChannelIds()) {
 			ChannelManager.loadChannel(channelId, playerState);
 		}

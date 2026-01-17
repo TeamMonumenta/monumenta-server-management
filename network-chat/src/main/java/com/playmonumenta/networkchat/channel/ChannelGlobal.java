@@ -118,8 +118,7 @@ public class ChannelGlobal extends Channel implements ChannelAutoJoin, ChannelPe
 
 	@Override
 	public boolean shouldAutoJoin(PlayerState state) {
-		Player player = state.getPlayer();
-		return getAutoJoin() && player != null && mayListen(player);
+		return getAutoJoin() && super.shouldAutoJoin(state);
 	}
 
 	@Override

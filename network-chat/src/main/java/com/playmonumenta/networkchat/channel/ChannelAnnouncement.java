@@ -122,8 +122,7 @@ public class ChannelAnnouncement extends Channel implements ChannelAutoJoin, Cha
 
 	@Override
 	public boolean shouldAutoJoin(PlayerState state) {
-		Player player = state.getPlayer();
-		return getAutoJoin() && player != null && mayListen(player);
+		return getAutoJoin() && super.shouldAutoJoin(state);
 	}
 
 	@Override
