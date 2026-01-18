@@ -528,15 +528,20 @@ public class PlayerState {
 			return isListening;
 		}
 
+		if (mUnwatchedChannelIds.containsKey(channelId)) {
+			return false;
+		} else if (!mWatchedChannelIds.containsKey(channelId)) {
+			return false;
+		}
+
 		isListening = mDefaultChannelSettings.isListening();
 		if (isListening != null) {
 			return isListening;
 		}
 
-		if (mUnwatchedChannelIds.containsKey(channelId)) {
-			return false;
-		} else if (mWatchedChannelIds.containsKey(channelId)) {
-			return true;
+		Boolean channelIsListening = channel.channelSettings().isListening();
+		if (channelIsListening != null) {
+			return channelIsListening;
 		}
 
 		return true;
@@ -611,6 +616,10 @@ public class PlayerState {
 	 * @param channel Channel that has changed. null if deleted.
 	 */
 	public void channelUpdated(UUID channelId, @Nullable Channel channel) {
+		Player player = getPlayer();
+		if (player == null) {
+			return;
+		}
 		handlePlayerUuidChanges(channelId, channel);
 		@Nullable String newChannelName = null;
 		if (channel != null) {
@@ -643,17 +652,16 @@ public class PlayerState {
 			unregisterChannel(channelId);
 			// TODO Group deleted channel messages together.
 			if (showAlert) {
-				Player player = getPlayer();
-				if (player != null) {
-					player.sendMessage(Component.text("The channel you knew as " + lastKnownName + " is no longer available.", NamedTextColor.RED));
-				}
+				player.sendMessage(Component.text("The channel you knew as " + lastKnownName + " is no longer available.", NamedTextColor.RED));
 			}
 		} else {
-			if (showAlert && !lastKnownName.equals(newChannelName)) {
-				Player player = getPlayer();
-				if (player != null) {
-					player.sendMessage(Component.text("The channel you knew as " + lastKnownName + " is now known as " + newChannelName + ".", NamedTextColor.GRAY));
-				}
+			// Channel exists
+			if (showAlert && !lastKnownName.equals(newChannelName) && isListening(channel)) {
+				player.sendMessage(Component.text("The channel you knew as " + lastKnownName + " is now known as " + newChannelName + ".", NamedTextColor.GRAY));
+			}
+
+			if (!getKnownChannelIds().contains(channelId) && channel.shouldAutoJoin(this)) {
+				joinChannel(channel);
 			}
 		}
 	}

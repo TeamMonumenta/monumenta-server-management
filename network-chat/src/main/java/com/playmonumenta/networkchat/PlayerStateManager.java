@@ -14,6 +14,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonPrimitive;
 import com.playmonumenta.networkchat.channel.Channel;
+import com.playmonumenta.networkchat.channel.ChannelFuture;
+import com.playmonumenta.networkchat.channel.ChannelLoading;
 import com.playmonumenta.networkchat.channel.ChannelWhisper;
 import com.playmonumenta.networkchat.channel.interfaces.ChannelInviteOnly;
 import com.playmonumenta.networkchat.utils.MMLog;
@@ -260,11 +262,12 @@ public class PlayerStateManager implements Listener {
 		}
 
 		for (Channel channel : ChannelManager.getLoadedChannels()) {
+			if (channel instanceof ChannelLoading || channel instanceof ChannelFuture) {
+				continue;
+			}
 			if (!(channel instanceof ChannelInviteOnly)) {
-				if (playerState.hasNotSeenChannelId(channel.getUniqueId())) {
-					if (channel.shouldAutoJoin(playerState)) {
-						playerState.joinChannel(channel);
-					}
+				if (playerState.hasNotSeenChannelId(channel.getUniqueId()) && channel.shouldAutoJoin(playerState)) {
+					playerState.joinChannel(channel);
 				}
 			} else if (!(channel instanceof ChannelWhisper)) {
 				ChannelInviteOnly channelInvOnly = (ChannelInviteOnly) channel;
@@ -272,7 +275,7 @@ public class PlayerStateManager implements Listener {
 					playerState.handlePlayerUuidChanges(channel.getUniqueId(), channel);
 					continue;
 				}
-				if (playerState.hasNotSeenChannelId(channel.getUniqueId())) {
+				if (playerState.hasNotSeenChannelId(channel.getUniqueId()) && channel.shouldAutoJoin(playerState)) {
 					playerState.joinChannel(channel);
 				}
 			}
@@ -280,9 +283,6 @@ public class PlayerStateManager implements Listener {
 		}
 
 		for (UUID channelId : playerState.getWatchedChannelIds()) {
-			ChannelManager.loadChannel(channelId, playerState);
-		}
-		for (UUID channelId : playerState.getUnwatchedChannelIds()) {
 			ChannelManager.loadChannel(channelId, playerState);
 		}
 		for (UUID channelId : playerState.getWhisperChannelIds()) {

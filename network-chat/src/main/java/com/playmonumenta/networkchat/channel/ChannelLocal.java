@@ -122,8 +122,7 @@ public class ChannelLocal extends Channel implements ChannelAutoJoin, ChannelPer
 
 	@Override
 	public boolean shouldAutoJoin(PlayerState state) {
-		Player player = state.getPlayer();
-		return getAutoJoin() && player != null && mayListen(player);
+		return getAutoJoin() && super.shouldAutoJoin(state);
 	}
 
 	@Override
