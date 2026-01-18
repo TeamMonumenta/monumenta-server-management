@@ -29,6 +29,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +39,7 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.Predicate;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -298,14 +300,13 @@ public class ChannelManager implements Listener {
 		// Continue registering the loaded channel.
 		mChannels.put(channelId, channel);
 
-		if (!(channel instanceof ChannelInviteOnly)) {
+		if (!(channel instanceof ChannelInviteOnly channelInvOnly)) {
 			for (PlayerState state : PlayerStateManager.getPlayerStates().values()) {
 				if (state.hasNotSeenChannelId(channelId) && channel.shouldAutoJoin(state)) {
 					state.joinChannel(channel);
 				}
 			}
 		} else if (!(channel instanceof ChannelWhisper)) {
-			ChannelInviteOnly channelInvOnly = (ChannelInviteOnly) channel;
 			for (UUID participantId : channelInvOnly.getParticipantIds()) {
 				PlayerState state = PlayerStateManager.getPlayerState(participantId);
 				if (state == null) {
@@ -499,7 +500,8 @@ public class ChannelManager implements Listener {
 		String channelIdStr = channelId.toString();
 		RedisFuture<String> channelDataFuture = RedisAPI.getInstance().async().hget(REDIS_CHANNELS_PATH, channelIdStr);
 		channelDataFuture.thenApply(channelData -> {
-			loadChannelApply(channelId, channelData);
+			Bukkit.getScheduler().runTask(NetworkChatPlugin.getInstance(),
+				() -> loadChannelApply(channelId, channelData));
 			return channelData;
 		});
 		return loadingChannel;
@@ -547,12 +549,16 @@ public class ChannelManager implements Listener {
 	}
 
 	private static void loadChannelApply(UUID channelId, JsonObject channelJson) {
-		List<PlayerState> playersToNotify = new ArrayList<>();
+		Set<PlayerState> playersToNotify = new HashSet<>();
 		Channel oldChannel = mChannels.get(channelId);
 		if (oldChannel != null) {
 			for (PlayerState state : PlayerStateManager.getPlayerStates().values()) {
-				if (state.isListening(oldChannel)) {
+				if (state.isWatchingChannelId(channelId)) {
 					playersToNotify.add(state);
+				} else if (!(oldChannel instanceof ChannelLoading || oldChannel instanceof ChannelFuture)) {
+					if (state.isListening(oldChannel)) {
+						playersToNotify.add(state);
+					}
 				}
 			}
 		}
@@ -575,7 +581,7 @@ public class ChannelManager implements Listener {
 			playerState.channelUpdated(channelId, channel);
 		}
 
-		if (oldChannel != null) {
+		if (oldChannel != null && !(oldChannel instanceof ChannelLoading || oldChannel instanceof ChannelFuture)) {
 			// Clean up old name if needed
 			String oldName = oldChannel.getName();
 			if (!channel.getName().equals(oldName)) {
@@ -729,11 +735,13 @@ public class ChannelManager implements Listener {
 			return;
 		}
 
-		if (channelData == null) {
-			deleteChannelLocally(channelId);
-		} else {
-			loadChannelApply(channelId, channelData);
-		}
+		Bukkit.getScheduler().runTask(NetworkChatPlugin.getInstance(), () -> {
+			if (channelData == null) {
+				deleteChannelLocally(channelId);
+			} else {
+				loadChannelApply(channelId, channelData);
+			}
+		});
 	}
 
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.LOW)

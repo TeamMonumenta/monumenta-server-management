@@ -358,7 +358,7 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 
 	@Override
 	public boolean shouldAutoJoin(PlayerState state) {
-		return false;
+		return isParticipant(state.getPlayerUniqueId());
 	}
 
 	@Override
