@@ -266,10 +266,8 @@ public class PlayerStateManager implements Listener {
 				continue;
 			}
 			if (!(channel instanceof ChannelInviteOnly)) {
-				if (playerState.hasNotSeenChannelId(channel.getUniqueId())) {
-					if (channel.shouldAutoJoin(playerState)) {
-						playerState.joinChannel(channel);
-					}
+				if (playerState.hasNotSeenChannelId(channel.getUniqueId()) && channel.shouldAutoJoin(playerState)) {
+					playerState.joinChannel(channel);
 				}
 			} else if (!(channel instanceof ChannelWhisper)) {
 				ChannelInviteOnly channelInvOnly = (ChannelInviteOnly) channel;
@@ -277,7 +275,7 @@ public class PlayerStateManager implements Listener {
 					playerState.handlePlayerUuidChanges(channel.getUniqueId(), channel);
 					continue;
 				}
-				if (playerState.hasNotSeenChannelId(channel.getUniqueId())) {
+				if (playerState.hasNotSeenChannelId(channel.getUniqueId()) && channel.shouldAutoJoin(playerState)) {
 					playerState.joinChannel(channel);
 				}
 			}

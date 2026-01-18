@@ -265,10 +265,8 @@ public class ChannelManager implements Listener {
 		saveChannel(channel);
 
 		for (PlayerState state : PlayerStateManager.getPlayerStates().values()) {
-			if (state.hasNotSeenChannelId(channelId)) {
-				if (channel.shouldAutoJoin(state)) {
-					state.joinChannel(channel);
-				}
+			if (state.hasNotSeenChannelId(channelId) && channel.shouldAutoJoin(state)) {
+				state.joinChannel(channel);
 			}
 		}
 
@@ -302,7 +300,7 @@ public class ChannelManager implements Listener {
 
 		if (!(channel instanceof ChannelInviteOnly)) {
 			for (PlayerState state : PlayerStateManager.getPlayerStates().values()) {
-				if (state.hasNotSeenChannelId(channelId)) {
+				if (state.hasNotSeenChannelId(channelId) && channel.shouldAutoJoin(state)) {
 					state.joinChannel(channel);
 				}
 			}
@@ -313,7 +311,7 @@ public class ChannelManager implements Listener {
 				if (state == null) {
 					continue;
 				}
-				if (state.hasNotSeenChannelId(channelId)) {
+				if (state.hasNotSeenChannelId(channelId) && channel.shouldAutoJoin(state)) {
 					state.joinChannel(channel);
 				}
 			}

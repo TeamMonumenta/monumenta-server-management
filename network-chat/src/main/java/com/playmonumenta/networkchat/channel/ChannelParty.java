@@ -191,7 +191,7 @@ public class ChannelParty extends Channel implements ChannelInviteOnly {
 		mParticipants.add(playerId);
 		PlayerState state = PlayerStateManager.getPlayerState(playerId);
 		if (state != null) {
-			if (!state.isWatchingChannelId(mId)) {
+			if (!state.isWatchingChannelId(mId) && shouldAutoJoin(state)) {
 				state.joinChannel(this);
 			}
 		}
