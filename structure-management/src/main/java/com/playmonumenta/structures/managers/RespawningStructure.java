@@ -2,6 +2,7 @@ package com.playmonumenta.structures.managers;
 
 import com.fastasyncworldedit.core.util.collection.BlockSet;
 import com.fastasyncworldedit.core.util.collection.MemBlockSet;
+import com.playmonumenta.structures.StructureConquerEvent;
 import com.playmonumenta.structures.StructuresAPI;
 import com.playmonumenta.structures.StructuresPlugin;
 import com.playmonumenta.structures.utils.MSLog;
@@ -544,7 +545,7 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 	public void spawnerBreakEvent(Location loc) {
 		// Only care about tracking spawners if there is a trigger
 		if (mSpawnerBreakTrigger != null && mWorld.equals(loc.getWorld()) && mInnerBounds.within(loc.toVector())) {
-			mSpawnerBreakTrigger.spawnerBreakEvent(this);
+			mSpawnerBreakTrigger.spawnerBreakEvent(this, loc);
 		}
 	}
 
@@ -597,6 +598,18 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 
 	public World getWorld() {
 		return mWorld;
+	}
+
+	public int getSpawnerCount() {
+		return mSpawnerBreakTrigger != null ? mSpawnerBreakTrigger.mSpawnerCount : -1;
+	}
+
+	public int getSpawnerRemaining() {
+		return mSpawnerBreakTrigger != null ? mSpawnerBreakTrigger.mSpawnerCountRemaining : -1;
+	}
+
+	public String getSpawnerInfoString() {
+		return mSpawnerBreakTrigger != null ? mSpawnerBreakTrigger.getInfoString() : "";
 	}
 
 	/**
