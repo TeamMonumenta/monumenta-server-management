@@ -5,6 +5,7 @@ import com.playmonumenta.structures.utils.CommandUtils;
 import com.playmonumenta.structures.utils.MessagingUtils;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
+import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.IntegerArgument;
 import dev.jorel.commandapi.arguments.LocationArgument;
 import dev.jorel.commandapi.arguments.StringArgument;
@@ -22,7 +23,7 @@ public class AddRespawningStructure {
 		final CommandPermission perms = CommandPermission.fromString("monumenta.structures");
 
 		StringArgument labelArg = new StringArgument("label");
-		TextArgument pathArg = new TextArgument("path"); // TODO: Path arguments autocomplete?
+		Argument<String> pathArg = CommandUtils.getStructurePathArgument();
 		LocationArgument locationArg = new LocationArgument("location");
 		IntegerArgument radiusArg = new IntegerArgument("extraRadius", 0);
 		IntegerArgument respawnTimeArg = new IntegerArgument("respawnTime", 20);

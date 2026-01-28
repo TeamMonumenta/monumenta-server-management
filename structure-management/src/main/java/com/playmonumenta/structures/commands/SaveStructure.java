@@ -6,6 +6,7 @@ import com.playmonumenta.structures.utils.MessagingUtils;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.LocationArgument;
+import dev.jorel.commandapi.arguments.LocationType;
 import dev.jorel.commandapi.arguments.TextArgument;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -15,8 +16,8 @@ import org.bukkit.command.CommandSender;
 public class SaveStructure {
 	public static void register() {
 		TextArgument pathArg = new TextArgument("path");
-		LocationArgument pos1Arg = new LocationArgument("pos1");
-		LocationArgument pos2Arg = new LocationArgument("pos2");
+		LocationArgument pos1Arg = new LocationArgument("pos1", LocationType.BLOCK_POSITION);
+		LocationArgument pos2Arg = new LocationArgument("pos2", LocationType.BLOCK_POSITION);
 
 		new CommandAPICommand("savestructure")
 				.withPermission(CommandPermission.fromString("monumenta.structures"))
