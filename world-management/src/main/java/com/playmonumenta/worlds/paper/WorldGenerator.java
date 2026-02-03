@@ -313,7 +313,8 @@ public class WorldGenerator {
 
 			// Generate the instance
 			String generatingWorldName = pregeneratedWorldName + GENERATING_SUFFIX;
-			Process process = Runtime.getRuntime().exec(WorldManagementPlugin.getCopyWorldCommand() + " " + templateName + " " + generatingWorldName);
+			String[] commandStrings = {WorldManagementPlugin.getCopyWorldCommand(), templateName, generatingWorldName};
+			Process process = Runtime.getRuntime().exec(commandStrings);
 			int exitVal = process.waitFor();
 			if (exitVal != 0) {
 				String msg = "Failed to copy world '" + templateName + "' to '" + generatingWorldName + "': " + exitVal;
