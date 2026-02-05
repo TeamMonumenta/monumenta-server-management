@@ -6,6 +6,7 @@ plugins {
 
 dependencies {
 	compileOnly(libs.commandapi)
+	compileOnly(project(":network-relay"))
 	compileOnly(project(":redis-sync:redissync"))
 	// compileOnly(libs.gson)
 }
@@ -18,7 +19,7 @@ monumenta {
 		BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
 		"1.20",
 		depends = listOf("CommandAPI", "MonumentaRedisSync"),
-		softDepends = listOf()
+		softDepends = listOf("MonumentaNetworkRelay")
 	)
 	gitPrefix("world-management/")
 }
