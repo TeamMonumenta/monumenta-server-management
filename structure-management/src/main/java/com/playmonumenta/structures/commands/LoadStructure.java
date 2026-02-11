@@ -1,12 +1,15 @@
 package com.playmonumenta.structures.commands;
 
 import com.playmonumenta.structures.StructuresAPI;
+import com.playmonumenta.structures.utils.CommandUtils;
 import com.playmonumenta.structures.utils.MessagingUtils;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
+import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.BooleanArgument;
 import dev.jorel.commandapi.arguments.FunctionArgument;
 import dev.jorel.commandapi.arguments.LocationArgument;
+import dev.jorel.commandapi.arguments.LocationType;
 import dev.jorel.commandapi.arguments.TextArgument;
 import dev.jorel.commandapi.wrappers.FunctionWrapper;
 import net.kyori.adventure.text.Component;
@@ -23,8 +26,8 @@ public class LoadStructure {
 		final String command = "loadstructure";
 		final CommandPermission perms = CommandPermission.fromString("monumenta.structures");
 
-		TextArgument pathArg = new TextArgument("path");
-		LocationArgument positionArg = new LocationArgument("position");
+		Argument<String> pathArg = CommandUtils.getStructurePathArgument();
+		LocationArgument positionArg = new LocationArgument("position", LocationType.BLOCK_POSITION);
 		BooleanArgument includeEntitiesArg = new BooleanArgument("includeEntities");
 		BooleanArgument includeBiomesArg = new BooleanArgument("includeBiomes");
 		FunctionArgument functionArg = new FunctionArgument("postLoadFunction");
