@@ -197,6 +197,9 @@ public class ShardHealth implements ComponentLike {
 		for (Map.Entry<String, JsonObject> sampleDataEntry : sample.mPluginData.entrySet()) {
 			String pluginIdentifier = sampleDataEntry.getKey();
 			JsonObject samplePluginData = sampleDataEntry.getValue();
+			if (samplePluginData == null) {
+				continue;
+			}
 			JsonObject runningTotalPluginData = mPluginData.get(pluginIdentifier);
 			JsonObject dataSampleCounts = allPluginDataSampleCounts
 				.computeIfAbsent(pluginIdentifier, k -> new JsonObject());
@@ -226,13 +229,17 @@ public class ShardHealth implements ComponentLike {
 
 		for (Map.Entry<String, JsonObject> sampleDataEntry : new HashMap<>(mPluginData).entrySet()) {
 			String pluginIdentifier = sampleDataEntry.getKey();
-			JsonObject runningTotalPluginData = sampleDataEntry.getValue().deepCopy();
+			JsonObject runningTotalPluginDataOriginal = sampleDataEntry.getValue();
+			if (runningTotalPluginDataOriginal == null) {
+				continue;
+			}
+			JsonObject runningTotalPluginDataFinal = runningTotalPluginDataOriginal.deepCopy();
 			JsonObject dataSampleCounts = allPluginDataSampleCounts
 				.computeIfAbsent(pluginIdentifier, k -> new JsonObject());
 
 			AverageShardHealthDataDivideSamplesEvent divideSamplesEvent = new AverageShardHealthDataDivideSamplesEvent(
 				pluginIdentifier,
-				runningTotalPluginData,
+				runningTotalPluginDataFinal,
 				dataSampleCounts
 			);
 			Bukkit.getPluginManager().callEvent(divideSamplesEvent);
