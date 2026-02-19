@@ -140,7 +140,7 @@ public class StructuresPlugin extends JavaPlugin implements Executor {
 
 		mConfig = YamlConfiguration.loadConfiguration(configFile);
 
-		CommandUtils.getStructurePathArgument();
+		CommandUtils.reloadStructurePathSuggestions();
 
 		/* TODO: Non-hardcoded worlds! These should be saved into the respawning structure */
 		mRespawnManager = new RespawnManager(this, Bukkit.getWorlds().get(0), mConfig);
