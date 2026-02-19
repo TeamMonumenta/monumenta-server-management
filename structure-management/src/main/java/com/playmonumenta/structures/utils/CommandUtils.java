@@ -21,6 +21,8 @@ public class CommandUtils {
 	private static final String BASE_FOLDER_NAME = "structures";
 	private static final String SCHEMATIC_EXTENSION = ".schematic";
 
+	private static List<String> STRUCTURE_PATH_SUGGESTIONS = new ArrayList<>();
+
 	public static String getSchematicPath(Plugin plugin, String baseName) {
 		return Paths.get(plugin.getDataFolder().toString(), BASE_FOLDER_NAME, baseName + SCHEMATIC_EXTENSION).toString();
 	}
@@ -49,12 +51,12 @@ public class CommandUtils {
 	}
 
 	public static Argument<String> getStructurePathArgument() {
-		return new TextArgument("path").includeSuggestions(ArgumentSuggestions.stringCollection(info -> CommandUtils.getPathSuggestions()));
+		return new TextArgument("path").includeSuggestions(ArgumentSuggestions.stringCollection(info -> STRUCTURE_PATH_SUGGESTIONS));
 	}
 
-	public static List<String> getPathSuggestions() {
+	public static void reloadStructurePathSuggestions() {
 		Path base = Paths.get(StructuresPlugin.getInstance().getDataFolder().toString(), BASE_FOLDER_NAME);
-		return getAllPaths(base, base.toString().length() + 1, SCHEMATIC_EXTENSION.length()); // + 1 for the slash
+		STRUCTURE_PATH_SUGGESTIONS =  getAllPaths(base, base.toString().length() + 1, SCHEMATIC_EXTENSION.length()); // + 1 for the slash
 	}
 
 	private static List<String> getAllPaths(Path base, int startCutoff, int endCutoff) {

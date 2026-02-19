@@ -1,13 +1,20 @@
 package com.playmonumenta.networkrelay.shardhealth;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.playmonumenta.networkrelay.shardhealth.g1.G1GcHealth;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
+import net.kyori.adventure.text.JoinConfiguration;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -71,6 +78,13 @@ public class ShardHealth implements ComponentLike {
 		}
 
 		averageHealth.divide(actualTicks, allPluginDataSampleCounts);
+
+		for (Map.Entry<String, JsonObject> pluginDataEntry : averageHealth.mPluginData.entrySet()) {
+			String pluginIdentifier = pluginDataEntry.getKey();
+			GetPluginHealthFactorsEvent pluginHealthFactorsEvent = new GetPluginHealthFactorsEvent(pluginIdentifier, pluginDataEntry.getValue());
+			Bukkit.getPluginManager().callEvent(pluginHealthFactorsEvent);
+			averageHealth.mPluginHealth.put(pluginIdentifier, pluginHealthFactorsEvent.getPluginHealthFactor());
+		}
 
 		return averageHealth;
 	}
@@ -160,6 +174,29 @@ public class ShardHealth implements ComponentLike {
 			result.tickHealth(tickHealthPrimitive.getAsDouble());
 		}
 
+		if (
+			object.get("pluginData") instanceof JsonObject pluginDataObj
+		) {
+			for (Map.Entry<String, JsonElement> entry : pluginDataObj.entrySet()) {
+				if (entry.getValue() instanceof JsonObject value) {
+					result.mPluginData.put(entry.getKey(), value);
+				}
+			}
+		}
+
+		if (
+			object.get("pluginHealth") instanceof JsonObject pluginHealthObj
+		) {
+			for (Map.Entry<String, JsonElement> entry : pluginHealthObj.entrySet()) {
+				if (
+					entry.getValue() instanceof JsonPrimitive valuePrimitive &&
+					valuePrimitive.isNumber()
+				) {
+					result.mPluginHealth.put(entry.getKey(), valuePrimitive.getAsDouble());
+				}
+			}
+		}
+
 		result.gcHealth(G1GcHealth.fromJson(object.get("gcHealth")));
 
 		return result;
@@ -171,6 +208,18 @@ public class ShardHealth implements ComponentLike {
 		result.addProperty("healthScore", healthScore());
 		result.addProperty("memoryHealth", memoryHealth());
 		result.addProperty("tickHealth", tickHealth());
+
+		JsonObject pluginData = new JsonObject();
+		for (Map.Entry<String, JsonObject> entry : mPluginData.entrySet()) {
+			pluginData.add(entry.getKey(), entry.getValue());
+		}
+		result.add("pluginData", pluginData);
+
+		JsonObject pluginHealth = new JsonObject();
+		for (Map.Entry<String, Double> entry : mPluginHealth.entrySet()) {
+			pluginHealth.addProperty(entry.getKey(), entry.getValue());
+		}
+		result.add("pluginHealth", pluginHealth);
 
 		if (gcHealth() != null) {
 			result.add("gcHealth", gcHealth().toJson());
@@ -197,6 +246,9 @@ public class ShardHealth implements ComponentLike {
 		for (Map.Entry<String, JsonObject> sampleDataEntry : sample.mPluginData.entrySet()) {
 			String pluginIdentifier = sampleDataEntry.getKey();
 			JsonObject samplePluginData = sampleDataEntry.getValue();
+			if (samplePluginData == null) {
+				continue;
+			}
 			JsonObject runningTotalPluginData = mPluginData.get(pluginIdentifier);
 			JsonObject dataSampleCounts = allPluginDataSampleCounts
 				.computeIfAbsent(pluginIdentifier, k -> new JsonObject());
@@ -226,13 +278,17 @@ public class ShardHealth implements ComponentLike {
 
 		for (Map.Entry<String, JsonObject> sampleDataEntry : new HashMap<>(mPluginData).entrySet()) {
 			String pluginIdentifier = sampleDataEntry.getKey();
-			JsonObject runningTotalPluginData = sampleDataEntry.getValue().deepCopy();
+			JsonObject runningTotalPluginDataOriginal = sampleDataEntry.getValue();
+			if (runningTotalPluginDataOriginal == null) {
+				continue;
+			}
+			JsonObject runningTotalPluginDataFinal = runningTotalPluginDataOriginal.deepCopy();
 			JsonObject dataSampleCounts = allPluginDataSampleCounts
 				.computeIfAbsent(pluginIdentifier, k -> new JsonObject());
 
 			AverageShardHealthDataDivideSamplesEvent divideSamplesEvent = new AverageShardHealthDataDivideSamplesEvent(
 				pluginIdentifier,
-				runningTotalPluginData,
+				runningTotalPluginDataFinal,
 				dataSampleCounts
 			);
 			Bukkit.getPluginManager().callEvent(divideSamplesEvent);
@@ -263,7 +319,7 @@ public class ShardHealth implements ComponentLike {
 		if (mHealthScore != null) {
 			return mHealthScore;
 		}
-		return mMemoryHealth * mTickHealth;
+		return mMemoryHealth * mTickHealth * pluginHealth();
 	}
 
 	public ShardHealth healthScore(@Nullable Double healthScore) {
@@ -310,7 +366,25 @@ public class ShardHealth implements ComponentLike {
 
 	@Override
 	public @NotNull Component asComponent() {
+		List<Component> hoverComponents = new ArrayList<>();
+		hoverComponents.add(Component.text("Plugin data:", NamedTextColor.GOLD));
+
+		Set<String> pluginIds = new TreeSet<>(mPluginData.keySet());
+		pluginIds.addAll(mPluginHealth.keySet());
+		for (String pluginId : pluginIds) {
+			Double pluginHealth = mPluginHealth.get(pluginId);
+			String pluginHealthStr = pluginHealth == null ? "null" : String.format("%5.1f%%", 100 * pluginHealth);
+
+			JsonObject pluginData = mPluginData.get(pluginId);
+			String pluginDataStr = pluginData == null ? "null" : pluginData.toString();
+
+			hoverComponents.add(Component.text(pluginId + " (" + pluginHealthStr + "): ", NamedTextColor.YELLOW)
+				.append(Component.text(pluginDataStr, NamedTextColor.GRAY)));
+		}
+		Component hoverComponent = Component.join(JoinConfiguration.newlines(), hoverComponents);
+
 		return Component.empty()
+			.hoverEvent(hoverComponent)
 			.append(Component.text(String.format("%5.1f%% Shard Health (lags/crashes at 0, only devs see this)", 100 * healthScore())))
 			.append(Component.newline())
 			.append(Component.text(String.format("- %5.1f%% Memory Available", 100 * memoryHealth())))

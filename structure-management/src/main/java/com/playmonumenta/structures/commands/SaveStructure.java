@@ -2,6 +2,7 @@ package com.playmonumenta.structures.commands;
 
 import com.playmonumenta.structures.StructuresAPI;
 import com.playmonumenta.structures.StructuresPlugin;
+import com.playmonumenta.structures.utils.CommandUtils;
 import com.playmonumenta.structures.utils.MessagingUtils;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
@@ -33,16 +34,17 @@ public class SaveStructure {
 	private static void save(CommandSender sender, Location loc1, Location loc2, String path) {
 		sender.sendMessage(Component.text("Started saving structure '" + path + "'"));
 		Bukkit.getScheduler().runTaskAsynchronously(StructuresPlugin.getInstance(), () -> {
-			try {
-				StructuresAPI.copyAreaAndSaveStructure(path, loc1, loc2).get();
-				Bukkit.getScheduler().runTask(StructuresPlugin.getInstance(), () -> sender.sendMessage(Component.text("Saved structure '" + path + "'")));
-			} catch (Exception e) {
-				Bukkit.getScheduler().runTask(StructuresPlugin.getInstance(), () -> {
+			StructuresAPI.copyAreaAndSaveStructure(path, loc1, loc2).whenComplete((unused, e) -> {
+				if (e == null) {
+					sender.sendMessage(Component.text("Saved structure '" + path + "'"));
+					CommandUtils.reloadStructurePathSuggestions();
+				} else {
 					sender.sendMessage(Component.text("Failed to save structure" + e.getMessage()));
 					StructuresPlugin.getInstance().getLogger().severe("Caught exception saving structure: " + e.getMessage());
 					MessagingUtils.sendStackTrace(sender, e);
-				});
-			}
+				}
+
+			});
 		});
 	}
 }
