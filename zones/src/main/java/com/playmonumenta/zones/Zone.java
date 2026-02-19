@@ -1,13 +1,8 @@
 package com.playmonumenta.zones;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.util.Vector;
@@ -61,25 +56,6 @@ public class Zone extends ZoneBase {
 
 	public String getName() {
 		return mName;
-	}
-
-	private static List<String> getProperties(@Nullable JsonElement propertiesElement) throws Exception {
-		if (propertiesElement == null) {
-			throw new Exception("Failed to parse 'properties'");
-		}
-		@Nullable JsonArray propertiesArray = propertiesElement.getAsJsonArray();
-		if (propertiesArray == null) {
-			throw new Exception("Failed to parse 'properties'");
-		}
-		List<String> rawProperties = new ArrayList<>();
-		for (JsonElement element : propertiesArray) {
-			String propertyName = element.getAsString();
-			if (propertyName == null || propertyName.isBlank()) {
-				throw new Exception("Property may not be empty");
-			}
-			rawProperties.add(propertyName);
-		}
-		return rawProperties;
 	}
 
 	public Set<String> getProperties() {

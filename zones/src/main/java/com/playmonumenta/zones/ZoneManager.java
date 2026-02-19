@@ -62,16 +62,18 @@ public class ZoneManager {
 		mQueuedReloadRequesters.add(Bukkit.getConsoleSender());
 	}
 
-	public static ZoneManager createInstance(ZonesPlugin plugin) {
-		INSTANCE = new ZoneManager(plugin);
+	public static ZoneManager getInstance() {
+		if (INSTANCE == null) {
+			INSTANCE = new ZoneManager(ZonesPlugin.getInstance());
+		}
 		return INSTANCE;
 	}
 
-	public static ZoneManager getInstance() {
-		if (INSTANCE == null) {
-			throw new RuntimeException("Attempted to access ZoneManager before initialization");
-		}
-		return INSTANCE;
+	/************************************************************************************
+	 * For use in test code ONLY
+	 ************************************************************************************/
+	public static void setTestMode(boolean isEnabled) {
+		IS_TEST_MODE = isEnabled;
 	}
 
 	/************************************************************************************

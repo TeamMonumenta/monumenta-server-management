@@ -5,7 +5,6 @@ import com.playmonumenta.zones.commands.ShowZones;
 import com.playmonumenta.zones.commands.TestZone;
 import java.util.logging.Level;
 import org.bukkit.Bukkit;
-import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
@@ -36,9 +35,7 @@ public class ZonesPlugin extends JavaPlugin {
 	public void onEnable() {
 		INSTANCE = this;
 
-		PluginManager manager = getServer().getPluginManager();
-
-		mZoneManager = ZoneManager.createInstance(this);
+		mZoneManager = ZoneManager.getInstance();
 		mZoneManager.doReload(this, true);
 
 		/* Load the config 1 tick later to let other plugins load */

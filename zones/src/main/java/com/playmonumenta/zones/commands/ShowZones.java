@@ -59,7 +59,7 @@ public class ShowZones {
 		Z_XMAX_YMAX
 	}
 
-	static class ShownInfo extends BukkitRunnable {
+	protected static class ShownInfo extends BukkitRunnable {
 		private static final XoRoShiRo128PlusRandom RANDOM = new XoRoShiRo128PlusRandom();
 		private static final double DELTA_POS = 0.000001;
 		private static final double RENDER_DISTANCE = 16.0; // Really this goes up to 32 blocks, but that's hard to see.
@@ -427,6 +427,7 @@ public class ShowZones {
 			.register();
 	}
 
+	@SuppressWarnings("SameReturnValue")
 	private static int hide(CommandSender sender) throws WrapperCommandSyntaxException {
 		CommandSender callee = sender;
 		if (sender instanceof ProxiedCommandSender proxiedCommandSender) {

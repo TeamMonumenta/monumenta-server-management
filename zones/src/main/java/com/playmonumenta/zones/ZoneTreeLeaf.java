@@ -63,7 +63,7 @@ public class ZoneTreeLeaf extends ZoneTreeBase {
 			b = 0x7f;
 		}
 
-		String world = Bukkit.getWorlds().get(0).getName();
+		String world = Bukkit.getWorlds().getFirst().getName();
 		String fragmentId = "zone_fragment_hash_" + hashCode();
 		String fragmentLabel = "zone fragment";
 
