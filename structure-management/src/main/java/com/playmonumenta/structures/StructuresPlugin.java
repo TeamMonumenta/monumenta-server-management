@@ -17,6 +17,7 @@ import com.playmonumenta.structures.commands.SetRespawnTimer;
 import com.playmonumenta.structures.commands.SetSpawnerBreakTrigger;
 import com.playmonumenta.structures.managers.EventListener;
 import com.playmonumenta.structures.managers.RespawnManager;
+import com.playmonumenta.structures.utils.CommandUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.Executor;
@@ -138,6 +139,8 @@ public class StructuresPlugin extends JavaPlugin implements Executor {
 		File configFile = getConfigFile();
 
 		mConfig = YamlConfiguration.loadConfiguration(configFile);
+
+		CommandUtils.reloadStructurePathSuggestions();
 
 		/* TODO: Non-hardcoded worlds! These should be saved into the respawning structure */
 		mRespawnManager = new RespawnManager(this, Bukkit.getWorlds().get(0), mConfig);
