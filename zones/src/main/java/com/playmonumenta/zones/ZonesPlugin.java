@@ -36,13 +36,13 @@ public class ZonesPlugin extends JavaPlugin {
 		INSTANCE = this;
 
 		mZoneManager = ZoneManager.getInstance();
-		mZoneManager.doReload(this, true);
+		mZoneManager.doReload(true);
 
 		/* Load the config 1 tick later to let other plugins load */
 		new BukkitRunnable() {
 			@Override
 			public void run() {
-				mZoneManager.reload(ZonesPlugin.this, Bukkit.getConsoleSender());
+				mZoneManager.reload(Bukkit.getConsoleSender());
 			}
 		}.runTaskLater(this, 1);
 	}

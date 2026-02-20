@@ -1,6 +1,7 @@
 package com.playmonumenta.structures.managers;
 
 import com.playmonumenta.structures.StructuresPlugin;
+import com.playmonumenta.zones.ZoneManager;
 import java.util.EnumSet;
 import java.util.List;
 import org.bukkit.Location;
@@ -79,7 +80,7 @@ public class EventListener implements Listener {
 		// We need to allow spawning mobs intentionally, but disable natural spawns.
 		if (DISALLOWED_STRUCTURE_SPAWN_REASONS.contains(event.getSpawnReason())) {
 			// We don't care which poi it is, just that the poi exists at that location
-			if (StructuresPlugin.getRespawnManager().mZoneManager.isInside(loc)) {
+			if (ZoneManager.getInstance().getZone(loc, RespawnManager.ZONE_NAMESPACE_INSIDE) != null) {
 				event.setCancelled(true);
 			}
 		}

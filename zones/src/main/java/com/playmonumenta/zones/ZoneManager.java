@@ -97,7 +97,7 @@ public class ZoneManager {
 		}
 
 		mPluginNamespaces.put(namespaceName, namespace);
-		reload(mPlugin, Bukkit.getConsoleSender());
+		reload(Bukkit.getConsoleSender());
 		return true;
 	}
 
@@ -114,7 +114,7 @@ public class ZoneManager {
 		}
 
 		mPluginNamespaces.remove(namespaceName);
-		reload(mPlugin, Bukkit.getConsoleSender());
+		reload(Bukkit.getConsoleSender());
 		return true;
 	}
 
@@ -133,7 +133,7 @@ public class ZoneManager {
 		String namespaceName = namespace.getName();
 
 		mPluginNamespaces.put(namespaceName, namespace);
-		reload(mPlugin, Bukkit.getConsoleSender());
+		reload(Bukkit.getConsoleSender());
 		return true;
 	}
 
@@ -274,17 +274,21 @@ public class ZoneManager {
 	 * End of methods for use with external plugins:
 	 ************************************************************************************/
 
+	public void reload() {
+		reload(Bukkit.getConsoleSender());
+	}
+
 	/*
 	 * If sender is non-null, it will be sent debugging information
 	 *
 	 * In the event we have enough zones this takes a while to load:
 	 * Reloading after the first startup could use an async load, only pausing long enough to swap
 	 * the generated tree. If that's not good enough, an unbalanced tree is even faster to generate
-	 * without too much slowdown, and the ZoneNamespace class could be modified to handle determining
+	 * without too much slowdown. The ZoneNamespace class could be modified to handle determining
 	 * which zones have priority if startup time NEEDS to be near-instant in exchange for slower
 	 * clock speeds while the tree is loading. We have options.
 	 */
-	public void reload(ZonesPlugin plugin, @Nullable CommandSender sender) {
+	public void reload(@Nullable CommandSender sender) {
 		if (sender == null) {
 			sender = Bukkit.getConsoleSender();
 		}
@@ -296,7 +300,7 @@ public class ZoneManager {
 				@Override
 				public void run() {
 					try {
-						handleReloads(plugin);
+						handleReloads();
 					} catch (Exception e) {
 						Bukkit.getScheduler().runTask(ZonesPlugin.getInstance(), () -> {
 							MessagingUtils.sendStackTrace(mReloadRequesters, e);
@@ -308,21 +312,21 @@ public class ZoneManager {
 				}
 			};
 
-			mAsyncReloadHandler.runTaskAsynchronously(plugin);
+			mAsyncReloadHandler.runTaskAsynchronously(ZonesPlugin.getInstance());
 		}
 	}
 
-	private void handleReloads(ZonesPlugin plugin) {
+	private void handleReloads() {
 		do {
-			doReload(plugin);
+			doReload();
 		} while (!mQueuedReloadRequesters.isEmpty());
 	}
 
-	public void doReload(ZonesPlugin plugin) {
-		doReload(plugin, false);
+	public void doReload() {
+		doReload(false);
 	}
 
-	public void doReload(ZonesPlugin plugin, boolean firstRun) {
+	public void doReload(boolean firstRun) {
 		MMLog.fine("[Zone Reload] Begin");
 		mQueuedReloadRequesters.add(Bukkit.getConsoleSender());
 		mReloadRequesters = Audience.audience(mQueuedReloadRequesters);
@@ -336,7 +340,7 @@ public class ZoneManager {
 		cpuNanos = System.nanoTime();
 
 		// Refresh plugin namespaces
-		if (mPlugin.mShowZonesDynmap) {
+		if (ZonesPlugin.getInstance().mShowZonesDynmap) {
 			for (ZoneNamespace namespace : mPluginNamespaces.values()) {
 				namespace.refreshDynmapLayer();
 			}
@@ -451,7 +455,7 @@ public class ZoneManager {
 		};
 
 		if (!IS_TEST_MODE) {
-			mPlayerTracker.runTaskTimer(plugin, 0, 1);
+			mPlayerTracker.runTaskTimer(ZonesPlugin.getInstance(), 0, 1);
 		}
 
 		mReloadRequesters.sendMessage(Component.text("Zones reloaded successfully.", NamedTextColor.GOLD));
