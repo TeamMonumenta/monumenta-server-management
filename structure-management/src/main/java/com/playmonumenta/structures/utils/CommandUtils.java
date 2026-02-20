@@ -1,6 +1,5 @@
 package com.playmonumenta.structures.utils;
 
-import com.playmonumenta.scriptedquests.utils.MMLog;
 import com.playmonumenta.structures.StructuresPlugin;
 import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
@@ -74,7 +73,7 @@ public class CommandUtils {
 				}
 			}
 		} catch (IOException ex) {
-			MMLog.warning("Encountered IOException finding path suggestions: ");
+			MSLog.warning("Encountered IOException finding path suggestions: ");
 			ex.printStackTrace();
 		}
 

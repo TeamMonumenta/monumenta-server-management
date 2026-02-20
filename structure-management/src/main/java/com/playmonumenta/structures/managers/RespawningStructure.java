@@ -2,22 +2,24 @@ package com.playmonumenta.structures.managers;
 
 import com.fastasyncworldedit.core.util.collection.BlockSet;
 import com.fastasyncworldedit.core.util.collection.MemBlockSet;
-import com.playmonumenta.structures.StructureConquerEvent;
 import com.playmonumenta.structures.StructuresAPI;
 import com.playmonumenta.structures.StructuresPlugin;
 import com.playmonumenta.structures.utils.MSLog;
 import com.playmonumenta.structures.utils.MessagingUtils;
+import com.playmonumenta.zones.Zone;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.regions.Region;
 import com.sk89q.worldedit.world.block.BlockType;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -184,7 +186,7 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 					nextRespawnPath, spawnerBreakTrigger);
 
 			// Load the first schematic to get its size
-			return StructuresAPI.loadStructure(structure.mGenericVariants.get(0)).thenApply((clipboard) -> {
+			return StructuresAPI.loadStructure(structure.mGenericVariants.getFirst()).thenApply((clipboard) -> {
 				if (specialPaths != null) {
 					structure.mSpecialVariants.addAll(specialPaths);
 				}
@@ -630,21 +632,25 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 		RespawnManager respawnManager = StructuresPlugin.getRespawnManager();
 
 		respawnManager.registerRespawningStructureZone(
-			respawnManager.mZoneManager.registerInsideZone(
+			new Zone(
+				respawnManager.mZoneNamespaceInside,
+				Pattern.quote(mWorld.getName()),
 				mInnerBounds.mLowerCorner.clone(),
 				mInnerBounds.mUpperCorner.clone(),
-				mWorld,
-				mName
+				mName,
+				new LinkedHashSet<>()
 			),
 			this
 		);
 
 		respawnManager.registerRespawningStructureZone(
-			respawnManager.mZoneManager.registerNearbyZone(
+			new Zone(
+				respawnManager.mZoneNamespaceNearby,
+				Pattern.quote(mWorld.getName()),
 				mOuterBounds.mLowerCorner.clone(),
 				mOuterBounds.mUpperCorner.clone(),
-				mWorld,
-				mName
+				mName,
+				new LinkedHashSet<>()
 			),
 			this
 		);

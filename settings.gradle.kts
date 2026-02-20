@@ -10,9 +10,9 @@ pluginManagement {
 include("network-chat")
 include("network-relay")
 include("redis-sync")
+include("zones")
 include("structure-management")
 include("world-management")
-include("redis-sync")
 
 include("redis-sync:adapter_api")
 include("redis-sync:adapter_v1_20_R3")
