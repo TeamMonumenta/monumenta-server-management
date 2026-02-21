@@ -25,7 +25,7 @@ public class Stash {
 				player.sendMessage(Component.text("/stash get [name]: Replaces your current playerdata with the data from the stash. If [name] is unspecified, defaults to your UUID."));
 				player.sendMessage(Component.text("/stash put [name]: Saves your current playerdata to the stash, overwriting any existing stash in its place. If [name] is unspecified, defaults to your UUID. Stashes are shared between players!"));
 				player.sendMessage(Component.text("/stash info [name]: Lists the player, last saved date, and shard associated with the stash."));
-				player.sendMessage(Component.text("/stash list: Lists all existing stashes."));
+				player.sendMessage(Component.text("/stash list all: Lists all existing stashes from all users."));
 				player.sendMessage(Component.text("/stash list user [username]: Lists all existing stashes saved by a user. Defaults to your username if not specified. This is checked by username at time of saving, not by UUID, so username changes may affect the result."));
 			})
 			.register();
@@ -95,7 +95,7 @@ public class Stash {
 		StringArgument usernameArg = new StringArgument("username");
 
 		new CommandAPICommand(command)
-			.withArguments(new LiteralArgument("list"))
+			.withArguments(new LiteralArgument("list"), new LiteralArgument("all"))
 			.withPermission(perms)
 			.executesPlayer((player, args) -> {
 				try {
