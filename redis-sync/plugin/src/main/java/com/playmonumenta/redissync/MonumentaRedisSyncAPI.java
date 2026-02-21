@@ -33,6 +33,7 @@ import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -391,6 +392,79 @@ public class MonumentaRedisSyncAPI {
 					player.sendMessage(Component.text("Stash last saved on " + split[0] + " " + getTimeDifferenceSince(Long.parseLong(split[1])) + " ago", NamedTextColor.GOLD));
 				} else {
 					player.sendMessage(Component.text("Stash '" + name + "' last saved on " + split[0] + " by " + split[2] + " " + getTimeDifferenceSince(Long.parseLong(split[1])) + " ago", NamedTextColor.GOLD));
+				}
+			});
+		});
+	}
+
+	public static void stashList(Player player, @Nullable String searchName) {
+		MonumentaRedisSync mrs = MonumentaRedisSync.getInstance();
+
+		RedisAPI api = RedisAPI.getInstance();
+
+		Bukkit.getScheduler().runTaskAsynchronously(mrs, () -> {
+			List<String> stashNames = api.async().hkeys(getStashPath()).toCompletableFuture().join()
+				.stream()
+				.filter(field -> field.endsWith("-history"))
+				.map(field ->
+					field.substring(0, field.length() - 8)
+				)
+				.sorted()
+				.toList();
+
+			Bukkit.getScheduler().runTask(mrs, () -> {
+				if (stashNames.isEmpty()) {
+					player.sendMessage(Component.text("No stashes were found"));
+					return;
+				}
+
+				if (searchName != null) {
+					player.sendMessage(Component.text("Listing stashes saved by username " + searchName, NamedTextColor.GOLD));
+					player.sendMessage(Component.text("If a stash you saved does not appear here, it may have been overwritten by another user, or you may have saved it under a past username", NamedTextColor.GOLD));
+					for (String stash : stashNames) {
+						String history = api.async().hget(getStashPath(), stash + "-history").toCompletableFuture().join();
+						if (history == null) {
+							player.sendMessage(Component.text("Failed to get data for an existing stash? name: " + stash, NamedTextColor.RED));
+							continue;
+						}
+
+						String[] split = history.split("\\|");
+						if (split.length != 3) {
+							player.sendMessage(Component.text("Stash "+" is seemingly corrupted, with " + split.length + " entries: " + history, NamedTextColor.RED));
+							continue;
+						}
+
+						if (searchName.equals(split[2])) {
+							player.sendMessage(Component.text("Stash '" + stash + "' last saved on " + split[0] + " by " + split[2] + " " + getTimeDifferenceSince(Long.parseLong(split[1])) + " ago", NamedTextColor.WHITE));
+						}
+					}
+				} else {
+					List<Component> formattedStashNames = stashNames
+						.stream()
+						.map(stashName -> {
+							UUID uuid;
+							try {
+								uuid = UUID.fromString(stashName);
+							} catch (IllegalArgumentException ignored) {
+								uuid = null;
+							}
+							Component result = Component.text(stashName).clickEvent(ClickEvent.copyToClipboard(stashName));
+							if (uuid != null && mUuidToName.containsKey(uuid)) {
+								result = result.hoverEvent(Component.text("This UUID belongs to " + mUuidToName.get(uuid)));
+							} else {
+								result = result.hoverEvent(Component.empty());
+							}
+							return result;
+						})
+						.toList();
+					player.sendMessage(Component.text(formattedStashNames.size() + " stashes found (click a stash name to copy): ", NamedTextColor.GOLD));
+					Component merge = Component.empty().append(formattedStashNames.getFirst()); // appending to empty component fixes hover text weirdness
+					for (int i = 1; i < formattedStashNames.size(); i++) {
+						merge = merge.append(Component.text(", ")).append(formattedStashNames.get(i));
+					}
+					player.sendMessage(merge);
+					player.sendMessage(Component.text("Use `/stash list user` to list only your stashes, or `/stash list user [username]` for stashes saved by a certain player. " +
+						"Note that this searches by username only, so old usernames must be searched separately", NamedTextColor.GOLD));
 				}
 			});
 		});
