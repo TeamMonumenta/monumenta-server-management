@@ -23,7 +23,7 @@ import org.gradle.external.javadoc.StandardJavadocDocletOptions
 import org.gradle.jvm.tasks.Jar
 import java.net.URI
 
-private fun setupProject(project: Project, target: Project, javadoc: Boolean) {
+private fun setupProject(project: Project, target: Project, javadoc: Boolean, pmdWarningsAsErrors: Boolean) {
     project.applyPlugin(
         "pmd",
         "java-library",
@@ -84,7 +84,7 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean) {
         isConsoleOutput = true
         toolVersion = "7.13.0"
         ruleSetConfig = project.embeddedResource("/pmd-ruleset.xml")
-        isIgnoreFailures = true
+        isIgnoreFailures = !pmdWarningsAsErrors
     }
 
     with(project.extensions.getByType(CheckstyleExtension::class.java)) {
@@ -94,6 +94,8 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean) {
     project.tasks.withType(Checkstyle::class.java) {
         it.minHeapSize.set("1g")
         it.maxHeapSize.set("1g")
+        it.configProperties?.set("checkstyle.suppressions.file",
+            project.rootProject.file("config/checkstyle/suppressions.xml").absolutePath)
     }
 
     project.charset("UTF-8")
@@ -142,6 +144,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
     private var pluginId: String? = null
     private var disableMaven: Boolean = false
     private var disableJavadoc: Boolean = false
+    private var pmdWarningsAsErrors: Boolean = false
 
     private val deferActions: MutableList<() -> Unit> = ArrayList()
 
@@ -195,6 +198,10 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
 
     override fun disableJavadoc() {
         disableJavadoc = true
+    }
+
+    override fun pmdWarningsAsErrors() {
+        pmdWarningsAsErrors = true
     }
 
     override fun pluginProject(path: String, config: Project.() -> Unit) {
@@ -371,7 +378,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
             adapterUnsupportedProject,
             *simpleProjects.toTypedArray(),
             *adapterImplementations.map { it.first }.toTypedArray()
-        ).filterNotNull().forEach { setupProject(it, target, !disableJavadoc) }
+        ).filterNotNull().forEach { setupProject(it, target, !disableJavadoc, pmdWarningsAsErrors) }
 
         if (hasAdapter) {
             val apiProject = adapterApiProject
