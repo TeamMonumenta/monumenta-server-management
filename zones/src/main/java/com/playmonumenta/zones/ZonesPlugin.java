@@ -5,6 +5,7 @@ import com.playmonumenta.zones.commands.ShowZones;
 import com.playmonumenta.zones.commands.TestZone;
 import java.util.logging.Level;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
@@ -34,6 +35,11 @@ public class ZonesPlugin extends JavaPlugin {
 	@Override
 	public void onEnable() {
 		INSTANCE = this;
+
+		PluginManager manager = getServer().getPluginManager();
+		if (manager.isPluginEnabled("MonumentaRedisSync")) {
+			manager.registerEvents(new RedisSyncListener(), this);
+		}
 
 		mZoneManager = ZoneManager.getInstance();
 		mZoneManager.doReload(true);

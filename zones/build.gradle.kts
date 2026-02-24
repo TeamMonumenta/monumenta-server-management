@@ -13,7 +13,7 @@ repositories {
 dependencies {
 	compileOnly(libs.commandapi)
 	compileOnly(libs.dynmap)
-	// compileOnly(libs.gson)
+	compileOnly(project(":redis-sync:redissync"))
 }
 
 monumenta {
@@ -24,7 +24,7 @@ monumenta {
 		BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
 		"1.20",
 		depends = listOf("CommandAPI"),
-		softDepends = listOf("dynmap")
+		softDepends = listOf("dynmap", "MonumentaRedisSync")
 	)
 	gitPrefix("zones/")
 }
