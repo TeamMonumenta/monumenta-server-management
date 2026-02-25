@@ -41,43 +41,24 @@ The version is determined automatically from the nearest git tag via the git-ver
 
 ## Local Testing (without publishing)
 
-To test changes to this plugin against a consuming project without going through the official repository, use Gradle's **composite build** feature. This wires the local plugin source directly into the consuming project's build — no separate publish step is required, and changes are picked up immediately on the next build.
-
-### Step 1 — Patch the consuming project's `settings.gradle.kts`
-
-In the consuming project (e.g. `monumenta-plugins/plugins/settings.gradle.kts`), add `includeBuild` pointing at this repository inside the `pluginManagement` block:
-
-```kotlin
+### Option 1 - Using Gradle Composite Build
+Add the below line temporarily to `settings.gradle.kts`. Make sure you use the correct path for your system:
+```diff
 pluginManagement {
-    // Add this line — adjust the relative path to match your directory layout
-    includeBuild("../../monumenta-server-management/gradle-plugin")
-
-    repositories {
-        gradlePluginPortal()
-        maven("https://repo.papermc.io/repository/maven-public/")
-        maven("https://maven.playmonumenta.com/releases")
-    }
++   includeBuild("../../monumenta-server-management/gradle-plugin")
+   repositories {
+       gradlePluginPortal()
+       maven("https://repo.papermc.io/repository/maven-public/")
+       maven("https://maven.playmonumenta.com/releases")
+   }
 }
 ```
 
-The path `../../monumenta-server-management/gradle-plugin` is relative to the directory that contains `settings.gradle.kts`. Adjust it to match your local checkout layout.
+Now all you have to do is build your project normally. Gradle will follow this path and build the gradle-plugin automatically.
 
-### Step 2 — Build the consuming project normally
+### Option 2 - Maven Local
 
-```bash
-cd monumenta-plugins/plugins
-./gradlew clean build
-```
-
-Gradle will automatically build the local plugin and substitute it for the remote version. No version pinning changes are needed.
-
-### Step 3 — Revert when done
-
-Remove the `includeBuild(...)` line from `settings.gradle.kts` to go back to pulling the plugin from the official Maven repository.
-
-### Alternative: Maven Local
-
-If composite build is not suitable, you can publish to your local Maven cache instead:
+You can publish to your local Maven cache instead:
 
 ```bash
 # In the gradle-plugin directory:
