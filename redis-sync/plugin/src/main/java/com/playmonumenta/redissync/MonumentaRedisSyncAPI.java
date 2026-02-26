@@ -12,6 +12,7 @@ import com.playmonumenta.redissync.event.PlayerServerTransferEvent;
 import com.playmonumenta.redissync.utils.Trie;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import dev.jorel.commandapi.wrappers.Rotation;
+import io.lettuce.core.KeyValue;
 import io.lettuce.core.LettuceFutures;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.TransactionResult;
@@ -402,17 +403,21 @@ public class MonumentaRedisSyncAPI {
 
 		RedisAPI api = RedisAPI.getInstance();
 
-		Bukkit.getScheduler().runTaskAsynchronously(mrs, () -> {
-			List<String> stashNames = api.async().hkeys(getStashPath()).toCompletableFuture().join()
-				.stream()
-				.filter(field -> field.endsWith("-history"))
-				.map(field ->
-					field.substring(0, field.length() - 8)
-				)
-				.sorted()
-				.toList();
-
+		api.async().hkeys(getStashPath()).toCompletableFuture().whenComplete((keyResults, ex) -> {
 			Bukkit.getScheduler().runTask(mrs, () -> {
+				if (ex != null) {
+					player.sendMessage(Component.text("Error fetching stash list: " + ex.getMessage(), NamedTextColor.RED));
+					return;
+				}
+				List<String> stashNames = keyResults
+					.stream()
+					.filter(field -> field.endsWith("-history"))
+					.map(field ->
+						field.substring(0, field.length() - 8)
+					)
+					.sorted()
+					.toList();
+
 				if (stashNames.isEmpty()) {
 					player.sendMessage(Component.text("No stashes were found"));
 					return;
@@ -421,23 +426,38 @@ public class MonumentaRedisSyncAPI {
 				if (searchName != null) {
 					player.sendMessage(Component.text("Listing stashes saved by username " + searchName, NamedTextColor.GOLD));
 					player.sendMessage(Component.text("If a stash you saved does not appear here, it may have been overwritten by another user, or you may have saved it under a past username", NamedTextColor.GOLD));
-					for (String stash : stashNames) {
-						String history = api.async().hget(getStashPath(), stash + "-history").toCompletableFuture().join();
-						if (history == null) {
-							player.sendMessage(Component.text("Failed to get data for an existing stash? name: " + stash, NamedTextColor.RED));
-							continue;
-						}
 
-						String[] split = history.split("\\|");
-						if (split.length != 3) {
-							player.sendMessage(Component.text("Stash "+" is seemingly corrupted, with " + split.length + " entries: " + history, NamedTextColor.RED));
-							continue;
-						}
+					api.async().hmget(getStashPath(), stashNames.stream().map((stash) -> stash + "-history").toArray(String[]::new)).whenComplete((results, e) -> {
+						Bukkit.getScheduler().runTask(mrs, () -> {
+							if (e != null) {
+								player.sendMessage(Component.text("Error fetching stash list entries: " + e.getMessage(), NamedTextColor.RED));
+								return;
+							}
 
-						if (searchName.equals(split[2])) {
-							player.sendMessage(Component.text("Stash '" + stash + "' last saved on " + split[0] + " by " + split[2] + " " + getTimeDifferenceSince(Long.parseLong(split[1])) + " ago", NamedTextColor.WHITE));
-						}
-					}
+							for (KeyValue<String, String> historyEntry : results) {
+								String stash = historyEntry.getKey();
+								if (stash.endsWith("-history")) { // Should always be true...
+									stash = stash.substring(0, stash.length() - "-history".length());
+								}
+								String history = historyEntry.getValue();
+
+								if (history == null) {
+									player.sendMessage(Component.text("Failed to get data for an existing stash? name: " + stash, NamedTextColor.RED));
+									continue;
+								}
+
+								String[] split = history.split("\\|");
+								if (split.length != 3) {
+									player.sendMessage(Component.text("Stash "+" is seemingly corrupted, with " + split.length + " entries: " + history, NamedTextColor.RED));
+									continue;
+								}
+
+								if (searchName.equals(split[2])) {
+									player.sendMessage(Component.text("Stash '" + stash + "' last saved on " + split[0] + " by " + split[2] + " " + getTimeDifferenceSince(Long.parseLong(split[1])) + " ago", NamedTextColor.WHITE));
+								}
+							}
+						});
+					});
 				} else {
 					List<Component> formattedStashNames = stashNames
 						.stream()
