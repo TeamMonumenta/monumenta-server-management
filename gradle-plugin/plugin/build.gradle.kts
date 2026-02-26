@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "com.playmonumenta.gradle-config"
-version = "3.7.2"
+version = "3.8.0"
 
 repositories {
     mavenCentral()
