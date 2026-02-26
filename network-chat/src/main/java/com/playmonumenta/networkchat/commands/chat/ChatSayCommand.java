@@ -24,6 +24,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
+import static com.playmonumenta.networkchat.DefaultChannels.SPEED_DIAL_PREFIX;
+
 public class ChatSayCommand {
 	public static void register() {
 		Argument<String> channelArg = ChannelManager.getChannelNameArgument(ChannelPredicate.MAY_CHAT
@@ -65,6 +67,10 @@ public class ChatSayCommand {
 					return sendMessageInDefault(sender, channelType, args.getByArgument(messageArg));
 				})
 				.register();
+
+			if (channelType.startsWith(SPEED_DIAL_PREFIX)) {
+				continue;
+			}
 
 			String shortcut;
 			if (channelType.equals(DefaultChannels.GUILD_CHANNEL)) {
