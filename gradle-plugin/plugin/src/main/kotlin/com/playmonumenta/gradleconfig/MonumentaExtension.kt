@@ -47,6 +47,12 @@ interface MonumentaExtension {
     fun disableJavadoc()
 
     /**
+     * Treats PMD violations as errors instead of warnings, failing the build.
+     * By default PMD violations are warnings only.
+     */
+    fun pmdWarningsAsErrors()
+
+    /**
      * Specifies the project that contains the actual plugin.
      * This defaults to the root project, and is useful in cases with version adapters and such.
      *
