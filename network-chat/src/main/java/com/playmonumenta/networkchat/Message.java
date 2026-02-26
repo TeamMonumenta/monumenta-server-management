@@ -384,7 +384,7 @@ public class Message implements AutoCloseable {
 	}
 
 	// Get the message as shown to a given recipient
-	public Component shownMessage(CommandSender recipient) {
+	public Component shownMessage() {
 		@Nullable Channel channel;
 		if (mChannelId == null) {
 			channel = null;
@@ -404,7 +404,7 @@ public class Message implements AutoCloseable {
 			}
 			return mMessage;
 		}
-		return channel.shownMessage(recipient, this);
+		return channel.shownMessage(this);
 	}
 
 	// Must be called from PlayerState to allow pausing messages.

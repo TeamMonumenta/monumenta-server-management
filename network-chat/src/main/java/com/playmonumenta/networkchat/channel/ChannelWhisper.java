@@ -446,7 +446,7 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 
 	@Override
 	public void distributeMessage(Message message) {
-		showMessage(Bukkit.getConsoleSender(), message);
+		super.distributeMessage(message);
 
 		JsonObject extraData = message.getExtraData();
 		if (extraData == null) {
@@ -494,7 +494,7 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 	}
 
 	@Override
-	public Component shownMessage(CommandSender recipient, Message message) {
+	public Component shownMessage(Message message) {
 		JsonObject extraData = message.getExtraData();
 		if (extraData == null) {
 			MMLog.warning("No receiver specified for whisper message");
@@ -527,7 +527,7 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 	@Override
 	public void showMessage(CommandSender recipient, Message message) {
 		UUID senderUuid = message.getSenderId();
-		recipient.sendMessage(shownMessage(recipient, message));
+		recipient.sendMessage(shownMessage(message));
 		if (recipient instanceof Player player && !player.getUniqueId().equals(senderUuid)) {
 			@Nullable PlayerState playerState = PlayerStateManager.getPlayerState(player);
 			if (playerState == null) {

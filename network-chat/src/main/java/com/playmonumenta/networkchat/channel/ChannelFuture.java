@@ -87,7 +87,7 @@ public class ChannelFuture extends Channel {
 
 	// The channel is from a future version - we can't determine how to display this!
 	@Override
-	public Component shownMessage(CommandSender recipient, Message message) {
+	public Component shownMessage(Message message) {
 		return message.getMessage();
 	}
 
