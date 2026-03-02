@@ -66,7 +66,7 @@ public class AccountTransferManager implements Listener {
 		INSTANCE = null;
 	}
 
-	@EventHandler
+	@EventHandler(ignoreCancelled = false)
 	public void playerSaveEvent(PlayerSaveEvent event) {
 		Player player = event.getPlayer();
 
@@ -77,7 +77,7 @@ public class AccountTransferManager implements Listener {
 		event.setPluginData(PLUGIN_KEY, redisSyncData);
 	}
 
-	@EventHandler
+	@EventHandler(ignoreCancelled = false)
 	public void playerJoinEvent(PlayerJoinEvent event) {
 		Player player = event.getPlayer();
 		UUID currentPlayerId = player.getUniqueId();

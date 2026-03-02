@@ -38,31 +38,31 @@ public class RespawnManager {
 		private record Entry(RespawningStructure.StructureBounds bounds, World world) implements ZoneInstance {
 		}
 
-		private final List<Entry> insideZones = new ArrayList<>();
-		private final List<Entry> nearbyZones = new ArrayList<>();
+		private final List<Entry> mInsideZones = new ArrayList<>();
+		private final List<Entry> mNearbyZones = new ArrayList<>();
 
 		@Override
 		public boolean isInside(Location loc) {
-			return insideZones.stream().anyMatch(x -> x.bounds.within(loc.toVector()) && x.world == loc.getWorld());
+			return mInsideZones.stream().anyMatch(x -> x.bounds.within(loc.toVector()) && x.world == loc.getWorld());
 		}
 
 		@Override
 		public ZoneInstance registerInsideZone(Vector lowerCorner, Vector upperCorner, World world, String name) {
 			final var entry = new Entry(new RespawningStructure.StructureBounds(lowerCorner, upperCorner), world);
-			insideZones.add(entry);
+			mInsideZones.add(entry);
 			return entry;
 		}
 
 		@Override
 		public ZoneInstance registerNearbyZone(Vector lowerCorner, Vector upperCorner, World world, String name) {
 			final var entry = new Entry(new RespawningStructure.StructureBounds(lowerCorner, upperCorner), world);
-			nearbyZones.add(entry);
+			mNearbyZones.add(entry);
 			return entry;
 		}
 
 		@Override
 		public List<ZoneInstance> findZones(Vector loc, boolean includeNearby) {
-			final var inList = includeNearby ? nearbyZones : insideZones;
+			final var inList = includeNearby ? mNearbyZones : mInsideZones;
 			return inList.stream().filter(x -> x.bounds.within(loc)).collect(Collectors.toUnmodifiableList());
 		}
 
@@ -72,8 +72,8 @@ public class RespawnManager {
 
 		@Override
 		public void reset() {
-			insideZones.clear();
-			nearbyZones.clear();
+			mInsideZones.clear();
+			mNearbyZones.clear();
 		}
 	}
 

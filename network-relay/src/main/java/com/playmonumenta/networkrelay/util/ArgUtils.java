@@ -22,20 +22,20 @@ public class ArgUtils {
 		return "\"" + arg.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
 	}
 
-	public static @Nullable String quoteIfNeeded(@Nullable String arg) {
-		if (requiresQuotes(arg)) {
-			return quote(arg);
-		} else {
-			return arg;
-		}
-	}
-
 	public static Collection<String> quote(Collection<String> args) {
 		Collection<String> possiblyQuotedArgs = new ArrayList<>();
 		for (String arg : args) {
 			possiblyQuotedArgs.add(quote(arg));
 		}
 		return possiblyQuotedArgs;
+	}
+
+	public static @Nullable String quoteIfNeeded(@Nullable String arg) {
+		if (requiresQuotes(arg)) {
+			return quote(arg);
+		} else {
+			return arg;
+		}
 	}
 
 	public static Collection<String> quoteIfNeeded(Collection<String> args) {
