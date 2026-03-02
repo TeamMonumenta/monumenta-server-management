@@ -2,7 +2,6 @@ package com.playmonumenta.redissync;
 
 import com.google.inject.Inject;
 import com.playmonumenta.redissync.config.ProxyConfig;
-import com.velocitypowered.api.event.PostOrder;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
@@ -53,8 +52,8 @@ public class MonumentaRedisSyncVelocity implements MonumentaRedisSyncInterface {
 		mServer.getEventManager().register(this, new VelocityListener(this));
 	}
 
-	// we use ProxyShutdownEvent because ListenerClosEvent might fire too early
-	@Subscribe(order = PostOrder.LATE)
+	// we use ProxyShutdownEvent because ListenerCloseEvent might fire too early
+	@Subscribe(priority = -16384)
 	public void onDisable(ProxyShutdownEvent event) {
 		if (mRedisAPI != null) {
 			mRedisAPI.shutdown();

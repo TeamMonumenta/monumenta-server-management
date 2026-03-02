@@ -4,7 +4,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.velocitypowered.api.event.EventTask;
-import com.velocitypowered.api.event.PostOrder;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.plugin.PluginManager;
 import com.velocitypowered.api.proxy.Player;
@@ -60,7 +59,7 @@ public class NetworkMessageListenerVelocity {
 		event.setPluginData("networkrelay", data);
 	}
 
-	@Subscribe(order = PostOrder.FIRST)
+	@Subscribe(priority = 32766)
 	public @Nullable EventTask networkRelayMessageEvent(NetworkRelayMessageEventGeneric event) {
 		if (!mRunReceivedCommands) {
 			return null;
@@ -108,7 +107,7 @@ public class NetworkMessageListenerVelocity {
 		});
 	}
 
-	@Subscribe(order = PostOrder.NORMAL)
+	@Subscribe(priority = 0)
 	public void destOnline(DestOnlineEventGeneric event) {
 		if (!mAutoRegisterServersToBungee) {
 			return;
@@ -181,7 +180,7 @@ public class NetworkMessageListenerVelocity {
 		mServer.registerServer(serverInfo); // Deprecation note: This whole class is deprecated to discourage use, but no other options exist
 	}
 
-	@Subscribe(order = PostOrder.NORMAL)
+	@Subscribe(priority = 0)
 	public void destOffline(DestOfflineEventGeneric event) {
 		if (!mAutoUnregisterInactiveServersFromBungee) {
 			return;

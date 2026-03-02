@@ -4,7 +4,6 @@ import com.google.inject.Inject;
 import com.playmonumenta.networkrelay.commands.WhereIsCommandVelocity;
 import com.playmonumenta.networkrelay.config.BungeeConfig;
 import com.playmonumenta.networkrelay.config.CommonConfig;
-import com.velocitypowered.api.event.PostOrder;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
@@ -77,7 +76,7 @@ public class NetworkRelayVelocity {
 		return INSTANCE;
 	}
 
-	@Subscribe(order = PostOrder.NORMAL)
+	@Subscribe(priority = 0)
 	public void onProxyInit(ProxyInitializeEvent event) {
 		this.mServer.getEventManager().register(this, new NetworkMessageListenerVelocity(mConfig.mRunRecievedCommands, mConfig.mAutoRegisterServersToProxy, mConfig.mAutoUnregisterInactiveServersFromProxy));
 		try {
@@ -102,7 +101,7 @@ public class NetworkRelayVelocity {
 		this.mServer.getCommandManager().register(this.mServer.getCommandManager().metaBuilder("whereisv").plugin(this).build(), new WhereIsCommandVelocity());
 	}
 
-	@Subscribe(order = PostOrder.NORMAL)
+	@Subscribe(priority = 0)
 	public void onProxyShutdown(ProxyShutdownEvent event) {
 		NetworkRelayVelocityExecutor.getInstance().stop();
 		if (mRabbitMQManager != null) {
