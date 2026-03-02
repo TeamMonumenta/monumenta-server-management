@@ -604,7 +604,7 @@ public class DataEventListener implements Listener {
 			return;
 		}
 
-		if(mLoadFailedPlayers.contains(event.getPlayer().getUniqueId())) {
+		if (mLoadFailedPlayers.contains(event.getPlayer().getUniqueId())) {
 			mLoadFailedPlayers.remove(event.getPlayer().getUniqueId());
 			mLogger.warning("Skipping playerdata save for " + event.getPlayer().getUniqueId() + " because their playerdata failed to load");
 			return;

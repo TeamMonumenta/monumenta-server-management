@@ -121,7 +121,7 @@ public class AccountTransferManager implements Listener {
 		}
 
 		MonumentaRedisSync plugin = MonumentaRedisSync.getInstance();
-		plugin.getLogger().info("[AccountTransferManager] Detected account transfer for " + lastAccountName + " (" + lastAccountId +") -> " + currentPlayerName + " (" + currentPlayerId + ")");
+		plugin.getLogger().info("[AccountTransferManager] Detected account transfer for " + lastAccountName + " (" + lastAccountId + ") -> " + currentPlayerName + " (" + currentPlayerId + ")");
 
 		LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
 		long timestampMillis = EPOCH.until(now, ChronoUnit.MILLIS);

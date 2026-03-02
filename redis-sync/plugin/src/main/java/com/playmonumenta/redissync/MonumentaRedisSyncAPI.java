@@ -448,7 +448,7 @@ public class MonumentaRedisSyncAPI {
 
 								String[] split = history.split("\\|");
 								if (split.length != 3) {
-									player.sendMessage(Component.text("Stash "+" is seemingly corrupted, with " + split.length + " entries: " + history, NamedTextColor.RED));
+									player.sendMessage(Component.text("Stash " + " is seemingly corrupted, with " + split.length + " entries: " + history, NamedTextColor.RED));
 									continue;
 								}
 

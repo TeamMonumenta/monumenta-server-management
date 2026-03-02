@@ -46,7 +46,7 @@ public class PlayerTransferHistory {
 							transferDetailsList = AccountTransferAPI.getEffectiveTransfersSince(since).join();
 						} catch (Throwable throwable) {
 							sender.sendMessage(Component.text("Unable to fetch transfer history: " + throwable, NamedTextColor.RED));
-							plugin.getLogger().log(Level.WARNING,"Unable to fetch transfer history: ", throwable);
+							plugin.getLogger().log(Level.WARNING, "Unable to fetch transfer history: ", throwable);
 							return;
 						}
 
@@ -66,7 +66,7 @@ public class PlayerTransferHistory {
 								sender.sendMessage(Component.text("Done!", NamedTextColor.GREEN));
 							} catch (Throwable throwable) {
 								sender.sendMessage(Component.text("Unable to display transfer history: " + throwable, NamedTextColor.RED));
-								plugin.getLogger().log(Level.WARNING,"Unable to display transfer history: ", throwable);
+								plugin.getLogger().log(Level.WARNING, "Unable to display transfer history: ", throwable);
 							}
 						});
 					});
@@ -90,7 +90,7 @@ public class PlayerTransferHistory {
 							transferDetailsList = AccountTransferAPI.getAllTransfersSince(since).join();
 						} catch (Throwable throwable) {
 							sender.sendMessage(Component.text("Unable to fetch transfer history: " + throwable, NamedTextColor.RED));
-							plugin.getLogger().log(Level.WARNING,"Unable to fetch transfer history: ", throwable);
+							plugin.getLogger().log(Level.WARNING, "Unable to fetch transfer history: ", throwable);
 							return;
 						}
 
@@ -110,7 +110,7 @@ public class PlayerTransferHistory {
 								sender.sendMessage(Component.text("Done!", NamedTextColor.GREEN));
 							} catch (Throwable throwable) {
 								sender.sendMessage(Component.text("Unable to display transfer history: " + throwable, NamedTextColor.RED));
-								plugin.getLogger().log(Level.WARNING,"Unable to display transfer history: ", throwable);
+								plugin.getLogger().log(Level.WARNING, "Unable to display transfer history: ", throwable);
 							}
 						});
 					});
