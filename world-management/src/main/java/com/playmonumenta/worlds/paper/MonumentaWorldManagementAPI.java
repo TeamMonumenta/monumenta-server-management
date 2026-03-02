@@ -261,7 +261,7 @@ public class MonumentaWorldManagementAPI {
 		Bukkit.getScheduler().runTaskAsynchronously(WorldManagementPlugin.getInstance(), () -> {
 			try {
 				// Copy and wait for completion
-				Process process = Runtime.getRuntime().exec(WorldManagementPlugin.getCopyWorldCommand() + " " + fromWorldName + " " + newWorldName);
+				Process process = Runtime.getRuntime().exec(WorldManagementPlugin.getCopyWorldCommandWithArgs(fromWorldName, newWorldName));
 				int exitVal = process.waitFor();
 
 				if (exitVal != 0) {
