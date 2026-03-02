@@ -156,6 +156,7 @@ public class DataEventListener implements Listener {
 
 	/* ******************* Protected API ******************* */
 
+	@SuppressWarnings("deprecation") // No replacement API exists for getShoulderEntityLeft/Right
 	protected static void setPlayerAsTransferring(Player player) throws Exception {
 		if (INSTANCE.mTransferringPlayers.contains(player.getUniqueId())) {
 			throw new Exception("Player " + player.getName() + " is already transferring");
