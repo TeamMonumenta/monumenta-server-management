@@ -243,12 +243,12 @@ public class MonumentaWorldManagementAPI {
 	public static CompletableFuture<Void> copyWorld(String fromWorldName, String newWorldName) {
 		CompletableFuture<Void> future = new CompletableFuture<>();
 
-		if (MonumentaWorldManagementAPI.isWorldAvailable(newWorldName)) {
+		if (isWorldAvailable(newWorldName)) {
 			future.completeExceptionally(new Exception("World '" + newWorldName + "' already exists, this command is for creating new worlds"));
 			return future;
 		}
 
-		if (!MonumentaWorldManagementAPI.isWorldAvailable(fromWorldName)) {
+		if (!isWorldAvailable(fromWorldName)) {
 			future.completeExceptionally(new Exception("Copy-from world '" + fromWorldName + "' does not exist"));
 			return future;
 		}
@@ -317,7 +317,7 @@ public class MonumentaWorldManagementAPI {
 				}
 
 				// Delete all files recursively but do **not** follow symbolic links
-				Files.walkFileTree(rootPath, new SimpleFileVisitor<Path>() {
+				Files.walkFileTree(rootPath, new SimpleFileVisitor<>() {
 				   @Override
 				   public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 					   Files.delete(file);

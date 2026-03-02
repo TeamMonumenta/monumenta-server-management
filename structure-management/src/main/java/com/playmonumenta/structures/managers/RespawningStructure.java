@@ -2,7 +2,6 @@ package com.playmonumenta.structures.managers;
 
 import com.fastasyncworldedit.core.util.collection.BlockSet;
 import com.fastasyncworldedit.core.util.collection.MemBlockSet;
-import com.playmonumenta.structures.StructureConquerEvent;
 import com.playmonumenta.structures.StructuresAPI;
 import com.playmonumenta.structures.StructuresPlugin;
 import com.playmonumenta.structures.utils.MSLog;

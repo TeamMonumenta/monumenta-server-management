@@ -178,9 +178,9 @@ public class DataEventListener implements Listener {
 		 * This task is cancelled when player leaves the server (PlayerQuitEvent)
 		 */
 		TRANSFER_UNLOCK_TASKS.put(player.getUniqueId(), Bukkit.getScheduler().runTaskLater(MonumentaRedisSync.getInstance(), () -> {
-			if (DataEventListener.isPlayerTransferring(player)) {
+			if (isPlayerTransferring(player)) {
 				player.sendMessage(Component.text("Transferring timed out and your player has been unlocked", NamedTextColor.RED));
-				DataEventListener.setPlayerAsNotTransferring(player);
+				setPlayerAsNotTransferring(player);
 			}
 			TRANSFER_UNLOCK_TASKS.remove(player.getUniqueId());
 		}, TRANSFER_UNLOCK_TIMEOUT_TICKS));
