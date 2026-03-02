@@ -15,6 +15,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.Nullable;
 
 public class ExampleServerListener implements Listener {
 	/*################################################################################
@@ -36,7 +37,7 @@ public class ExampleServerListener implements Listener {
 			mData.put(key, value);
 		}
 
-		public Integer getPoints(final String key) {
+		public @Nullable Integer getPoints(final String key) {
 			return mData.get(key);
 		}
 
@@ -119,7 +120,7 @@ public class ExampleServerListener implements Listener {
 	}
 
 	/* Get the player's custom data for use by other parts of your plugin */
-	public CustomData getCustomData(final Player player) {
+	public @Nullable CustomData getCustomData(final Player player) {
 		return mAllPlayerData.get(player.getUniqueId());
 	}
 }

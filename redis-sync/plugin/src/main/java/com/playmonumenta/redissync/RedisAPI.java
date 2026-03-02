@@ -91,7 +91,7 @@ public class RedisAPI {
 		mStringByteConnection = mRedisClient.connect(StringByteCodec.INSTANCE);
 
 		Thread thread = Thread.currentThread();
-		long threadId = thread.getId();
+		long threadId = thread.threadId();
 		mThreadStringStringConnections.put(threadId, mConnection);
 		mThreadStringByteConnections.put(threadId, mStringByteConnection);
 
@@ -116,7 +116,7 @@ public class RedisAPI {
 	 */
 	public <K, V> StatefulRedisConnection<K, V> openConnection(RedisCodec<K, V> codec) {
 		Thread thread = Thread.currentThread();
-		MonumentaRedisSync.getInstance().getLogger().info("Creating a new autocloseable connection on thread " + thread.getId());
+		MonumentaRedisSync.getInstance().getLogger().info("Creating a new autocloseable connection on thread " + thread.threadId());
 		return mRedisClient.connect(codec);
 	}
 
@@ -161,16 +161,16 @@ public class RedisAPI {
 	@Deprecated
 	public StatefulRedisConnection<String, String> getMagicallyClosingStringStringConnection() {
 		Thread thread = Thread.currentThread();
-		long threadId = thread.getId();
-		MonumentaRedisSync.getInstance().getLogger().info("Magically closing connection request from thread " + thread.getId());
+		long threadId = thread.threadId();
+		MonumentaRedisSync.getInstance().getLogger().info("Magically closing connection request from thread " + threadId);
 		return mThreadStringStringConnections.computeIfAbsent(threadId, k -> {
 			StatefulRedisConnection<String, String> connection = mRedisClient.connect();
-			MonumentaRedisSync.getInstance().getLogger().info("Created new magically closing connection request from thread " + thread.getId());
+			MonumentaRedisSync.getInstance().getLogger().info("Created new magically closing connection request from thread " + threadId);
 			mServer.runAsync(() -> {
 				Uninterruptibles.joinUninterruptibly(thread);
 				mThreadStringStringConnections.remove(k, connection);
 				connection.close();
-				MonumentaRedisSync.getInstance().getLogger().info("Closed magically closing connection request from thread " + thread.getId());
+				MonumentaRedisSync.getInstance().getLogger().info("Closed magically closing connection request from thread " + threadId);
 			});
 			return connection;
 		});
@@ -185,7 +185,7 @@ public class RedisAPI {
 	@Deprecated
 	public StatefulRedisConnection<String, byte[]> getMagicallyClosingStringByteConnection() {
 		Thread thread = Thread.currentThread();
-		long threadId = thread.getId();
+		long threadId = thread.threadId();
 		return mThreadStringByteConnections.computeIfAbsent(threadId, k -> {
 			StatefulRedisConnection<String, byte[]> connection = mRedisClient.connect(STRING_BYTE_CODEC);
 			mServer.runAsync(() -> {
