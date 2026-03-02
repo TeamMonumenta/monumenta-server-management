@@ -23,7 +23,7 @@ import org.gradle.external.javadoc.StandardJavadocDocletOptions
 import org.gradle.jvm.tasks.Jar
 import java.net.URI
 
-private fun setupProject(project: Project, target: Project, javadoc: Boolean, pmdWarningsAsErrors: Boolean) {
+private fun setupProject(project: Project, target: Project, javadoc: Boolean, pmdWarningsAsErrors: Boolean, checkstyleWarningsAsErrors: Boolean) {
     project.applyPlugin(
         "pmd",
         "java-library",
@@ -89,6 +89,9 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean, pm
 
     with(project.extensions.getByType(CheckstyleExtension::class.java)) {
         config = project.embeddedResource("/checkstyle.xml")
+        if (checkstyleWarningsAsErrors) {
+            maxWarnings = 0
+        }
     }
 
     project.tasks.withType(Checkstyle::class.java) {
@@ -145,6 +148,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
     private var disableMaven: Boolean = false
     private var disableJavadoc: Boolean = false
     private var pmdWarningsAsErrors: Boolean = false
+    private var checkstyleWarningsAsErrors: Boolean = false
 
     private val deferActions: MutableList<() -> Unit> = ArrayList()
 
@@ -202,6 +206,10 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
 
     override fun pmdWarningsAsErrors() {
         pmdWarningsAsErrors = true
+    }
+
+    override fun checkstyleWarningsAsErrors() {
+        checkstyleWarningsAsErrors = true
     }
 
     override fun pluginProject(path: String, config: Project.() -> Unit) {
@@ -378,7 +386,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
             adapterUnsupportedProject,
             *simpleProjects.toTypedArray(),
             *adapterImplementations.map { it.first }.toTypedArray()
-        ).filterNotNull().forEach { setupProject(it, target, !disableJavadoc, pmdWarningsAsErrors) }
+        ).filterNotNull().forEach { setupProject(it, target, !disableJavadoc, pmdWarningsAsErrors, checkstyleWarningsAsErrors) }
 
         if (hasAdapter) {
             val apiProject = adapterApiProject
