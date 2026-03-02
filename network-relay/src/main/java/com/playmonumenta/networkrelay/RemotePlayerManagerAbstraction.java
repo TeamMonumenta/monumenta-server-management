@@ -264,14 +264,14 @@ public abstract class RemotePlayerManagerAbstraction {
 			shouldBroadcast = true;
 		} else if (!isRemote && forceBroadcast) {
 			// Broadcast local data, regardless of if data changed or not
-			MMLog.fine(() -> "Broadcasted player: " + player.mName + " remote=" + isRemote + " serverType=" + serverType);
+			MMLog.fine(() -> "Broadcasted player: " + player.mName + " remote=false serverType=" + serverType);
 			shouldBroadcast = true;
 		}
 
 		if (isRemote && this.playerShouldBeRefreshed(player)) {
 			// Player logged off on remote shard, but is locally online.
 			// This can happen if the remote shard was not notified the player logged in here in time.
-			MMLog.warning(() -> "Detected race condition, triggering refresh on " + player.mName + " remote=" + isRemote + " serverType=" + serverType);
+			MMLog.warning(() -> "Detected race condition, triggering refresh on " + player.mName + " remote=true serverType=" + serverType);
 			this.refreshLocalPlayerWithDelay(player.mUuid);
 		}
 
