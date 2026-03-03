@@ -1,7 +1,6 @@
 package com.playmonumenta.redissync;
 
 import com.google.inject.Inject;
-import com.playmonumenta.redissync.config.ProxyConfig;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
@@ -44,7 +43,7 @@ public class MonumentaRedisSyncVelocity {
 		System.setProperty("com.playmonumenta.redissync.internal.netty", "com.playmonumenta.redissync.internal");
 
 		loadConfig();
-		mRedisAPI = new RedisAPI(ProxyConfig.getRedisHost(), ProxyConfig.getRedisPort());
+		mRedisAPI = new RedisAPI(ProxyConfigAPI.getRedisHost(), ProxyConfigAPI.getRedisPort());
 	}
 
 	@Subscribe
@@ -83,7 +82,7 @@ public class MonumentaRedisSyncVelocity {
 		String defaultServer = mConfig.mDefaultServer;
 		List<String> excludedServers = mConfig.mExcludedServers;
 
-		new ProxyConfig(
+		new ProxyConfigAPI(
 			mLogger,
 			redisHost,
 			redisPort,

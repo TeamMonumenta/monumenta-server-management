@@ -7,7 +7,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
-import com.playmonumenta.redissync.config.CommonConfig;
 import com.playmonumenta.redissync.event.PlayerServerTransferEvent;
 import com.playmonumenta.redissync.utils.Trie;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
@@ -605,90 +604,6 @@ public class MonumentaRedisSyncAPI {
 		});
 	}
 
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<String> getRemoteData(UUID uuid, String key) throws Exception {
-		return RemoteDataAPI.get(uuid, key);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Boolean> setRemoteData(UUID uuid, String key, String value) throws Exception {
-		return RemoteDataAPI.set(uuid, key, value);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Long> incrementRemoteData(UUID uuid, String key, int incBy) throws Exception {
-		return RemoteDataAPI.increment(uuid, key, incBy);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Boolean> delRemoteData(UUID uuid, String key) throws Exception {
-		return RemoteDataAPI.del(uuid, key);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, String>> getAllRemoteData(UUID uuid) throws Exception {
-		return remoteDataGetAll(uuid);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<String> remoteDataGet(UUID uuid, String key) {
-		return RemoteDataAPI.get(uuid, key);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, String>> remoteDataGetMulti(UUID uuid, String... keys) {
-		return RemoteDataAPI.getMulti(uuid, keys);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Boolean> remoteDataSet(UUID uuid, String key, String value) {
-		return RemoteDataAPI.set(uuid, key, value);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Long> remoteDataIncrement(UUID uuid, String key, int incBy) {
-		return RemoteDataAPI.increment(uuid, key, incBy);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Boolean> remoteDataDel(UUID uuid, String key) {
-		return RemoteDataAPI.del(uuid, key);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, String>> remoteDataGetAll(UUID uuid) {
-		return RemoteDataAPI.getAll(uuid);
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static String getRedisRemoteDataPath(Player player) {
-		return RemoteDataAPI.getRedisPath(player.getUniqueId());
-	}
-
-	/** @deprecated - use RemoteDataAPI */
-	@Deprecated
-	public static String getRedisRemoteDataPath(UUID uuid) {
-		return RemoteDataAPI.getRedisPath(uuid);
-	}
-
-	/** @deprecated - use ConfigAPI */
-	@Deprecated
-	public static String getServerDomain() {
-		return CommonConfig.getServerDomain();
-	}
-
 	public static String getRedisDataPath(Player player) {
 		return getRedisDataPath(player.getUniqueId());
 	}
@@ -720,7 +635,6 @@ public class MonumentaRedisSyncAPI {
 	public static String getRedisPerShardDataWorldKey(UUID worldUUID, String worldName) {
 		return worldUUID.toString() + ":" + worldName;
 	}
-
 
 	public static String getRedisPluginDataPath(Player player) {
 		return getRedisPluginDataPath(player.getUniqueId());
@@ -991,24 +905,6 @@ public class MonumentaRedisSyncAPI {
 		return PlayerWorldData.fromJson(worldShardData, world);
 	}
 
-	/** @deprecated - use LeaderboardAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, Integer>> getLeaderboard(String objective, long start, long stop, boolean ascending) {
-		return LeaderboardAPI.get(objective, start, stop, ascending);
-	}
-
-	/** @deprecated - use LeaderboardAPI */
-	@Deprecated
-	public static void updateLeaderboardAsync(String objective, String name, long value) {
-		LeaderboardAPI.updateAsync(objective, name, value);
-	}
-
-	/** @deprecated - use LeaderboardAPI */
-	@Deprecated
-	public static String getRedisLeaderboardPath(String objective) {
-		return LeaderboardAPI.getRedisPath(objective);
-	}
-
 	/** Future returns non-null if successfully loaded data, null on error */
 	@Nullable
 	private static RedisPlayerData transformPlayerData(MonumentaRedisSync mrs, UUID uuid, TransactionResult result) {
@@ -1152,68 +1048,6 @@ public class MonumentaRedisSyncAPI {
 
 		return commands.exec().thenApply((TransactionResult result) -> transformPlayerSaveResult(mrs, result)).toCompletableFuture();
 	}
-
-	/* *******************************************************************************
-	 * rboard API
-	 */
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static String getRedisRboardPath(String name) throws Exception {
-		return RBoardAPI.getRedisPath(name);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Long> rboardSet(String name, Map<String, String> data) throws Exception {
-		return RBoardAPI.set(name, data);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Long> rboardAdd(String name, String key, long amount) throws Exception {
-		return RBoardAPI.add(name, key, amount);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, String>> rboardGet(String name, String... keys) throws Exception {
-		return RBoardAPI.get(name, keys);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, String>> rboardGetAndReset(String name, String... keys) throws Exception {
-		return RBoardAPI.getAndReset(name, keys);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<List<String>> rboardGetKeys(String name) throws Exception {
-		return RBoardAPI.getKeys(name);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Map<String, String>> rboardGetAll(String name) throws Exception {
-		return RBoardAPI.getAll(name);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Long> rboardReset(String name, String... keys) throws Exception {
-		return RBoardAPI.reset(name, keys);
-	}
-
-	/** @deprecated - use RBoardAPI */
-	@Deprecated
-	public static CompletableFuture<Long> rboardResetAll(String name) throws Exception {
-		return RBoardAPI.resetAll(name);
-	}
-
-	/*
-	 * rboard API
-	 *********************************************************************************/
 
 	/**
 	 * If MonumentaNetworkRelay is installed, returns a list of all other shard names

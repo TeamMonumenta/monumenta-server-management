@@ -1,17 +1,17 @@
-package com.playmonumenta.redissync.config;
+package com.playmonumenta.redissync;
 
 import java.util.ArrayList;
 import java.util.List;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public class ProxyConfig extends CommonConfig {
-	protected static @Nullable ProxyConfig PROXY_INSTANCE = null;
+public class ProxyConfigAPI extends CommonConfig {
+	protected static @Nullable ProxyConfigAPI PROXY_INSTANCE = null;
 
 	protected final String mDefaultServer;
 	protected final List<String> mExcludedServers = new ArrayList<>();
 
-	public ProxyConfig(
+	ProxyConfigAPI(
 		Logger logger,
 		String redisHost,
 		int redisPort,
@@ -32,14 +32,13 @@ public class ProxyConfig extends CommonConfig {
 		logger.info("  default_server = {}", (mDefaultServer == null ? "null" : mDefaultServer));
 		logger.info("  excluded_servers = [{}]", String.join("  ", mExcludedServers));
 
-		COMMON_INSTANCE = this;
 		PROXY_INSTANCE = this;
 	}
 
-	public static ProxyConfig getProxyInstance() {
-		ProxyConfig proxyConfig = PROXY_INSTANCE;
+	private static ProxyConfigAPI getProxyInstance() {
+		ProxyConfigAPI proxyConfig = PROXY_INSTANCE;
 		if (proxyConfig == null) {
-			throw new RuntimeException("ProxyConfig not initialized");
+			throw new RuntimeException("ProxyConfigAPI not initialized");
 		}
 		return proxyConfig;
 	}
