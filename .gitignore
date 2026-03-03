@@ -38,6 +38,8 @@ out/
 .settings/
 plugin/bin/
 api/bin/
+redis-sync/plugin/bin/
+redis-sync/example/bin/
 
 # Compiled class file
 *.class

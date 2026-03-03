@@ -21,6 +21,5 @@ monumenta {
 			compileOnly(mixinapi)
 		}
 	}
-	javaSimple("redissync-example")
 	gitPrefix("redis-sync/")
 }

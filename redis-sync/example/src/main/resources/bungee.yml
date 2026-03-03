@@ -1,6 +1,0 @@
-name: MonumentaRedisSyncExample
-main: com.playmonumenta.redissync.example.MonumentaRedisSyncExampleBungee
-version: 0.0.1
-author: Combustible
-depend: [MonumentaRedisSync]
-softdepend: []
