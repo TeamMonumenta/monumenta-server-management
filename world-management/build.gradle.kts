@@ -8,7 +8,6 @@ dependencies {
 	compileOnly(libs.commandapi)
 	compileOnly(project(":network-relay"))
 	compileOnly(project(":redis-sync:redissync"))
-	// compileOnly(libs.gson)
 }
 
 monumenta {
