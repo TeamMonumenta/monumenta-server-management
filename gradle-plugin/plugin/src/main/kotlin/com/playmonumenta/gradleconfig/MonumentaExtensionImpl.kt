@@ -120,6 +120,14 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean, pm
 }
 
 private fun setupVersion(project: Project, prefix: String?) {
+    val gitStatus = ProcessBuilder("git", "status", "--porcelain")
+        .directory(project.rootDir)
+        .redirectErrorStream(true)
+        .start()
+        .inputStream.bufferedReader().readText().trim()
+    if (gitStatus.isNotEmpty()) {
+        project.logger.lifecycle("Dirty files at version check for '{}': {}", project.name, gitStatus)
+    }
     project.applyPlugin("com.palantir.git-version")
     val extra = project.extensions.getByType(ExtraPropertiesExtension::class.java)
 
@@ -131,8 +139,7 @@ private fun setupVersion(project: Project, prefix: String?) {
     val gitResult = prefix?.let { gitVersion.call(mapOf("prefix" to it)) } ?: gitVersion.call(prefix)
     val details = versionDetails.call()
     project.version = gitResult + (if (details.isCleanTag) "" else "-SNAPSHOT")
-    project.logger.lifecycle("Project '{}' version: {} (isCleanTag={}, commitDistance={})",
-        project.name, project.version, details.isCleanTag, details.commitDistance)
+    project.logger.lifecycle("Project '{}' version: {}", project.name, project.version)
 }
 
 internal class MonumentaExtensionImpl(private val target: Project) : MonumentaExtension {
