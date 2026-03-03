@@ -1,7 +1,5 @@
 package com.playmonumenta.redissync;
 
-import com.playmonumenta.redissync.config.CommonConfig;
-import com.playmonumenta.redissync.config.ProxyConfig;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.PostLoginEvent;
 import com.velocitypowered.api.event.player.KickedFromServerEvent;
@@ -39,7 +37,7 @@ public class VelocityListener {
 			mPlugin.mLogger.warn("Exception while getting player location for '{}': {}", player.getUsername(), ex.getMessage(), ex);
 		}
 
-		String defaultServer = ProxyConfig.getDefaultServer();
+		String defaultServer = ProxyConfigAPI.getDefaultServer();
 		if (storedServerName == null) {
 			/* Player has never connected before */
 			server = mPlugin.mServer.getServer(defaultServer).orElse(null);
@@ -86,7 +84,7 @@ public class VelocityListener {
 		}
 		String reconnectServer = server.getServerInfo().getName();
 		// exclude servers such as purgatory
-		if (reconnectServer == null || ProxyConfig.getExcludedServers().contains(reconnectServer)) {
+		if (reconnectServer == null || ProxyConfigAPI.getExcludedServers().contains(reconnectServer)) {
 			return;
 		}
 		RedisAPI.getInstance().async().hset(locationsKey(), player.getUniqueId().toString(), reconnectServer);

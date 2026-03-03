@@ -11,7 +11,6 @@ import com.playmonumenta.redissync.commands.RemoteDataCommand;
 import com.playmonumenta.redissync.commands.Stash;
 import com.playmonumenta.redissync.commands.TransferServer;
 import com.playmonumenta.redissync.commands.UpgradeAllPlayers;
-import com.playmonumenta.redissync.config.BukkitConfig;
 import java.io.File;
 import java.util.Locale;
 import java.util.logging.Level;
@@ -92,11 +91,11 @@ public class MonumentaRedisSync extends JavaPlugin {
 		}
 
 		loadConfig();
-		mRedisAPI = new RedisAPI(BukkitConfig.getRedisHost(), BukkitConfig.getRedisPort());
+		mRedisAPI = new RedisAPI(BukkitConfigAPI.getRedisHost(), BukkitConfigAPI.getRedisPort());
 		getServer().getPluginManager().registerEvents(new DataEventListener(this.getLogger(), mVersionAdapter), this);
 		getServer().getPluginManager().registerEvents(new ScoreboardCleanupListener(this, this.getLogger(), mVersionAdapter), this);
 		getServer().getPluginManager().registerEvents(AccountTransferManager.getInstance(), this);
-		if (BukkitConfig.getTicksPerPlayerAutosave() > 0) {
+		if (BukkitConfigAPI.getTicksPerPlayerAutosave() > 0) {
 			getServer().getPluginManager().registerEvents(new AutoSaveListener(this, mVersionAdapter), this);
 		}
 
@@ -130,7 +129,7 @@ public class MonumentaRedisSync extends JavaPlugin {
 		return versionAdapter;
 	}
 
-	private BukkitConfig loadConfig() {
+	private BukkitConfigAPI loadConfig() {
 		File configFile = new File(this.getDataFolder(), "config.yml");
 		/* TODO: Default file if not exist */
 		FileConfiguration config = YamlConfiguration.loadConfiguration(configFile);
@@ -165,7 +164,7 @@ public class MonumentaRedisSync extends JavaPlugin {
 				setLogLevel(Level.INFO);
 		}
 
-		 return new BukkitConfig(getLogger(), redisHost, redisPort, serverDomain, shardName, historyAmount, ticksPerPlayerAutosave, savingDisabled, scoreboardCleanupEnabled);
+		 return new BukkitConfigAPI(getLogger(), redisHost, redisPort, serverDomain, shardName, historyAmount, ticksPerPlayerAutosave, savingDisabled, scoreboardCleanupEnabled);
 	}
 
 	public void setLogLevel(Level level) {

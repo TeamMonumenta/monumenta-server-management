@@ -1,6 +1,5 @@
 package com.playmonumenta.redissync;
 
-import com.playmonumenta.redissync.config.CommonConfig;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.ScoredValue;
 import java.util.LinkedHashMap;

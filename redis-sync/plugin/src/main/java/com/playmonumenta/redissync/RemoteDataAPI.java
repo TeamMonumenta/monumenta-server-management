@@ -1,6 +1,5 @@
 package com.playmonumenta.redissync;
 
-import com.playmonumenta.redissync.config.CommonConfig;
 import io.lettuce.core.KeyValue;
 import io.lettuce.core.Value;
 import java.util.Map;

@@ -13,21 +13,6 @@ import org.bukkit.scoreboard.Score;
 import org.bukkit.scoreboard.Scoreboard;
 
 public class ScoreboardUtils {
-	@Deprecated
-	/* Use the method in the VersionAdapter instead */
-	public static JsonObject getAsJsonObject(Player player) {
-		JsonObject data = new JsonObject();
-
-		for (Objective objective : Bukkit.getScoreboardManager().getMainScoreboard().getObjectives()) {
-			Score score = objective.getScore(player.getName());
-			if (score.isScoreSet()) {
-				data.addProperty(objective.getName(), score.getScore());
-			}
-		}
-
-		return data;
-	}
-
 	public static void loadFromJsonObject(Player player, JsonObject data) {
 		Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
 

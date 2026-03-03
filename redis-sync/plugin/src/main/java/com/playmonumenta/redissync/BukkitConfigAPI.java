@@ -1,17 +1,17 @@
-package com.playmonumenta.redissync.config;
+package com.playmonumenta.redissync;
 
 import java.util.logging.Logger;
 import org.jetbrains.annotations.Nullable;
 
-public class BukkitConfig extends CommonConfig {
-	protected static @Nullable BukkitConfig BUKKIT_INSTANCE = null;
+public class BukkitConfigAPI extends CommonConfig {
+	protected static @Nullable BukkitConfigAPI BUKKIT_INSTANCE = null;
 
 	protected final int mHistoryAmount;
 	protected final int mTicksPerPlayerAutosave;
 	protected final boolean mSavingDisabled;
 	protected final boolean mScoreboardCleanupEnabled;
 
-	public BukkitConfig(Logger logger, String redisHost, int redisPort, String serverDomain, String shardName, int historyAmount, int ticksPerPlayerAutosave, boolean savingDisabled, boolean scoreboardCleanupEnabled) {
+	BukkitConfigAPI(Logger logger, String redisHost, int redisPort, String serverDomain, String shardName, int historyAmount, int ticksPerPlayerAutosave, boolean savingDisabled, boolean scoreboardCleanupEnabled) {
 		super(redisHost, redisPort, serverDomain, shardName);
 		mHistoryAmount = historyAmount;
 		mTicksPerPlayerAutosave = ticksPerPlayerAutosave;
@@ -28,14 +28,13 @@ public class BukkitConfig extends CommonConfig {
 		logger.info("  saving_disabled = " + mSavingDisabled);
 		logger.info("  scoreboard_cleanup_enabled = " + mScoreboardCleanupEnabled);
 
-		COMMON_INSTANCE = this;
 		BUKKIT_INSTANCE = this;
 	}
 
-	public static BukkitConfig getBukkitInstance() {
-		BukkitConfig bukkitConfig = BUKKIT_INSTANCE;
+	private static BukkitConfigAPI getBukkitInstance() {
+		BukkitConfigAPI bukkitConfig = BUKKIT_INSTANCE;
 		if (bukkitConfig == null) {
-			throw new RuntimeException("BukkitConfig not initialized");
+			throw new RuntimeException("BukkitConfigAPI not initialized");
 		}
 		return bukkitConfig;
 	}

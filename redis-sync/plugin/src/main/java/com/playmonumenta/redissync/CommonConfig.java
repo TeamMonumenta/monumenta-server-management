@@ -1,8 +1,8 @@
-package com.playmonumenta.redissync.config;
+package com.playmonumenta.redissync;
 
 import org.jetbrains.annotations.Nullable;
 
-public class CommonConfig {
+public abstract class CommonConfig {
 	protected static @Nullable CommonConfig COMMON_INSTANCE = null;
 
 	protected final String mRedisHost;
@@ -10,12 +10,12 @@ public class CommonConfig {
 	protected final String mServerDomain;
 	protected final String mShardName;
 
-	public CommonConfig(String redisHost, int redisPort, String serverDomain, String shardName) {
+	protected CommonConfig(String redisHost, int redisPort, String serverDomain, String shardName) {
 		mRedisHost = redisHost;
 		mRedisPort = redisPort;
 		mServerDomain = serverDomain;
 		mShardName = shardName;
-
+		COMMON_INSTANCE = this;
 	}
 
 	public static CommonConfig getCommonInstance() {

@@ -3,7 +3,6 @@ package com.playmonumenta.redissync;
 import com.destroystokyo.paper.event.player.PlayerAdvancementDataLoadEvent;
 import com.destroystokyo.paper.event.player.PlayerDataLoadEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
-import com.playmonumenta.redissync.config.BukkitConfig;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -42,7 +41,7 @@ public class AutoSaveListener implements Listener {
 
 			// Distribute saves evenly in the autosave interval.
 			// This means that at most a player will take two autosave intervals to save
-			int delayBetweenSaves = BukkitConfig.getTicksPerPlayerAutosave() / players.size();
+			int delayBetweenSaves = BukkitConfigAPI.getTicksPerPlayerAutosave() / players.size();
 
 			// Remove all the previous iteration saves
 			for (Map.Entry<UUID, BukkitTask> entry : mPendingSaves.entrySet()) {
@@ -72,7 +71,7 @@ public class AutoSaveListener implements Listener {
 
 				mPendingSaves.put(uuid, task);
 			}
-		}, BukkitConfig.getTicksPerPlayerAutosave(), BukkitConfig.getTicksPerPlayerAutosave());
+		}, BukkitConfigAPI.getTicksPerPlayerAutosave(), BukkitConfigAPI.getTicksPerPlayerAutosave());
 	}
 
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)

@@ -3,7 +3,6 @@ package com.playmonumenta.redissync;
 import com.destroystokyo.paper.event.player.PlayerAdvancementDataLoadEvent;
 import com.destroystokyo.paper.event.player.PlayerDataLoadEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
-import com.playmonumenta.redissync.config.BukkitConfig;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -51,7 +50,7 @@ public class ScoreboardCleanupListener implements Listener {
 	public void playerQuitEvent(PlayerQuitEvent event) {
 		cancelCleanupTask(event.getPlayer());
 
-		if (!BukkitConfig.getScoreboardCleanupEnabled()) {
+		if (!BukkitConfigAPI.getScoreboardCleanupEnabled()) {
 			return;
 		}
 
