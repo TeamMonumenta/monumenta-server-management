@@ -129,7 +129,10 @@ private fun setupVersion(project: Project, prefix: String?) {
     project.group = "com.playmonumenta"
 
     val gitResult = prefix?.let { gitVersion.call(mapOf("prefix" to it)) } ?: gitVersion.call(prefix)
-    project.version = gitResult + (if (versionDetails.call().isCleanTag) "" else "-SNAPSHOT")
+    val details = versionDetails.call()
+    project.version = gitResult + (if (details.isCleanTag) "" else "-SNAPSHOT")
+    project.logger.lifecycle("Project '{}' version: {} (isCleanTag={}, commitDistance={})",
+        project.name, project.version, details.isCleanTag, details.commitDistance)
 }
 
 internal class MonumentaExtensionImpl(private val target: Project) : MonumentaExtension {
