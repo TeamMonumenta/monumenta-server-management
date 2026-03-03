@@ -2,7 +2,6 @@ package com.playmonumenta.redissync;
 
 import com.playmonumenta.redissync.config.CommonConfig;
 import com.playmonumenta.redissync.config.ProxyConfig;
-import com.velocitypowered.api.event.PostOrder;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.PostLoginEvent;
 import com.velocitypowered.api.event.player.KickedFromServerEvent;
@@ -28,7 +27,7 @@ public class VelocityListener {
 		mPlugin = plugin;
 	}
 
-	@Subscribe(order = PostOrder.LATE)
+	@Subscribe(priority = -16384)
 	public void playerChooseInitialServerEvent(PlayerChooseInitialServerEvent event) {
 		Player player = event.getPlayer();
 		@Nullable RegisteredServer server = event.getInitialServer().orElse(null);
@@ -63,7 +62,7 @@ public class VelocityListener {
 	}
 
 	// Fix for kicks from the server
-	@Subscribe(order = PostOrder.EARLY)
+	@Subscribe(priority = 16383)
 	public void kickedFromServerEvent(KickedFromServerEvent event) {
 		@Nullable Component kickReason = event.getServerKickReason().orElse(null);
 		// exclude servers such as purgatory

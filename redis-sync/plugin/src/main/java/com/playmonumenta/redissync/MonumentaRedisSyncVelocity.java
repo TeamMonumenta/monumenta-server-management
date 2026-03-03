@@ -2,7 +2,6 @@ package com.playmonumenta.redissync;
 
 import com.google.inject.Inject;
 import com.playmonumenta.redissync.config.ProxyConfig;
-import com.velocitypowered.api.event.PostOrder;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
@@ -22,7 +21,7 @@ import org.spongepowered.configurate.yaml.NodeStyle;
 import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
 @Plugin(id = "monumenta-redisapi", name = "Monumenta-RedisAPI", version = "", url = "", description = "", authors = {""})
-public class MonumentaRedisSyncVelocity implements MonumentaRedisSyncInterface {
+public class MonumentaRedisSyncVelocity {
 	private @Nullable RedisAPI mRedisAPI = null;
 	public final ProxyServer mServer;
 	public final Logger mLogger;
@@ -45,7 +44,7 @@ public class MonumentaRedisSyncVelocity implements MonumentaRedisSyncInterface {
 		System.setProperty("com.playmonumenta.redissync.internal.netty", "com.playmonumenta.redissync.internal");
 
 		loadConfig();
-		mRedisAPI = new RedisAPI(this, ProxyConfig.getRedisHost(), ProxyConfig.getRedisPort());
+		mRedisAPI = new RedisAPI(ProxyConfig.getRedisHost(), ProxyConfig.getRedisPort());
 	}
 
 	@Subscribe
@@ -53,8 +52,8 @@ public class MonumentaRedisSyncVelocity implements MonumentaRedisSyncInterface {
 		mServer.getEventManager().register(this, new VelocityListener(this));
 	}
 
-	// we use ProxyShutdownEvent because ListenerClosEvent might fire too early
-	@Subscribe(order = PostOrder.LATE)
+	// we use ProxyShutdownEvent because ListenerCloseEvent might fire too early
+	@Subscribe(priority = -16384)
 	public void onDisable(ProxyShutdownEvent event) {
 		if (mRedisAPI != null) {
 			mRedisAPI.shutdown();
@@ -106,13 +105,6 @@ public class MonumentaRedisSyncVelocity implements MonumentaRedisSyncInterface {
 		} catch (ConfigurateException ex) {
 			mLogger.warn("Could not save config.yaml", ex);
 		}
-	}
-
-	@Override
-	public void runAsync(Runnable runnable) {
-		mServer.getScheduler()
-			.buildTask(this, runnable)
-			.schedule();
 	}
 
 	@ConfigSerializable

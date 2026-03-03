@@ -55,7 +55,7 @@ public class CommandUtils {
 
 	public static void reloadStructurePathSuggestions() {
 		Path base = Paths.get(StructuresPlugin.getInstance().getDataFolder().toString(), BASE_FOLDER_NAME);
-		STRUCTURE_PATH_SUGGESTIONS =  getAllPaths(base, base.toString().length() + 1, SCHEMATIC_EXTENSION.length()); // + 1 for the slash
+		STRUCTURE_PATH_SUGGESTIONS = getAllPaths(base, base.toString().length() + 1, SCHEMATIC_EXTENSION.length()); // + 1 for the slash
 	}
 
 	private static List<String> getAllPaths(Path base, int startCutoff, int endCutoff) {

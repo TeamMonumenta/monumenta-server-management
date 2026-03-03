@@ -66,7 +66,7 @@ public class AccountTransferManager implements Listener {
 		INSTANCE = null;
 	}
 
-	@EventHandler
+	@EventHandler(ignoreCancelled = false)
 	public void playerSaveEvent(PlayerSaveEvent event) {
 		Player player = event.getPlayer();
 
@@ -77,7 +77,7 @@ public class AccountTransferManager implements Listener {
 		event.setPluginData(PLUGIN_KEY, redisSyncData);
 	}
 
-	@EventHandler
+	@EventHandler(ignoreCancelled = false)
 	public void playerJoinEvent(PlayerJoinEvent event) {
 		Player player = event.getPlayer();
 		UUID currentPlayerId = player.getUniqueId();
@@ -121,7 +121,7 @@ public class AccountTransferManager implements Listener {
 		}
 
 		MonumentaRedisSync plugin = MonumentaRedisSync.getInstance();
-		plugin.getLogger().info("[AccountTransferManager] Detected account transfer for " + lastAccountName + " (" + lastAccountId +") -> " + currentPlayerName + " (" + currentPlayerId + ")");
+		plugin.getLogger().info("[AccountTransferManager] Detected account transfer for " + lastAccountName + " (" + lastAccountId + ") -> " + currentPlayerName + " (" + currentPlayerId + ")");
 
 		LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
 		long timestampMillis = EPOCH.until(now, ChronoUnit.MILLIS);

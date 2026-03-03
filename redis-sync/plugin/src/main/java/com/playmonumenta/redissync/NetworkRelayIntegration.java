@@ -170,9 +170,9 @@ public class NetworkRelayIntegration implements Listener {
 	}
 
 	private void remoteAccountTransferEvent(JsonObject data) {
-		AccountTransferDetails transferDetails = new  AccountTransferDetails(data);
+		AccountTransferDetails transferDetails = new AccountTransferDetails(data);
 		MonumentaRedisSync.getInstance().getLogger()
-			.info("[AccountTransferManager] Detected remote account transfer for " + transferDetails.oldName() + " (" + transferDetails.oldId() +") -> " + transferDetails.newName() + " (" + transferDetails.newId() + ")");
+			.info("[AccountTransferManager] Detected remote account transfer for " + transferDetails.oldName() + " (" + transferDetails.oldId() + ") -> " + transferDetails.newName() + " (" + transferDetails.newId() + ")");
 		AccountTransferManager.registerRemoteTransfer(transferDetails);
 
 		PlayerAccountTransferEvent event = new PlayerAccountTransferEvent(transferDetails);

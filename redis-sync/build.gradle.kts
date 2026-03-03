@@ -6,13 +6,6 @@ plugins {
 
 val mixinapi = libs.mixinapi
 
-
-tasks {
-    javadoc {
-        (options as StandardJavadocDocletOptions).addBooleanOption("Xdoclint:none", true)
-    }
-}
-
 monumenta {
 	id("MonumentaRedisSync")
 	name("MonumentaRedisSync")

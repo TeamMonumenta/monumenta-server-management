@@ -11,8 +11,6 @@ repositories {
 }
 
 dependencies {
-	testImplementation(platform(libs.junit.bom))
-	testImplementation(libs.junit.jupiter)
 	testImplementation(libs.snakeyaml)
 	implementation(libs.rabbitmq)
 	compileOnly(libs.annotations)
@@ -22,6 +20,14 @@ dependencies {
 	compileOnly(libs.viaversion)
 	annotationProcessor(libs.velocity)
 	implementation(libs.slf4j)
+}
+
+testing {
+	suites {
+		val test by getting(JvmTestSuite::class) {
+			useJUnitJupiter(libs.versions.junit.get())
+		}
+	}
 }
 
 monumenta {

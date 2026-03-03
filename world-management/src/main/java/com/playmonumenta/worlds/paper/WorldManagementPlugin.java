@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -204,6 +205,13 @@ public class WorldManagementPlugin extends JavaPlugin {
 
 	public static String getCopyWorldCommand() {
 		return mCopyWorldCommand;
+	}
+
+	public static String[] getCopyWorldCommandWithArgs(String... args) {
+		String[] cmdParts = mCopyWorldCommand.split("\\s+");
+		String[] result = Arrays.copyOf(cmdParts, cmdParts.length + args.length);
+		System.arraycopy(args, 0, result, cmdParts.length, args.length);
+		return result;
 	}
 
 	@Override

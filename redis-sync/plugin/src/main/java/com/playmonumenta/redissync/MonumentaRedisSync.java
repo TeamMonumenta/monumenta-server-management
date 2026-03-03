@@ -23,7 +23,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class MonumentaRedisSync extends JavaPlugin implements MonumentaRedisSyncInterface {
+public class MonumentaRedisSync extends JavaPlugin {
 	private static @Nullable MonumentaRedisSync INSTANCE = null;
 	private @Nullable RedisAPI mRedisAPI = null;
 	private @Nullable VersionAdapter mVersionAdapter = null;
@@ -92,7 +92,7 @@ public class MonumentaRedisSync extends JavaPlugin implements MonumentaRedisSync
 		}
 
 		loadConfig();
-		mRedisAPI = new RedisAPI(this, BukkitConfig.getRedisHost(), BukkitConfig.getRedisPort());
+		mRedisAPI = new RedisAPI(BukkitConfig.getRedisHost(), BukkitConfig.getRedisPort());
 		getServer().getPluginManager().registerEvents(new DataEventListener(this.getLogger(), mVersionAdapter), this);
 		getServer().getPluginManager().registerEvents(new ScoreboardCleanupListener(this, this.getLogger(), mVersionAdapter), this);
 		getServer().getPluginManager().registerEvents(AccountTransferManager.getInstance(), this);
@@ -179,10 +179,5 @@ public class MonumentaRedisSync extends JavaPlugin implements MonumentaRedisSync
 			mLogger = new CustomLogger(super.getLogger(), Level.INFO);
 		}
 		return mLogger;
-	}
-
-	@Override
-	public void runAsync(Runnable runnable) {
-		Bukkit.getScheduler().runTaskAsynchronously(this, runnable);
 	}
 }

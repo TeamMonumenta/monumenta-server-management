@@ -41,16 +41,18 @@ public class MessageVisibility {
 	}
 
 	public enum VisibilityValue {
-		DEFAULT("default"),
-		ALWAYS("always"),
-		LOCAL("local"),
-		SELF("self"),
-		NEVER("never");
+		DEFAULT("default", 0),
+		ALWAYS("always", 1),
+		LOCAL("local", 2),
+		SELF("self", 3),
+		NEVER("never", 4);
 
 		final String mValue;
+		final int mIndex;
 
-		VisibilityValue(String s) {
+		VisibilityValue(String s, int index) {
 			mValue = s;
+			mIndex = index;
 		}
 
 		public static VisibilityValue of(String s) {
@@ -63,6 +65,10 @@ public class MessageVisibility {
 
 		public String getValue() {
 			return mValue;
+		}
+
+		public int getIndex() {
+			return mIndex;
 		}
 	}
 
@@ -152,7 +158,7 @@ public class MessageVisibility {
 			    .append(Component.text(" is set to ", NamedTextColor.GRAY))
 			    .append(Component.text(value.getValue(), NamedTextColor.AQUA, TextDecoration.BOLD))
 			    .append(Component.text(".", NamedTextColor.GRAY)));
-			return value.ordinal();
+			return value.getIndex();
 		}
 
 		throw CommandUtils.fail(sender, "No such visibility category: " + category);
@@ -169,7 +175,7 @@ public class MessageVisibility {
 			    .append(Component.text(" to ", NamedTextColor.GRAY))
 			    .append(Component.text(value, NamedTextColor.AQUA, TextDecoration.BOLD))
 			    .append(Component.text(".", NamedTextColor.GRAY)));
-			return visibilityValue.ordinal();
+			return visibilityValue.getIndex();
 		}
 
 		throw CommandUtils.fail(sender, "No such visibility category: " + category);

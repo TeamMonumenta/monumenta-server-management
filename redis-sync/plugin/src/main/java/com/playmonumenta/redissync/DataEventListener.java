@@ -156,6 +156,7 @@ public class DataEventListener implements Listener {
 
 	/* ******************* Protected API ******************* */
 
+	@SuppressWarnings("deprecation") // No replacement API exists for getShoulderEntityLeft/Right
 	protected static void setPlayerAsTransferring(Player player) throws Exception {
 		if (INSTANCE.mTransferringPlayers.contains(player.getUniqueId())) {
 			throw new Exception("Player " + player.getName() + " is already transferring");
@@ -178,9 +179,9 @@ public class DataEventListener implements Listener {
 		 * This task is cancelled when player leaves the server (PlayerQuitEvent)
 		 */
 		TRANSFER_UNLOCK_TASKS.put(player.getUniqueId(), Bukkit.getScheduler().runTaskLater(MonumentaRedisSync.getInstance(), () -> {
-			if (DataEventListener.isPlayerTransferring(player)) {
+			if (isPlayerTransferring(player)) {
 				player.sendMessage(Component.text("Transferring timed out and your player has been unlocked", NamedTextColor.RED));
-				DataEventListener.setPlayerAsNotTransferring(player);
+				setPlayerAsNotTransferring(player);
 			}
 			TRANSFER_UNLOCK_TASKS.remove(player.getUniqueId());
 		}, TRANSFER_UNLOCK_TIMEOUT_TICKS));
@@ -604,7 +605,7 @@ public class DataEventListener implements Listener {
 			return;
 		}
 
-		if(mLoadFailedPlayers.contains(event.getPlayer().getUniqueId())) {
+		if (mLoadFailedPlayers.contains(event.getPlayer().getUniqueId())) {
 			mLoadFailedPlayers.remove(event.getPlayer().getUniqueId());
 			mLogger.warning("Skipping playerdata save for " + event.getPlayer().getUniqueId() + " because their playerdata failed to load");
 			return;

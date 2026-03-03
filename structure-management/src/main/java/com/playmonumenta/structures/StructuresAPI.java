@@ -29,11 +29,9 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.util.ArrayList;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -496,7 +494,6 @@ public class StructuresAPI {
 		}
 
 		final Set<BlockVector2> chunks = region.getChunks();
-		final List<CompletableFuture<Void>> futures = new ArrayList<>(chunks.size());
 		final AtomicInteger numRemaining = new AtomicInteger(chunks.size());
 
 		/* This chunk consumer adds plugin chunk tickets to all the appropriate chunks to keep them loaded */

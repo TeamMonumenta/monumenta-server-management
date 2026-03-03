@@ -3,7 +3,6 @@ package com.playmonumenta.networkrelay;
 import com.google.gson.JsonObject;
 import com.playmonumenta.networkrelay.util.MMLog;
 import com.velocitypowered.api.event.EventTask;
-import com.velocitypowered.api.event.PostOrder;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.connection.PostLoginEvent;
@@ -188,7 +187,7 @@ public final class RemotePlayerManagerVelocity extends RemotePlayerManagerAbstra
 		refreshPlayer(uuid, true);
 	}
 
-	@Subscribe(order = PostOrder.LAST)
+	@Subscribe(priority = -32767)
 	public void destOnlineEvent(DestOnlineEventGeneric event) {
 		String remoteShardName = event.getDest();
 		if (getServerId().equals(remoteShardName)) {
@@ -197,7 +196,7 @@ public final class RemotePlayerManagerVelocity extends RemotePlayerManagerAbstra
 		registerServer(remoteShardName);
 	}
 
-	@Subscribe(order = PostOrder.EARLY)
+	@Subscribe(priority = 16383)
 	public void destOfflineEvent(DestOnlineEventGeneric event) {
 		String remoteShardName = event.getDest();
 		if (getServerId().equals(remoteShardName)) {
@@ -207,7 +206,7 @@ public final class RemotePlayerManagerVelocity extends RemotePlayerManagerAbstra
 	}
 
 	// // This is when the player logins into the proxy
-	@Subscribe(order = PostOrder.LAST)
+	@Subscribe(priority = -32767)
 	public EventTask playerConnectEvent(PostLoginEvent event) {
 		Player player = event.getPlayer();
 		return EventTask.async(() -> {
@@ -216,7 +215,7 @@ public final class RemotePlayerManagerVelocity extends RemotePlayerManagerAbstra
 	}
 
 	// This is when the player connects or reconnects to a shard on the proxy
-	@Subscribe(order = PostOrder.LAST)
+	@Subscribe(priority = -32767)
 	public EventTask playerChangedServerEvent(ServerPostConnectEvent event) {
 		Player player = event.getPlayer();
 		return EventTask.async(() -> {
@@ -225,7 +224,7 @@ public final class RemotePlayerManagerVelocity extends RemotePlayerManagerAbstra
 	}
 
 	// This is when the player disconnects from the proxy
-	@Subscribe(order = PostOrder.LAST)
+	@Subscribe(priority = -32767)
 	public @Nullable EventTask playerQuitEvent(DisconnectEvent event) {
 		Player player = event.getPlayer();
 		// The DisconnectEvent can fire BEFORE PostLoginEvent
@@ -246,7 +245,7 @@ public final class RemotePlayerManagerVelocity extends RemotePlayerManagerAbstra
 		});
 	}
 
-	@Subscribe(order = PostOrder.LAST)
+	@Subscribe(priority = -32767)
 	public @Nullable EventTask networkRelayMessageEventGeneric(NetworkRelayMessageEventGeneric event) {
 		switch (event.getChannel()) {
 			case REMOTE_PLAYER_UPDATE_CHANNEL: {

@@ -2,9 +2,7 @@ package com.playmonumenta.structures;
 
 import com.playmonumenta.structures.managers.RespawningStructure;
 import java.time.Instant;
-import java.util.List;
 import org.bukkit.Location;
-import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 

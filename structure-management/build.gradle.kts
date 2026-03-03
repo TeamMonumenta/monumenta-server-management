@@ -18,12 +18,6 @@ dependencies {
     compileOnly(project(":zones"))
 }
 
-tasks {
-    javadoc {
-        (options as StandardJavadocDocletOptions).addBooleanOption("Xdoclint:none", true)
-    }
-}
-
 monumenta {
 	id("MonumentaStructureManagement")
 	name("MonumentaStructureManagement")
