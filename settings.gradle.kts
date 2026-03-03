@@ -12,7 +12,6 @@ include("network-relay")
 include("redis-sync")
 include("structure-management")
 include("world-management")
-include("redis-sync")
 
 include("redis-sync:adapter_api")
 include("redis-sync:adapter_v1_20_R3")
