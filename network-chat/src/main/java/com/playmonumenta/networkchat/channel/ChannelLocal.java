@@ -29,7 +29,6 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
@@ -240,7 +239,7 @@ public class ChannelLocal extends Channel implements ChannelAutoJoin, ChannelPer
 			// TODO Chat spy here
 			return;
 		}
-		showMessage(Bukkit.getConsoleSender(), message);
+		super.distributeMessage(message);
 		for (Map.Entry<UUID, PlayerState> playerStateEntry : PlayerStateManager.getPlayerStates().entrySet()) {
 			PlayerState state = playerStateEntry.getValue();
 			Player player = state.getPlayer();
@@ -256,7 +255,7 @@ public class ChannelLocal extends Channel implements ChannelAutoJoin, ChannelPer
 	}
 
 	@Override
-	public Component shownMessage(CommandSender recipient, Message message) {
+	public Component shownMessage(Message message) {
 		TextColor channelColor;
 		if (mMessageColor != null) {
 			channelColor = mMessageColor;
@@ -282,7 +281,7 @@ public class ChannelLocal extends Channel implements ChannelAutoJoin, ChannelPer
 	@Override
 	public void showMessage(CommandSender recipient, Message message) {
 		UUID senderUuid = message.getSenderId();
-		recipient.sendMessage(shownMessage(recipient, message));
+		recipient.sendMessage(shownMessage(message));
 		if (recipient instanceof Player player && !player.getUniqueId().equals(senderUuid)) {
 			@Nullable PlayerState playerState = PlayerStateManager.getPlayerState(player);
 			if (playerState == null) {
