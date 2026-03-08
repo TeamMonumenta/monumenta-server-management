@@ -149,10 +149,12 @@ public class MonumentaRedisSyncAPI {
 		return future.thenApply((data) -> data.keySet().stream().map(UUID::fromString).collect(Collectors.toSet())).toCompletableFuture();
 	}
 
+	// Thread-safe: backed by ConcurrentHashMap, callable from any thread
 	public static @Nullable String cachedUuidToName(UUID uuid) {
 		return mUuidToName.get(uuid);
 	}
 
+	// Thread-safe: backed by ConcurrentHashMap, callable from any thread
 	public static @Nullable UUID cachedNameToUuid(String name) {
 		return mNameLowercaseToUuid.get(name.toLowerCase(Locale.ROOT));
 	}
