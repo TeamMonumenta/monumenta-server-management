@@ -1,6 +1,7 @@
 package com.playmonumenta.redissync;
 
-import io.lettuce.core.api.async.RedisAsyncCommands;
+import io.lettuce.core.KeyValue;
+import io.lettuce.core.RedisFuture;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -65,18 +66,20 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
-		commands.multi();
-		for (String key : keys) {
-			commands.hincrby(redisPath, key, 0);
-		}
-		CompletableFuture<Map<String, String>> retVal = commands.hmget(redisPath, keys).toCompletableFuture().thenApply(list -> {
+		// Use single-element fixed-memory-location array to store values from lambda
+		@SuppressWarnings("unchecked")
+		final CompletableFuture<List<KeyValue<String, String>>>[] hmgetRef = new CompletableFuture[1];
+		RedisAPI.multi(conn -> {
+			for (String key : keys) {
+				conn.hincrby(redisPath, key, 0);
+			}
+			hmgetRef[0] = conn.hmget(redisPath, keys).toCompletableFuture();
+		});
+		return hmgetRef[0].thenApply(list -> {
 			Map<String, String> transformed = new LinkedHashMap<>();
 			list.forEach(item -> transformed.put(item.getKey(), item.getValue()));
 			return transformed;
 		});
-		commands.exec();
-		return retVal;
 	}
 
 	public static CompletableFuture<Long> getAsLong(String name, String key, long def) {
@@ -101,16 +104,18 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
-		commands.multi();
-		CompletableFuture<Map<String, String>> retVal = commands.hmget(redisPath, keys).toCompletableFuture().thenApply(list -> {
+		// Use single-element fixed-memory-location array to store values from lambda
+		@SuppressWarnings("unchecked")
+		final RedisFuture<List<KeyValue<String, String>>>[] hmgetRef = new RedisFuture[1];
+		RedisAPI.multi(conn -> {
+			hmgetRef[0] = conn.hmget(redisPath, keys);
+			conn.hdel(redisPath, keys);
+		});
+		return hmgetRef[0].toCompletableFuture().thenApply(list -> {
 			Map<String, String> transformed = new LinkedHashMap<>();
 			list.forEach(item -> transformed.put(item.getKey(), item.getValue()));
 			return transformed;
 		});
-		commands.hdel(redisPath, keys).toCompletableFuture();
-		commands.exec();
-		return retVal;
 	}
 
 	/* ******************* GetKeys ******************* */

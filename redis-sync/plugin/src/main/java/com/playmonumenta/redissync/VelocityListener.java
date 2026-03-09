@@ -9,6 +9,7 @@ import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -30,8 +31,12 @@ public class VelocityListener {
 		@Nullable RegisteredServer server = event.getInitialServer().orElse(null);
 		@Nullable String storedServerName = null;
 
+		CompletableFuture<String> serverFuture;
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			serverFuture = conn.hget(locationsKey(), player.getUniqueId().toString()).toCompletableFuture();
+		}
 		try {
-			storedServerName = RedisAPI.getInstance().async().hget(locationsKey(), player.getUniqueId().toString()).get(6, TimeUnit.SECONDS);
+			storedServerName = serverFuture.get(6, TimeUnit.SECONDS);
 		} catch (Exception ex) {
 			mPlugin.mLogger.warn("Exception while getting player location for '{}': {}", player.getUsername(), ex.getMessage(), ex);
 		}
@@ -86,7 +91,9 @@ public class VelocityListener {
 		if (reconnectServer == null || ProxyConfigAPI.getExcludedServers().contains(reconnectServer)) {
 			return;
 		}
-		RedisAPI.getInstance().async().hset(locationsKey(), player.getUniqueId().toString(), reconnectServer);
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hset(locationsKey(), player.getUniqueId().toString(), reconnectServer);
+		}
 	}
 
 	@Subscribe

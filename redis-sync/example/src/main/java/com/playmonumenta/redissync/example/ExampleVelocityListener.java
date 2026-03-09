@@ -11,7 +11,9 @@ import com.velocitypowered.api.proxy.Player;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import com.velocitypowered.api.proxy.Player;
 
 
 public class ExampleVelocityListener {
@@ -91,8 +93,12 @@ public class ExampleVelocityListener {
 		Player player = event.getPlayer();
 		UUID uuid = player.getUniqueId();
 
+		CompletableFuture<String> rawFuture;
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			rawFuture = conn.get(redisKey(uuid)).toCompletableFuture();
+		}
 		try {
-			String raw = RedisAPI.getInstance().async().get(redisKey(uuid)).get(5, TimeUnit.SECONDS);
+			String raw = rawFuture.get(5, TimeUnit.SECONDS);
 			if (raw == null) {
 				mPlugin.mLogger.info("No data for player {}", player.getUsername());
 			} else {

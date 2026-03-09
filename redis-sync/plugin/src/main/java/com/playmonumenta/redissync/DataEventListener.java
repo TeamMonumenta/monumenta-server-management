@@ -15,9 +15,7 @@ import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
 import com.playmonumenta.redissync.event.PlayerTransferFailEvent;
 import com.playmonumenta.redissync.utils.ScoreboardUtils;
-import io.lettuce.core.LettuceFutures;
 import io.lettuce.core.RedisFuture;
-import io.lettuce.core.api.async.RedisAsyncCommands;
 import io.lettuce.core.output.KeyValueStreamingChannel;
 import io.papermc.paper.event.server.ServerResourcesReloadedEvent;
 import java.io.IOException;
@@ -37,9 +35,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -128,7 +128,7 @@ public class DataEventListener implements Listener {
 	/* Key = shoulder entity UUID (i.e. parrot), value = player */
 	private final Map<UUID, UUID> mTransferringPlayerShoulderEntities = new LinkedHashMap<>();
 
-	private final Map<UUID, List<RedisFuture<?>>> mPendingSaves = new HashMap<>();
+	private final Map<UUID, List<CompletableFuture<?>>> mPendingSaves = new HashMap<>();
 	private final Map<UUID, JsonObject> mPluginData = new HashMap<>();
 	private final Set<UUID> mLoadingPlayers = new HashSet<>();
 	private final Set<UUID> mLoadFailedPlayers = new HashSet<>();
@@ -144,13 +144,12 @@ public class DataEventListener implements Listener {
 		mAdapter = adapter;
 		INSTANCE = this;
 
-		Bukkit.getServer().getScheduler().runTaskAsynchronously(MonumentaRedisSync.getInstance(), () -> {
-			KeyValueStreamingChannel<String, String> uuidToNameChannel = new PlayerUuidToNameStreamingChannel();
-			RedisAPI.getInstance().async().hgetall(uuidToNameChannel, "uuid2name");
-
-			KeyValueStreamingChannel<String, String> nameToUuidChannel = new PlayerNameToUuidStreamingChannel();
-			RedisAPI.getInstance().async().hgetall(nameToUuidChannel, "name2uuid");
-		});
+		KeyValueStreamingChannel<String, String> uuidToNameChannel = new PlayerUuidToNameStreamingChannel();
+		KeyValueStreamingChannel<String, String> nameToUuidChannel = new PlayerNameToUuidStreamingChannel();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hgetall(uuidToNameChannel, "uuid2name");
+			conn.hgetall(nameToUuidChannel, "name2uuid");
+		}
 	}
 
 	/* ******************* Protected API ******************* */
@@ -249,7 +248,7 @@ public class DataEventListener implements Listener {
 	}
 
 	private void blockingWaitForPlayerToSave(Player player) {
-		List<RedisFuture<?>> futures = mPendingSaves.remove(player.getUniqueId());
+		List<CompletableFuture<?>> futures = mPendingSaves.remove(player.getUniqueId());
 
 		if (futures == null || futures.isEmpty()) {
 			return;
@@ -257,8 +256,14 @@ public class DataEventListener implements Listener {
 
 		mLogger.fine("Blocking wait for pending save for player=" + player.getName());
 
-		if (!LettuceFutures.awaitAll(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS, futures.toArray(new RedisFuture[0]))) {
+		try {
+			@SuppressWarnings("unchecked")
+			CompletableFuture<?>[] futureArr = futures.toArray(new CompletableFuture[0]);
+			CompletableFuture.allOf(futureArr).get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
+		} catch (TimeoutException ex) {
 			mLogger.severe("Got timeout waiting to commit transactions for player '" + player.getName() + "'. This is very bad!");
+		} catch (InterruptedException | ExecutionException ex) {
+			mLogger.severe("Failed waiting to commit transactions for player '" + player.getName() + "': " + ex.getMessage());
 		}
 
 		mLogger.fine("Pending save completed for player=" + player.getName());
@@ -298,7 +303,10 @@ public class DataEventListener implements Listener {
 		/* Wait until player has finished saving if they just logged out and back in */
 		blockingWaitForPlayerToSave(player);
 
-		RedisFuture<String> advanceFuture = RedisAPI.getInstance().async().lindex(MonumentaRedisSyncAPI.getRedisAdvancementsPath(player), 0);
+		RedisFuture<String> advanceFuture;
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			advanceFuture = conn.lindex(MonumentaRedisSyncAPI.getRedisAdvancementsPath(player), 0);
+		}
 
 		try {
 			/* Advancements */
@@ -334,7 +342,7 @@ public class DataEventListener implements Listener {
 			return;
 		}
 
-		List<RedisFuture<?>> futures = mPendingSaves.remove(player.getUniqueId());
+		List<CompletableFuture<?>> futures = mPendingSaves.remove(player.getUniqueId());
 		if (futures == null) {
 			futures = new ArrayList<>();
 		} else {
@@ -342,17 +350,19 @@ public class DataEventListener implements Listener {
 		}
 
 		/* Execute the advancements as a multi() batch */
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
-		futures.add(commands.multi()); /* < MULTI */
-
 		/* Advancements */
 		mLogger.fine("Saving advancements data for player=" + player.getName());
 		mLogger.finest(() -> "Data:" + event.getJsonData());
 		String advPath = MonumentaRedisSyncAPI.getRedisAdvancementsPath(player);
-		commands.lpush(advPath, event.getJsonData());
-		commands.ltrim(advPath, 0, BukkitConfigAPI.getHistoryAmount());
-
-		futures.add(commands.exec()); /* MULTI > */
+		String advJsonData = event.getJsonData();
+		futures.add(RedisAPI.multi(commands -> {
+			commands.lpush(advPath, advJsonData);
+			commands.ltrim(advPath, 0, BukkitConfigAPI.getHistoryAmount());
+		}).exceptionally(ex -> {
+			mLogger.severe("Advancements saving for player=" + player.getName() + " failed: " + ex.getMessage());
+			ex.printStackTrace();
+			return null;
+		}));
 
 		/* Don't block - store the pending futures for completion later */
 		mPendingSaves.put(player.getUniqueId(), futures);
@@ -399,13 +409,19 @@ public class DataEventListener implements Listener {
 		/* Wait until player has finished saving if they just logged out and back in */
 		blockingWaitForPlayerToSave(player);
 
-		RedisFuture<byte[]> dataFuture = RedisAPI.getInstance().asyncStringBytes().lindex(MonumentaRedisSyncAPI.getRedisDataPath(player), 0);
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
-		commands.multi();
-		RedisFuture<String> pluginDataFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisPluginDataPath(player), 0);
-		RedisFuture<String> scoreFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisScoresPath(player), 0);
-		RedisFuture<Map<String, String>> shardDataFuture = commands.hgetall(MonumentaRedisSyncAPI.getRedisPerShardDataPath(player));
-		commands.exec();
+		//TODO: Rework to using something like MonumentaRedisSyncAPI.transformPlayerData()
+		RedisFuture<byte[]> dataFuture;
+		try (RedisAPI.BorrowedCommands<String, byte[]> byteConn = RedisAPI.borrowStringBytes()) {
+			dataFuture = byteConn.lindex(MonumentaRedisSyncAPI.getRedisDataPath(player), 0);
+		}
+		RedisFuture<String> pluginDataFuture;
+		RedisFuture<String> scoreFuture;
+		RedisFuture<Map<String, String>> shardDataFuture;
+		try (RedisAPI.BorrowedCommands<String, String> commands = RedisAPI.borrow()) {
+			pluginDataFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisPluginDataPath(player), 0);
+			scoreFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisScoresPath(player), 0);
+			shardDataFuture = commands.hgetall(MonumentaRedisSyncAPI.getRedisPerShardDataPath(player));
+		}
 
 		try {
 			/* Load the primary shared NBT data */
@@ -618,7 +634,7 @@ public class DataEventListener implements Listener {
 
 		mLogger.fine("Saving data for player=" + player.getName());
 
-		List<RedisFuture<?>> futures = mPendingSaves.remove(player.getUniqueId());
+		List<CompletableFuture<?>> futures = mPendingSaves.remove(player.getUniqueId());
 		if (futures == null) {
 			futures = new ArrayList<>();
 		} else {
@@ -652,13 +668,16 @@ public class DataEventListener implements Listener {
 
 			mLogger.finest(() -> "data: " + b64encode(data.getData()));
 			String dataPath = MonumentaRedisSyncAPI.getRedisDataPath(player);
-			futures.add(RedisAPI.getInstance().asyncStringBytes().lpush(dataPath, data.getData()));
-			futures.add(RedisAPI.getInstance().asyncStringBytes().ltrim(dataPath, 0, BukkitConfigAPI.getHistoryAmount()));
+			futures.add(RedisAPI.multiStringBytes(byteConn -> {
+				byteConn.lpush(dataPath, data.getData());
+				byteConn.ltrim(dataPath, 0, BukkitConfigAPI.getHistoryAmount());
+			}).exceptionally(ex -> {
+				mLogger.severe("Failed to save player nbt data for player=" + player.getName() + ": " + ex.getMessage());
+				ex.printStackTrace();
+				return null;
+			}));
 
 			/* Execute the sharddata, history and plugin data as a multi() batch */
-			RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
-			futures.add(commands.multi()); /* < MULTI */
-
 			/*
 			 * sharddata
 			 * This has two parts - an entry for the overall shard, and an entry for the specific world the player is on
@@ -666,7 +685,6 @@ public class DataEventListener implements Listener {
 			String shardDataPath = MonumentaRedisSyncAPI.getRedisPerShardDataPath(player);
 			// Save the data specifically for the world the player is currently on
 			String worldKey = MonumentaRedisSyncAPI.getRedisPerShardDataWorldKey(player.getWorld());
-			commands.hset(shardDataPath, worldKey, data.getShardData());
 			// Also update the local sharddata cache
 			Map<String, String> shardDataMap = mShardData.get(player.getUniqueId());
 			if (shardDataMap == null) {
@@ -681,7 +699,6 @@ public class DataEventListener implements Listener {
 			overallShardData.addProperty("WorldUUID", player.getWorld().getUID().toString());
 			overallShardData.addProperty("World", player.getWorld().getName());
 			String overallShardDataStr = mGson.toJson(overallShardData);
-			commands.hset(shardDataPath, BukkitConfigAPI.getShardName(), overallShardDataStr);
 			if (shardDataMap != null) {
 				shardDataMap.put(BukkitConfigAPI.getShardName(), overallShardDataStr);
 			}
@@ -691,29 +708,35 @@ public class DataEventListener implements Listener {
 			String histPath = MonumentaRedisSyncAPI.getRedisHistoryPath(player);
 			String history = BukkitConfigAPI.getShardName() + "|" + System.currentTimeMillis() + "|" + player.getName();
 			mLogger.finest(() -> "history: " + history);
-			commands.lpush(histPath, history);
-			commands.ltrim(histPath, 0, BukkitConfigAPI.getHistoryAmount());
 
 			/* plugindata */
 			String pluginDataPath = MonumentaRedisSyncAPI.getRedisPluginDataPath(player);
 			mPluginData.put(player.getUniqueId(), pluginData); // Update cache
 			String pluginDataStr = mGson.toJson(pluginData);
 			mLogger.finest(() -> "plugindata: " + pluginDataStr);
-			commands.lpush(pluginDataPath, pluginDataStr);
-			commands.ltrim(pluginDataPath, 0, BukkitConfigAPI.getHistoryAmount());
 
 			/* Scoreboards */
 			mLogger.fine("Saving scoreboard data for player=" + player.getName());
 			long scoreStartTime = System.currentTimeMillis();
-
 			String scoreboardData = mGson.toJson(mAdapter.getPlayerScoresAsJson(player.getName(), Bukkit.getScoreboardManager().getMainScoreboard()));
 			mLogger.fine(() -> "Scoreboard saving took " + (System.currentTimeMillis() - scoreStartTime) + " " + "milliseconds on main thread");
 			mLogger.finest(() -> "Data:" + scoreboardData);
 			String scorePath = MonumentaRedisSyncAPI.getRedisScoresPath(player);
-			commands.lpush(scorePath, scoreboardData);
-			commands.ltrim(scorePath, 0, BukkitConfigAPI.getHistoryAmount());
 
-			futures.add(commands.exec()); /* MULTI > */
+			futures.add(RedisAPI.multi(commands -> {
+				commands.hset(shardDataPath, worldKey, data.getShardData());
+				commands.hset(shardDataPath, BukkitConfigAPI.getShardName(), overallShardDataStr);
+				commands.lpush(histPath, history);
+				commands.ltrim(histPath, 0, BukkitConfigAPI.getHistoryAmount());
+				commands.lpush(pluginDataPath, pluginDataStr);
+				commands.ltrim(pluginDataPath, 0, BukkitConfigAPI.getHistoryAmount());
+				commands.lpush(scorePath, scoreboardData);
+				commands.ltrim(scorePath, 0, BukkitConfigAPI.getHistoryAmount());
+			}).exceptionally(ex -> {
+				mLogger.severe("Failed to save player data for player=" + player.getName() + ": " + ex.getMessage());
+				ex.printStackTrace();
+				return null;
+			}));
 		} catch (IOException ex) {
 			mLogger.severe("Failed to save player data: " + ex);
 			ex.printStackTrace();
@@ -736,12 +759,13 @@ public class DataEventListener implements Listener {
 		UUID uuid = player.getUniqueId();
 		String uuidStr = uuid.toString();
 
-		Bukkit.getServer().getScheduler().runTaskAsynchronously(MonumentaRedisSync.getInstance(), () -> {
-			RedisAPI.getInstance().async().hset("uuid2name", uuidStr, nameStr);
-			RedisAPI.getInstance().async().hset("name2uuid", nameStr, uuidStr);
-			MonumentaRedisSyncAPI.updateUuidToName(uuid, nameStr);
-			MonumentaRedisSyncAPI.updateNameToUuid(nameStr, uuid);
-		});
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hset("uuid2name", uuidStr, nameStr);
+			conn.hset("name2uuid", nameStr, uuidStr);
+		}
+		MonumentaRedisSyncAPI.updateUuidToName(uuid, nameStr);
+		MonumentaRedisSyncAPI.updateNameToUuid(nameStr, uuid);
+
 	}
 
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)

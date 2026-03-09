@@ -12,12 +12,8 @@ import com.playmonumenta.redissync.utils.Trie;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import dev.jorel.commandapi.wrappers.Rotation;
 import io.lettuce.core.KeyValue;
-import io.lettuce.core.LettuceFutures;
 import io.lettuce.core.RedisFuture;
-import io.lettuce.core.TransactionResult;
-import io.lettuce.core.api.async.RedisAsyncCommands;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -27,8 +23,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
@@ -263,46 +257,63 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static void stashPut(Player player, @Nullable String name) throws Exception {
+		MonumentaRedisSync mrs = MonumentaRedisSync.getInstance();
 		savePlayer(player);
 
-		DataEventListener.waitForPlayerToSaveThenAsync(player, () -> {
-			List<RedisFuture<?>> futures = new ArrayList<>();
+		DataEventListener.waitForPlayerToSaveThenSync(player, () -> {
+			final String saveName = name != null ? name : player.getUniqueId().toString();
 
-			RedisAPI api = RedisAPI.getInstance();
-
-			String saveName = name;
-			if (saveName == null) {
-				saveName = player.getUniqueId().toString();
-			} else {
-				futures.add(api.async().sadd(getStashListPath(), saveName));
+			if (name != null) {
+				try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+					conn.sadd(getStashListPath(), saveName).exceptionally(ex -> {
+						mrs.getLogger().severe("Redis sadd failed in stashPut: " + ex.getMessage());
+						return null;
+					});
+				}
 			}
 
-			try {
-				/* Read the most-recent player data save, and copy it to the stash */
-				RedisFuture<byte[]> dataFuture = api.asyncStringBytes().lindex(getRedisDataPath(player), 0);
-				RedisFuture<String> advanceFuture = api.async().lindex(getRedisAdvancementsPath(player), 0);
-				RedisFuture<String> scoreFuture = api.async().lindex(getRedisScoresPath(player), 0);
-				RedisFuture<String> pluginFuture = api.async().lindex(getRedisPluginDataPath(player), 0);
-				RedisFuture<String> historyFuture = api.async().lindex(getRedisHistoryPath(player), 0);
-
-				futures.add(api.asyncStringBytes().hset(getStashPath(), saveName + "-data", dataFuture.get()));
-				futures.add(api.async().hset(getStashPath(), saveName + "-scores", scoreFuture.get()));
-				futures.add(api.async().hset(getStashPath(), saveName + "-advancements", advanceFuture.get()));
-				futures.add(api.async().hset(getStashPath(), saveName + "-plugins", pluginFuture.get()));
-				futures.add(api.async().hset(getStashPath(), saveName + "-history", historyFuture.get()));
-
-				if (!LettuceFutures.awaitAll(TIMEOUT_SECONDS, TimeUnit.SECONDS, futures.toArray(new RedisFuture[0]))) {
-					MonumentaRedisSync.getInstance().getLogger().severe("Got timeout waiting to commit stash data for player '" + player.getName() + "'");
-					player.sendMessage(Component.text("Got timeout trying to commit stash data", NamedTextColor.RED));
+			/* Read all five fields from the player's current save atomically as bytes */
+			RedisAPI.multiStringBytes(conn -> {
+				conn.lindex(getRedisDataPath(player), 0);
+				conn.lindex(getRedisAdvancementsPath(player), 0);
+				conn.lindex(getRedisScoresPath(player), 0);
+				conn.lindex(getRedisPluginDataPath(player), 0);
+				conn.lindex(getRedisHistoryPath(player), 0);
+			}).whenComplete((readResult, readEx) -> {
+				if (readEx != null) {
+					mrs.getLogger().log(Level.SEVERE, "Got exception while reading data for stash put for player '" + player.getName() + "'", readEx);
+					player.sendMessage(Component.text("Failed to save stash data: " + readEx.getMessage(), NamedTextColor.RED));
 					return;
 				}
-			} catch (InterruptedException | ExecutionException ex) {
-				MonumentaRedisSync.getInstance().getLogger().log(Level.SEVERE, "Got exception while committing stash data for player '" + player.getName() + "'", ex);
-				player.sendMessage(Component.text("Failed to save stash data: " + ex.getMessage(), NamedTextColor.RED));
-				return;
-			}
 
-			player.sendMessage(Component.text("Data, scores, advancements saved to stash successfully", NamedTextColor.GOLD));
+				byte[] data = (byte[]) readResult.get(0);
+				byte[] advance = (byte[]) readResult.get(1);
+				byte[] score = (byte[]) readResult.get(2);
+				byte[] plugin = (byte[]) readResult.get(3);
+				byte[] history = (byte[]) readResult.get(4);
+
+				if (data == null || advance == null || score == null || plugin == null || history == null) {
+					mrs.getLogger().severe("Failed to retrieve player's data to stash for player '" + player.getName() + "'");
+					player.sendMessage(Component.text("Failed to save stash data: player data missing", NamedTextColor.RED));
+					return;
+				}
+
+				/* Write all five fields to the stash atomically as bytes */
+				RedisAPI.multiStringBytes(conn -> {
+					conn.hset(getStashPath(), saveName + "-data", data);
+					conn.hset(getStashPath(), saveName + "-advancements", advance);
+					conn.hset(getStashPath(), saveName + "-scores", score);
+					conn.hset(getStashPath(), saveName + "-plugins", plugin);
+					conn.hset(getStashPath(), saveName + "-history", history);
+				}).whenComplete((writeResult, writeEx) -> {
+					if (writeEx != null) {
+						mrs.getLogger().log(Level.SEVERE, "Got exception while committing stash data for player '" + player.getName() + "'", writeEx);
+						player.sendMessage(Component.text("Failed to save stash data: " + writeEx.getMessage(), NamedTextColor.RED));
+						return;
+					}
+					player.sendMessage(Component.text("Data, scores, advancements saved to stash successfully", NamedTextColor.GOLD));
+				});
+			});
 		});
 	}
 
@@ -319,27 +330,31 @@ public class MonumentaRedisSyncAPI {
 		DataEventListener.setPlayerAsTransferring(player);
 
 		/* Wait for save to complete */
-		DataEventListener.waitForPlayerToSaveThenAsync(player, () -> {
-			List<RedisFuture<?>> futures = new ArrayList<>();
+		DataEventListener.waitForPlayerToSaveThenSync(player, () -> {
+			final String saveName = name != null ? name : player.getUniqueId().toString();
 
-			RedisAPI api = RedisAPI.getInstance();
+			/* Read all five fields from the stash atomically as bytes */
+			RedisAPI.multiStringBytes(conn -> {
+				conn.hget(getStashPath(), saveName + "-data");
+				conn.hget(getStashPath(), saveName + "-advancements");
+				conn.hget(getStashPath(), saveName + "-scores");
+				conn.hget(getStashPath(), saveName + "-plugins");
+				conn.hget(getStashPath(), saveName + "-history");
+			}).whenComplete((readResult, readEx) -> {
+				if (readEx != null) {
+					mrs.getLogger().log(Level.SEVERE, "Got exception while loading stash data for player '" + player.getName() + "'", readEx);
+					player.sendMessage(Component.text("Failed to load stash data: " + readEx.getMessage(), NamedTextColor.RED));
+					return;
+				}
 
-			String saveName = name;
-			if (saveName == null) {
-				saveName = player.getUniqueId().toString();
-			}
-
-			try {
-				/* Read from the stash, and push it to the player's data */
-
-				RedisFuture<byte[]> dataFuture = api.asyncStringBytes().hget(getStashPath(), saveName + "-data");
-				RedisFuture<String> advanceFuture = api.async().hget(getStashPath(), saveName + "-advancements");
-				RedisFuture<String> scoreFuture = api.async().hget(getStashPath(), saveName + "-scores");
-				RedisFuture<String> pluginFuture = api.async().hget(getStashPath(), saveName + "-plugins");
-				RedisFuture<String> historyFuture = api.async().hget(getStashPath(), saveName + "-history");
+				byte[] data = (byte[]) readResult.get(0);
+				byte[] advance = (byte[]) readResult.get(1);
+				byte[] score = (byte[]) readResult.get(2);
+				byte[] plugin = (byte[]) readResult.get(3);
+				byte[] historyRaw = (byte[]) readResult.get(4);
 
 				/* Make sure there's actually data */
-				if (dataFuture.get() == null || advanceFuture.get() == null || scoreFuture.get() == null || pluginFuture.get() == null || historyFuture.get() == null) {
+				if (data == null || advance == null || score == null || plugin == null || historyRaw == null) {
 					if (name == null) {
 						player.sendMessage(Component.text("You don't have any stash data", NamedTextColor.RED));
 					} else {
@@ -348,73 +363,75 @@ public class MonumentaRedisSyncAPI {
 					return;
 				}
 
-				futures.add(api.asyncStringBytes().lpush(getRedisDataPath(player), dataFuture.get()));
-				futures.add(api.async().lpush(getRedisAdvancementsPath(player), advanceFuture.get()));
-				futures.add(api.async().lpush(getRedisScoresPath(player), scoreFuture.get()));
-				futures.add(api.async().lpush(getRedisPluginDataPath(player), pluginFuture.get()));
-				futures.add(api.async().lpush(getRedisHistoryPath(player), "stash@" + historyFuture.get()));
+				byte[] historyOut = ("stash@" + new String(historyRaw, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
 
-				if (!LettuceFutures.awaitAll(TIMEOUT_SECONDS, TimeUnit.SECONDS, futures.toArray(new RedisFuture[0]))) {
-					MonumentaRedisSync.getInstance().getLogger().severe("Got timeout loading stash data for player '" + player.getName() + "'");
-					player.sendMessage(Component.text("Got timeout loading stash data", NamedTextColor.RED));
-					return;
-				}
-			} catch (InterruptedException | ExecutionException ex) {
-				MonumentaRedisSync.getInstance().getLogger().log(Level.SEVERE, "Got exception while loading stash data for player '" + player.getName() + "'", ex);
-				player.sendMessage(Component.text("Failed to load stash data: " + ex.getMessage(), NamedTextColor.RED));
-				return;
-			}
-
-			/* Kick the player on the main thread to force rejoin */
-			Bukkit.getServer().getScheduler().runTask(mrs, () -> player.kick(Component.text("Stash data loaded successfully")));
+				/* Write all five fields to the player's data atomically as bytes */
+				RedisAPI.multiStringBytes(conn -> {
+					conn.lpush(getRedisDataPath(player), data);
+					conn.lpush(getRedisAdvancementsPath(player), advance);
+					conn.lpush(getRedisScoresPath(player), score);
+					conn.lpush(getRedisPluginDataPath(player), plugin);
+					conn.lpush(getRedisHistoryPath(player), historyOut);
+				}).whenComplete((writeResult, writeEx) -> {
+					if (writeEx != null) {
+						mrs.getLogger().log(Level.SEVERE, "Got exception while writing stash data for player '" + player.getName() + "'", writeEx);
+						player.sendMessage(Component.text("Failed to load stash data: " + writeEx.getMessage(), NamedTextColor.RED));
+						return;
+					}
+					/* Kick the player on the main thread to force rejoin */
+					Bukkit.getServer().getScheduler().runTask(mrs, () -> player.kick(Component.text("Stash data loaded successfully")));
+				});
+			});
 		});
 	}
 
-	public static void stashInfo(Player player, @Nullable String name) throws Exception {
+	public static void stashInfo(Player player, @Nullable String name) {
 		MonumentaRedisSync mrs = MonumentaRedisSync.getInstance();
 
-		RedisAPI api = RedisAPI.getInstance();
+		String saveName = name != null ? name : player.getUniqueId().toString();
 
-		String saveName;
-		if (name != null) {
-			saveName = name;
-		} else {
-			saveName = player.getUniqueId().toString();
-		}
-
-		Bukkit.getScheduler().runTaskAsynchronously(mrs, () -> {
-			String history = api.async().hget(getStashPath(), saveName + "-history").toCompletableFuture().join();
-			Bukkit.getScheduler().runTask(mrs, () -> {
-				if (history == null) {
-					if (name == null) {
-						player.sendMessage(Component.text("You don't have any stash data", NamedTextColor.RED));
-					} else {
-						player.sendMessage(Component.text("No stash data found for '" + name + "'", NamedTextColor.RED));
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hget(getStashPath(), saveName + "-history").whenComplete((history, ex) -> {
+				Bukkit.getScheduler().runTask(mrs, () -> {
+					if (ex != null) {
+						mrs.getLogger().severe("Redis hget failed in stashInfo: " + ex.getMessage());
+						player.sendMessage(Component.text("Error fetching stash info: " + ex.getMessage(), NamedTextColor.RED));
+						ex.printStackTrace();
+						return;
 					}
-					return;
-				}
+					if (history == null) {
+						if (name == null) {
+							player.sendMessage(Component.text("You don't have any stash data", NamedTextColor.RED));
+						} else {
+							player.sendMessage(Component.text("No stash data found for '" + name + "'", NamedTextColor.RED));
+						}
+						return;
+					}
 
-				String[] split = history.split("\\|");
-				if (split.length != 3) {
-					player.sendMessage(Component.text("Got corrupted history with " + split.length + " entries: " + history, NamedTextColor.RED));
-					return;
-				}
+					String[] split = history.split("\\|");
+					if (split.length != 3) {
+						player.sendMessage(Component.text("Got corrupted history with " + split.length + " entries: " + history, NamedTextColor.RED));
+						return;
+					}
 
-				if (name == null) {
-					player.sendMessage(Component.text("Stash last saved on " + split[0] + " " + getTimeDifferenceSince(Long.parseLong(split[1])) + " ago", NamedTextColor.GOLD));
-				} else {
-					player.sendMessage(Component.text("Stash '" + name + "' last saved on " + split[0] + " by " + split[2] + " " + getTimeDifferenceSince(Long.parseLong(split[1])) + " ago", NamedTextColor.GOLD));
-				}
+					if (name == null) {
+						player.sendMessage(Component.text("Stash last saved on " + split[0] + " " + getTimeDifferenceSince(Long.parseLong(split[1])) + " ago", NamedTextColor.GOLD));
+					} else {
+						player.sendMessage(Component.text("Stash '" + name + "' last saved on " + split[0] + " by " + split[2] + " " + getTimeDifferenceSince(Long.parseLong(split[1])) + " ago", NamedTextColor.GOLD));
+					}
+				});
 			});
-		});
+		}
 	}
 
 	public static void stashList(Player player, @Nullable String searchName) {
 		MonumentaRedisSync mrs = MonumentaRedisSync.getInstance();
 
-		RedisAPI api = RedisAPI.getInstance();
-
-		api.async().hkeys(getStashPath()).toCompletableFuture().whenComplete((keyResults, ex) -> {
+		CompletableFuture<List<String>> hkeysFuture;
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			hkeysFuture = conn.hkeys(getStashPath()).toCompletableFuture();
+		}
+		hkeysFuture.whenComplete((keyResults, ex) -> {
 			Bukkit.getScheduler().runTask(mrs, () -> {
 				if (ex != null) {
 					player.sendMessage(Component.text("Error fetching stash list: " + ex.getMessage(), NamedTextColor.RED));
@@ -438,37 +455,41 @@ public class MonumentaRedisSyncAPI {
 					player.sendMessage(Component.text("Listing stashes saved by username " + searchName, NamedTextColor.GOLD));
 					player.sendMessage(Component.text("If a stash you saved does not appear here, it may have been overwritten by another user, or you may have saved it under a past username", NamedTextColor.GOLD));
 
-					api.async().hmget(getStashPath(), stashNames.stream().map((stash) -> stash + "-history").toArray(String[]::new)).whenComplete((results, e) -> {
-						Bukkit.getScheduler().runTask(mrs, () -> {
-							if (e != null) {
-								player.sendMessage(Component.text("Error fetching stash list entries: " + e.getMessage(), NamedTextColor.RED));
-								return;
-							}
-
-							for (KeyValue<String, String> historyEntry : results) {
-								String stash = historyEntry.getKey();
-								if (stash.endsWith("-history")) { // Should always be true...
-									stash = stash.substring(0, stash.length() - "-history".length());
-								}
-								String history = historyEntry.getValue();
-
-								if (history == null) {
-									player.sendMessage(Component.text("Failed to get data for an existing stash? name: " + stash, NamedTextColor.RED));
-									continue;
+					try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+						conn.hmget(getStashPath(), stashNames.stream().map((stash) -> stash + "-history").toArray(String[]::new)).whenComplete((results, e) -> {
+							Bukkit.getScheduler().runTask(mrs, () -> {
+								if (e != null) {
+									mrs.getLogger().severe("Redis hmget failed in stashList: " + ex.getMessage());
+									player.sendMessage(Component.text("Error fetching stash list entries: " + e.getMessage(), NamedTextColor.RED));
+									ex.printStackTrace();
+									return;
 								}
 
-								String[] split = history.split("\\|");
-								if (split.length != 3) {
-									player.sendMessage(Component.text("Stash " + " is seemingly corrupted, with " + split.length + " entries: " + history, NamedTextColor.RED));
-									continue;
-								}
+								for (KeyValue<String, String> historyEntry : results) {
+									String stash = historyEntry.getKey();
+									if (stash.endsWith("-history")) { // Should always be true...
+										stash = stash.substring(0, stash.length() - "-history".length());
+									}
+									String history = historyEntry.getValue();
 
-								if (searchName.equals(split[2])) {
-									player.sendMessage(Component.text("Stash '" + stash + "' last saved on " + split[0] + " by " + split[2] + " " + getTimeDifferenceSince(Long.parseLong(split[1])) + " ago", NamedTextColor.WHITE));
+									if (history == null) {
+										player.sendMessage(Component.text("Failed to get data for an existing stash? name: " + stash, NamedTextColor.RED));
+										continue;
+									}
+
+									String[] split = history.split("\\|");
+									if (split.length != 3) {
+										player.sendMessage(Component.text("Stash is seemingly corrupted, with " + split.length + " entries: " + history, NamedTextColor.RED));
+										continue;
+									}
+
+									if (searchName.equals(split[2])) {
+										player.sendMessage(Component.text("Stash '" + stash + "' last saved on " + split[0] + " by " + split[2] + " " + getTimeDifferenceSince(Long.parseLong(split[1])) + " ago", NamedTextColor.WHITE));
+									}
 								}
-							}
+							});
 						});
-					});
+					}
 				} else {
 					List<Component> formattedStashNames = stashNames
 						.stream()
@@ -517,47 +538,53 @@ public class MonumentaRedisSyncAPI {
 		DataEventListener.setPlayerAsTransferring(player);
 
 		/* Wait for save to complete */
-		DataEventListener.waitForPlayerToSaveThenAsync(player, () -> {
-			List<RedisFuture<?>> futures = new ArrayList<>();
+		DataEventListener.waitForPlayerToSaveThenSync(player, () -> {
+			/* Read all five fields atomically as bytes */
+			RedisAPI.multiStringBytes(conn -> {
+				conn.lindex(getRedisDataPath(player), rollbackIndex);
+				conn.lindex(getRedisAdvancementsPath(player), rollbackIndex);
+				conn.lindex(getRedisScoresPath(player), rollbackIndex);
+				conn.lindex(getRedisPluginDataPath(player), rollbackIndex);
+				conn.lindex(getRedisHistoryPath(player), rollbackIndex);
+			}).whenComplete((readResult, readEx) -> {
+				if (readEx != null) {
+					mrs.getLogger().log(Level.SEVERE, "Got exception while reading rollback data for player '" + player.getName() + "'", readEx);
+					moderator.sendMessage(Component.text("Failed to load rollback data: " + readEx.getMessage(), NamedTextColor.RED));
+					return;
+				}
 
-			RedisAPI api = RedisAPI.getInstance();
-
-			try {
-				/* Read the history element and push it to the player's data */
-
-				RedisFuture<byte[]> dataFuture = api.asyncStringBytes().lindex(getRedisDataPath(player), rollbackIndex);
-				RedisFuture<String> advanceFuture = api.async().lindex(getRedisAdvancementsPath(player), rollbackIndex);
-				RedisFuture<String> scoreFuture = api.async().lindex(getRedisScoresPath(player), rollbackIndex);
-				RedisFuture<String> pluginFuture = api.async().lindex(getRedisPluginDataPath(player), rollbackIndex);
-				RedisFuture<String> historyFuture = api.async().lindex(getRedisHistoryPath(player), rollbackIndex);
+				byte[] data = (byte[]) readResult.get(0);
+				byte[] advance = (byte[]) readResult.get(1);
+				byte[] score = (byte[]) readResult.get(2);
+				byte[] plugin = (byte[]) readResult.get(3);
+				byte[] historyRaw = (byte[]) readResult.get(4);
 
 				/* Make sure there's actually data */
-				if (dataFuture.get() == null || advanceFuture.get() == null || scoreFuture.get() == null || pluginFuture.get() == null || historyFuture.get() == null) {
+				if (data == null || advance == null || score == null || plugin == null || historyRaw == null) {
 					moderator.sendMessage(Component.text("Failed to retrieve player's rollback data", NamedTextColor.RED));
 					return;
 				}
 
-				futures.add(api.asyncStringBytes().lpush(getRedisDataPath(player), dataFuture.get()));
-				futures.add(api.async().lpush(getRedisAdvancementsPath(player), advanceFuture.get()));
-				futures.add(api.async().lpush(getRedisScoresPath(player), scoreFuture.get()));
-				futures.add(api.async().lpush(getRedisPluginDataPath(player), pluginFuture.get()));
-				futures.add(api.async().lpush(getRedisHistoryPath(player), "rollback@" + historyFuture.get()));
+				byte[] historyOut = ("rollback@" + new String(historyRaw, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
 
-				if (!LettuceFutures.awaitAll(TIMEOUT_SECONDS, TimeUnit.SECONDS, futures.toArray(new RedisFuture[0]))) {
-					MonumentaRedisSync.getInstance().getLogger().severe("Got timeout loading rollback data for player '" + player.getName() + "'");
-					moderator.sendMessage(Component.text("Got timeout loading rollback data", NamedTextColor.RED));
-					return;
-				}
-			} catch (InterruptedException | ExecutionException ex) {
-				MonumentaRedisSync.getInstance().getLogger().log(Level.SEVERE, "Got exception while loading rollback data for player '" + player.getName() + "'", ex);
-				moderator.sendMessage(Component.text("Failed to load rollback data: " + ex.getMessage(), NamedTextColor.RED));
-				return;
-			}
-
-			moderator.sendMessage(Component.text("Player " + player.getName() + " rolled back successfully", NamedTextColor.GREEN));
-
-			/* Kick the player on the main thread to force rejoin */
-			Bukkit.getServer().getScheduler().runTask(mrs, () -> player.kick(Component.text("Your player data has been rolled back, and you can now re-join the server")));
+				/* Write all five fields atomically as bytes */
+				RedisAPI.multiStringBytes(conn -> {
+					conn.lpush(getRedisDataPath(player), data);
+					conn.lpush(getRedisAdvancementsPath(player), advance);
+					conn.lpush(getRedisScoresPath(player), score);
+					conn.lpush(getRedisPluginDataPath(player), plugin);
+					conn.lpush(getRedisHistoryPath(player), historyOut);
+				}).whenComplete((writeResult, writeEx) -> {
+					if (writeEx != null) {
+						mrs.getLogger().log(Level.SEVERE, "Got exception while writing rollback data for player '" + player.getName() + "'", writeEx);
+						moderator.sendMessage(Component.text("Failed to load rollback data: " + writeEx.getMessage(), NamedTextColor.RED));
+						return;
+					}
+					moderator.sendMessage(Component.text("Player " + player.getName() + " rolled back successfully", NamedTextColor.GREEN));
+					/* Kick the player on the main thread to force rejoin */
+					Bukkit.getServer().getScheduler().runTask(mrs, () -> player.kick(Component.text("Your player data has been rolled back, and you can now re-join the server")));
+				});
+			});
 		});
 	}
 
@@ -574,45 +601,52 @@ public class MonumentaRedisSyncAPI {
 		DataEventListener.setPlayerAsTransferring(loadTo);
 
 		/* Wait for save to complete */
-		DataEventListener.waitForPlayerToSaveThenAsync(loadTo, () -> {
-			List<RedisFuture<?>> futures = new ArrayList<>();
+		DataEventListener.waitForPlayerToSaveThenSync(loadTo, () -> {
+			/* Read all five fields atomically as bytes */
+			RedisAPI.multiStringBytes(conn -> {
+				conn.lindex(getRedisDataPath(loadFrom), index);
+				conn.lindex(getRedisAdvancementsPath(loadFrom), index);
+				conn.lindex(getRedisScoresPath(loadFrom), index);
+				conn.lindex(getRedisPluginDataPath(loadFrom), index);
+				conn.lindex(getRedisHistoryPath(loadFrom), index);
+			}).whenComplete((readResult, readEx) -> {
+				if (readEx != null) {
+					mrs.getLogger().log(Level.SEVERE, "Got exception while reading data for player '" + loadFrom.getName() + "'", readEx);
+					loadTo.sendMessage(Component.text("Failed to load data: " + readEx.getMessage(), NamedTextColor.RED));
+					return;
+				}
 
-			RedisAPI api = RedisAPI.getInstance();
+				byte[] data = (byte[]) readResult.get(0);
+				byte[] advance = (byte[]) readResult.get(1);
+				byte[] score = (byte[]) readResult.get(2);
+				byte[] plugin = (byte[]) readResult.get(3);
+				byte[] historyRaw = (byte[]) readResult.get(4);
 
-			try {
-				/* Read the history element and push it to the player's data */
-
-				RedisFuture<byte[]> dataFuture = api.asyncStringBytes().lindex(getRedisDataPath(loadFrom), index);
-				RedisFuture<String> advanceFuture = api.async().lindex(getRedisAdvancementsPath(loadFrom), index);
-				RedisFuture<String> scoreFuture = api.async().lindex(getRedisScoresPath(loadFrom), index);
-				RedisFuture<String> pluginFuture = api.async().lindex(getRedisPluginDataPath(loadFrom), index);
-				RedisFuture<String> historyFuture = api.async().lindex(getRedisHistoryPath(loadFrom), index);
-
-				/* Make sure there's actually data */
-				if (dataFuture.get() == null || advanceFuture.get() == null || scoreFuture.get() == null || pluginFuture.get() == null || historyFuture.get() == null) {
+				if (data == null || advance == null || score == null || plugin == null || historyRaw == null) {
 					loadTo.sendMessage(Component.text("Failed to retrieve player's data to load", NamedTextColor.RED));
+					mrs.getLogger().severe("Failed to retrieve player's data to load for player '" + loadFrom.getName() + "'");
 					return;
 				}
 
-				futures.add(api.asyncStringBytes().lpush(getRedisDataPath(loadTo), dataFuture.get()));
-				futures.add(api.async().lpush(getRedisAdvancementsPath(loadTo), advanceFuture.get()));
-				futures.add(api.async().lpush(getRedisScoresPath(loadTo), scoreFuture.get()));
-				futures.add(api.async().lpush(getRedisPluginDataPath(loadTo), pluginFuture.get()));
-				futures.add(api.async().lpush(getRedisHistoryPath(loadTo), "loadfrom@" + loadFrom.getName() + "@" + historyFuture.get()));
+				byte[] historyOut = ("loadfrom@" + loadFrom.getName() + "@" + new String(historyRaw, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
 
-				if (!LettuceFutures.awaitAll(TIMEOUT_SECONDS, TimeUnit.SECONDS, futures.toArray(new RedisFuture[0]))) {
-					MonumentaRedisSync.getInstance().getLogger().severe("Got timeout loading data for player '" + loadFrom.getName() + "'");
-					loadTo.sendMessage(Component.text("Got timeout loading data", NamedTextColor.RED));
-					return;
-				}
-			} catch (InterruptedException | ExecutionException ex) {
-				MonumentaRedisSync.getInstance().getLogger().log(Level.SEVERE, "Got exception while loading data for player '" + loadFrom.getName() + "'", ex);
-				loadTo.sendMessage(Component.text("Failed to load data: " + ex.getMessage(), NamedTextColor.RED));
-				return;
-			}
-
-			/* Kick the player on the main thread to force rejoin */
-			Bukkit.getServer().getScheduler().runTask(mrs, () -> loadTo.kick(Component.text("Data loaded from player " + loadFrom.getName() + " at index " + index + " and you can now re-join the server")));
+				/* Write all five fields atomically as bytes */
+				RedisAPI.multiStringBytes(conn -> {
+					conn.lpush(getRedisDataPath(loadTo), data);
+					conn.lpush(getRedisAdvancementsPath(loadTo), advance);
+					conn.lpush(getRedisScoresPath(loadTo), score);
+					conn.lpush(getRedisPluginDataPath(loadTo), plugin);
+					conn.lpush(getRedisHistoryPath(loadTo), historyOut);
+				}).whenComplete((writeResult, writeEx) -> {
+					if (writeEx != null) {
+						mrs.getLogger().log(Level.SEVERE, "Got exception while writing data for player '" + loadFrom.getName() + "'", writeEx);
+						loadTo.sendMessage(Component.text("Failed to load data: " + writeEx.getMessage(), NamedTextColor.RED));
+						return;
+					}
+					/* Kick the player on the main thread to force rejoin */
+					Bukkit.getServer().getScheduler().runTask(mrs, () -> loadTo.kick(Component.text("Data loaded from player " + loadFrom.getName() + " at index " + index + " and you can now re-join the server")));
+				});
+			});
 		});
 	}
 
@@ -919,14 +953,10 @@ public class MonumentaRedisSyncAPI {
 
 	/** Future returns non-null if successfully loaded data, null on error */
 	@Nullable
-	private static RedisPlayerData transformPlayerData(MonumentaRedisSync mrs, UUID uuid, TransactionResult result) {
-		if (result.isEmpty() || result.get(0) == null) {
+	private static RedisPlayerData transformPlayerData(MonumentaRedisSync mrs, UUID uuid,
+		byte[] data, byte[] advancementsBytes, byte[] scoresBytes, byte[] pluginDataBytes, byte[] historyBytes) {
+		if (data == null) {
 			mrs.getLogger().warning("Failed to retrieve player data; likely player didn't make it past the tutorial");
-			return null;
-		}
-
-		if (result.size() != 5) {
-			mrs.getLogger().severe("Failed to retrieve player data; only " + result.size() + " / 5 expected data elements retrieved");
 			return null;
 		}
 
@@ -936,34 +966,32 @@ public class MonumentaRedisSyncAPI {
 			String pluginData;
 			String history;
 
-			byte[] data = result.get(0);
-
-			if (result.get(1) == null) {
+			if (advancementsBytes == null) {
 				mrs.getLogger().severe("Player advancements data was missing or corrupted and has been reset");
 				advancements = "{}";
 			} else {
-				advancements = new String(result.get(1), StandardCharsets.UTF_8);
+				advancements = new String(advancementsBytes, StandardCharsets.UTF_8);
 			}
 
-			if (result.get(2) == null) {
+			if (scoresBytes == null) {
 				mrs.getLogger().severe("Player scores data was missing or corrupted and has been reset");
 				scores = "{}";
 			} else {
-				scores = new String(result.get(2), StandardCharsets.UTF_8);
+				scores = new String(scoresBytes, StandardCharsets.UTF_8);
 			}
 
-			if (result.get(3) == null) {
+			if (pluginDataBytes == null) {
 				mrs.getLogger().warning("Player pluginData was missing or corrupted and has been reset");
 				pluginData = "{}";
 			} else {
-				pluginData = new String(result.get(3), StandardCharsets.UTF_8);
+				pluginData = new String(pluginDataBytes, StandardCharsets.UTF_8);
 			}
 
-			if (result.get(4) == null) {
+			if (historyBytes == null) {
 				mrs.getLogger().warning("Player history data was missing or corrupted and has been reset");
 				history = "UpdateAllPlayers|" + System.currentTimeMillis() + "|unknown";
 			} else {
-				history = new String(result.get(4), StandardCharsets.UTF_8);
+				history = new String(historyBytes, StandardCharsets.UTF_8);
 			}
 
 			return new RedisPlayerData(uuid, mrs.getVersionAdapter().retrieveSaveData(data, new JsonObject()), advancements, scores, pluginData, history);
@@ -981,16 +1009,14 @@ public class MonumentaRedisSyncAPI {
 
 		MonumentaRedisSync mrs = MonumentaRedisSync.getInstance();
 
-		RedisAsyncCommands<String, byte[]> commands = RedisAPI.getInstance().asyncStringBytes();
-		commands.multi();
-
-		commands.lindex(getRedisDataPath(uuid), 0);
-		commands.lindex(getRedisAdvancementsPath(uuid), 0);
-		commands.lindex(getRedisScoresPath(uuid), 0);
-		commands.lindex(getRedisPluginDataPath(uuid), 0);
-		commands.lindex(getRedisHistoryPath(uuid), 0);
-
-		return commands.exec().thenApply((TransactionResult result) -> transformPlayerData(mrs, uuid, result)).toCompletableFuture();
+		return RedisAPI.multiStringBytes(conn -> {
+			conn.lindex(getRedisDataPath(uuid), 0);
+			conn.lindex(getRedisAdvancementsPath(uuid), 0);
+			conn.lindex(getRedisScoresPath(uuid), 0);
+			conn.lindex(getRedisPluginDataPath(uuid), 0);
+			conn.lindex(getRedisHistoryPath(uuid), 0);
+		}).thenApply(result -> transformPlayerData(mrs, uuid,
+			result.get(0), result.get(1), result.get(2), result.get(3), result.get(4)));
 	}
 
 	/**
@@ -1034,31 +1060,25 @@ public class MonumentaRedisSyncAPI {
 		return future;
 	}
 
-	private static Boolean transformPlayerSaveResult(MonumentaRedisSync mrs, TransactionResult result) {
-		if (result.isEmpty() || result.size() != 5 || result.get(0) == null
-			|| result.get(1) == null || result.get(2) == null || result.get(3) == null || result.get(4) == null) {
-			mrs.getLogger().severe("Failed to commit player data");
-			return false;
-		}
-
-		return true;
-	}
-
 	/** Future returns true if successfully committed, false if not */
 	public static CompletableFuture<Boolean> saveOfflinePlayerData(RedisPlayerData data) throws Exception {
 		MonumentaRedisSync mrs = MonumentaRedisSync.getInstance();
 
-		RedisAsyncCommands<String, byte[]> commands = RedisAPI.getInstance().asyncStringBytes();
-		commands.multi();
-
 		SaveData splitData = mrs.getVersionAdapter().extractSaveData(data.getNbtTagCompoundData(), null);
-		commands.lpush(getRedisDataPath(data.getUniqueId()), splitData.getData());
-		commands.lpush(getRedisAdvancementsPath(data.getUniqueId()), data.getAdvancements().getBytes(StandardCharsets.UTF_8));
-		commands.lpush(getRedisScoresPath(data.getUniqueId()), data.getScores().getBytes(StandardCharsets.UTF_8));
-		commands.lpush(getRedisPluginDataPath(data.getUniqueId()), data.getPluginData().getBytes(StandardCharsets.UTF_8));
-		commands.lpush(getRedisHistoryPath(data.getUniqueId()), data.getHistory().getBytes(StandardCharsets.UTF_8));
-
-		return commands.exec().thenApply((TransactionResult result) -> transformPlayerSaveResult(mrs, result)).toCompletableFuture();
+		return RedisAPI.multiStringBytes(conn -> {
+			conn.lpush(getRedisDataPath(data.getUniqueId()), splitData.getData());
+			conn.lpush(getRedisAdvancementsPath(data.getUniqueId()), data.getAdvancements().getBytes(StandardCharsets.UTF_8));
+			conn.lpush(getRedisScoresPath(data.getUniqueId()), data.getScores().getBytes(StandardCharsets.UTF_8));
+			conn.lpush(getRedisPluginDataPath(data.getUniqueId()), data.getPluginData().getBytes(StandardCharsets.UTF_8));
+			conn.lpush(getRedisHistoryPath(data.getUniqueId()), data.getHistory().getBytes(StandardCharsets.UTF_8));
+		}).thenApply(result -> {
+			if (result.isEmpty() || result.size() != 5 || result.get(0) == null
+				|| result.get(1) == null || result.get(2) == null || result.get(3) == null || result.get(4) == null) {
+				mrs.getLogger().severe("Failed to commit player data");
+				return false;
+			}
+			return true;
+		});
 	}
 
 	/**
