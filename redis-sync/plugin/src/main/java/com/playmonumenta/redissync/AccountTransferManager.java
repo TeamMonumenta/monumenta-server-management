@@ -144,7 +144,9 @@ public class AccountTransferManager implements Listener {
 		transferDetails.addProperty("new_id", currentPlayerId.toString());
 		transferDetails.addProperty("new_name", currentPlayerName);
 
-		RedisAPI.getInstance().async().zadd(REDIS_KEY, (double) timestampMillis, transferDetails.toString());
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.zadd(REDIS_KEY, (double) timestampMillis, transferDetails.toString());
+		}
 	}
 
 	public static CompletableFuture<List<AccountTransferDetails>> getTransfersInRange(
@@ -199,10 +201,14 @@ public class AccountTransferManager implements Listener {
 				}
 
 				// Fetch the list of transfers from Redis
-				List<String> transferJsonStrList = RedisAPI.getInstance().async().zrangebyscore(REDIS_KEY, Range.from(
-					startBound,
-					endBound
-				)).toCompletableFuture().join();
+				CompletableFuture<List<String>> transfersFuture;
+				try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+					transfersFuture = conn.zrangebyscore(REDIS_KEY, Range.from(
+						startBound,
+						endBound
+					)).toCompletableFuture();
+				}
+				List<String> transferJsonStrList = transfersFuture.join();
 
 				// Parse them as-is
 				Gson gson = new Gson();

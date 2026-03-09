@@ -24,7 +24,9 @@ public class RemoteDataAPI {
 			return future;
 		}
 
-		return api.async().hget(getRedisPath(uuid), key).toCompletableFuture();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.hget(getRedisPath(uuid), key).toCompletableFuture();
+		}
 	}
 
 	/**
@@ -43,7 +45,9 @@ public class RemoteDataAPI {
 			return future;
 		}
 
-		return api.async().hmget(getRedisPath(uuid), keys).toCompletableFuture().thenApply((listResult) -> listResult.stream().filter(Value::hasValue).collect(Collectors.toMap(KeyValue::getKey, Value::getValue)));
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.hmget(getRedisPath(uuid), keys).toCompletableFuture().thenApply((listResult) -> listResult.stream().filter(Value::hasValue).collect(Collectors.toMap(KeyValue::getKey, Value::getValue)));
+		}
 	}
 
 	/**
@@ -62,7 +66,9 @@ public class RemoteDataAPI {
 			return future;
 		}
 
-		return api.async().hset(getRedisPath(uuid), key, value).toCompletableFuture();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.hset(getRedisPath(uuid), key, value).toCompletableFuture();
+		}
 	}
 
 	/**
@@ -83,7 +89,9 @@ public class RemoteDataAPI {
 			return future;
 		}
 
-		return api.async().hincrby(getRedisPath(uuid), key, incBy).toCompletableFuture();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.hincrby(getRedisPath(uuid), key, incBy).toCompletableFuture();
+		}
 	}
 
 	/**
@@ -102,7 +110,9 @@ public class RemoteDataAPI {
 			return future;
 		}
 
-		return api.async().hdel(getRedisPath(uuid), key).thenApply((val) -> val == 1).toCompletableFuture();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.hdel(getRedisPath(uuid), key).thenApply((val) -> val == 1).toCompletableFuture();
+		}
 	}
 
 	/**
@@ -121,7 +131,9 @@ public class RemoteDataAPI {
 			return future;
 		}
 
-		return api.async().hgetall(getRedisPath(uuid)).toCompletableFuture();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.hgetall(getRedisPath(uuid)).toCompletableFuture();
+		}
 	}
 
 	public static String getRedisPath(UUID uuid) {

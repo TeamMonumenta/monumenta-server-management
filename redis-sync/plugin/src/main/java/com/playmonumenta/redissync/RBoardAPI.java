@@ -27,8 +27,9 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
-		return commands.hset(redisPath, data).toCompletableFuture();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.hset(redisPath, data).toCompletableFuture();
+		}
 	}
 
 	public static CompletableFuture<Long> set(String name, String key, long amount) {
@@ -48,8 +49,9 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
-		return commands.hincrby(redisPath, key, amount).toCompletableFuture();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.hincrby(redisPath, key, amount).toCompletableFuture();
+		}
 	}
 
 	/* ******************* Get ******************* */
@@ -122,8 +124,9 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
-		return commands.hkeys(redisPath).toCompletableFuture();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.hkeys(redisPath).toCompletableFuture();
+		}
 	}
 
 	/* ******************* GetAll ******************* */
@@ -137,8 +140,9 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
-		return commands.hgetall(redisPath).toCompletableFuture();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.hgetall(redisPath).toCompletableFuture();
+		}
 	}
 
 	/* ******************* Reset ******************* */
@@ -152,8 +156,9 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
-		return commands.hdel(redisPath, keys).toCompletableFuture();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.hdel(redisPath, keys).toCompletableFuture();
+		}
 	}
 
 	/* ******************* ResetAll ******************* */
@@ -167,7 +172,8 @@ public class RBoardAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
-		return commands.del(redisPath).toCompletableFuture();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.del(redisPath).toCompletableFuture();
+		}
 	}
 }

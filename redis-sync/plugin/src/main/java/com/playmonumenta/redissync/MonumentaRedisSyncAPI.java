@@ -132,20 +132,30 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static CompletableFuture<String> uuidToName(UUID uuid) {
-		return RedisAPI.getInstance().async().hget("uuid2name", uuid.toString()).toCompletableFuture();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.hget("uuid2name", uuid.toString()).toCompletableFuture();
+		}
 	}
 
 	public static CompletableFuture<UUID> nameToUUID(String name) {
-		return RedisAPI.getInstance().async().hget("name2uuid", name).thenApply((uuid) -> (uuid == null || uuid.isEmpty()) ? null : UUID.fromString(uuid)).toCompletableFuture();
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.hget("name2uuid", name).thenApply((uuid) -> (uuid == null || uuid.isEmpty()) ? null : UUID.fromString(uuid)).toCompletableFuture();
+		}
 	}
 
 	public static CompletableFuture<Set<String>> getAllPlayerNames() {
-		RedisFuture<Map<String, String>> future = RedisAPI.getInstance().async().hgetall("name2uuid");
+		RedisFuture<Map<String, String>> future;
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			future = conn.hgetall("name2uuid");
+		}
 		return future.thenApply(Map::keySet).toCompletableFuture();
 	}
 
 	public static CompletableFuture<Set<UUID>> getAllPlayerUUIDs() {
-		RedisFuture<Map<String, String>> future = RedisAPI.getInstance().async().hgetall("uuid2name");
+		RedisFuture<Map<String, String>> future;
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			future = conn.hgetall("uuid2name");
+		}
 		return future.thenApply((data) -> data.keySet().stream().map(UUID::fromString).collect(Collectors.toSet())).toCompletableFuture();
 	}
 
@@ -1008,18 +1018,18 @@ public class MonumentaRedisSyncAPI {
 			return future;
 		}
 
-		RedisAsyncCommands<String, String> commands = RedisAPI.getInstance().async();
-
-		commands.lindex(getRedisScoresPath(uuid), 0)
-			.thenApply(
-				(scoreData) -> new Gson().fromJson(scoreData, JsonObject.class).entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, (entry) -> entry.getValue().getAsInt())))
-			.whenComplete((scoreMap, ex) -> Bukkit.getScheduler().runTask(mrs, () -> {
-				if (ex != null) {
-					future.completeExceptionally(ex);
-				} else {
-					future.complete(scoreMap);
-				}
-			}));
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.lindex(getRedisScoresPath(uuid), 0)
+				.thenApply(
+					(scoreData) -> new Gson().fromJson(scoreData, JsonObject.class).entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, (entry) -> entry.getValue().getAsInt())))
+				.whenComplete((scoreMap, ex) -> Bukkit.getScheduler().runTask(mrs, () -> {
+					if (ex != null) {
+						future.completeExceptionally(ex);
+					} else {
+						future.complete(scoreMap);
+					}
+				}));
+		}
 
 		return future;
 	}

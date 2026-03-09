@@ -8,7 +8,6 @@ import com.velocitypowered.api.event.player.ServerPostConnectEvent;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
-import io.lettuce.core.api.async.RedisAsyncCommands;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import net.kyori.adventure.text.Component;
@@ -97,11 +96,10 @@ public class VelocityListener {
 		String name = player.getUsername();
 		UUID uuid = player.getUniqueId();
 
-		RedisAsyncCommands<String, String> async = RedisAPI.getInstance().async();
-		async.multi();
-		async.hset(uuidToNamePath, uuid.toString(), name);
-		async.hset(nameToUUIDPath, name, uuid.toString());
-		async.exec();
+		RedisAPI.multi(conn -> {
+			conn.hset(uuidToNamePath, uuid.toString(), name);
+			conn.hset(nameToUUIDPath, name, uuid.toString());
+		});
 	}
 
 	private String locationsKey() {

@@ -24,5 +24,6 @@ dependencies {
 	compileOnly("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
 	annotationProcessor("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
 	compileOnly("io.lettuce:lettuce-core:6.3.2.RELEASE")
-	compileOnly("com.playmonumenta:redissync:5.+:all")
+	/* Your project should use something like compileOnly("com.playmonumenta:redissync:6.1:all") */
+	compileOnly(project(":redis-sync:redissync"))
 }
