@@ -221,7 +221,7 @@ public class ChatFilter {
 					try {
 						content = mPattern.matcher(content).replaceAll(replacer);
 					} catch (IllegalArgumentException ex) {
-						MMLog.warning("An exception occurred while running the filter " + mId + ": " + ex);
+						MMLog.warning("An exception occurred while running the filter " + mId, ex);
 						MMLog.warning("content=" + content);
 						MMLog.warning("mIsLiteral=" + mIsLiteral);
 						MMLog.warning("mPatternString=`" + patternString() + "`");

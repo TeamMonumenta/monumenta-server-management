@@ -127,7 +127,7 @@ public class ChannelSettings {
 					try {
 						settings.mSounds.add(CSound.fromJson(element.getAsJsonObject()));
 					} catch (Exception e) {
-						MMLog.warning("Caught an exception while converting SoundsList to object. Reason: " + e.getMessage());
+						MMLog.warning("Caught an exception while converting SoundsList to object", e);
 					}
 				}
 			}

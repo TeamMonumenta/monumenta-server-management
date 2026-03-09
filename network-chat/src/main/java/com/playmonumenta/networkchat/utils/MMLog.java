@@ -111,4 +111,11 @@ public class MMLog {
 			logger.severe(msg);
 		}
 	}
+
+	public static void severe(String msg, Throwable t) {
+		Logger logger = CustomLogger.getInstance();
+		if (logger != null) {
+			logger.log(Level.SEVERE, msg, t);
+		}
+	}
 }
