@@ -1,5 +1,6 @@
 package com.playmonumenta.redissync;
 
+import com.google.errorprone.annotations.MustBeClosed;
 import io.lettuce.core.AbstractRedisAsyncCommands;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
@@ -105,6 +106,7 @@ public class RedisAPI {
 	 * Borrows exclusive access to the String/String Redis connection.
 	 * Must be used in a try-with-resources statement.
 	 */
+	@MustBeClosed
 	public static BorrowedCommands<String, String> borrow() {
 		RedisAPI api = INSTANCE;
 		api.mLock.lock();
@@ -115,6 +117,7 @@ public class RedisAPI {
 	 * Borrows exclusive access to the String/byte[] Redis connection.
 	 * Must be used in a try-with-resources statement.
 	 */
+	@MustBeClosed
 	public static BorrowedCommands<String, byte[]> borrowStringBytes() {
 		RedisAPI api = INSTANCE;
 		api.mBytesLock.lock();

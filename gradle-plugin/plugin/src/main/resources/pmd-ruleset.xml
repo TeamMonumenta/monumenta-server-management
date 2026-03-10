@@ -57,6 +57,65 @@
     <rule ref="category/java/multithreading.xml/DoubleCheckedLocking"/>
 
     <rule ref="category/java/performance.xml/BigIntegerInstantiation"/>
+    <rule name="NoBorrowJoinOrGet"
+          language="java"
+          message="Do not call .join() or .get() on a future inside a borrow() try block — holds the connection lock during a network wait. Capture the future, exit the try block, then wait outside."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Calling .join() or .get() on a CompletableFuture/RedisFuture inside a
+            borrow()/borrowStringBytes() try-with-resources block holds the Redis connection
+            lock for the duration of the network round-trip, blocking all other threads from
+            using Redis. Capture the future before the try block exits, then wait outside.
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+                    //TryStatement[
+                        ResourceList//MethodCall[@MethodName='borrow' or @MethodName='borrowStringBytes']
+                    ]/Block//MethodCall[
+                        (
+                            @MethodName='join'
+                            and *[1][pmd-java:typeIs('java.util.concurrent.CompletableFuture')]
+                        ) or (
+                            @MethodName='get'
+                            and *[1][
+                                pmd-java:typeIs('java.util.concurrent.Future')
+                                or pmd-java:typeIs('io.lettuce.core.RedisFuture')
+                            ]
+                        )
+                    ]
+                    ]]>
+                </value>
+            </property>
+        </properties>
+    </rule>
+    <rule name="NoMultiInsideBorrow"
+          language="java"
+          message="Do not call .multi(), .exec(), or .discard() directly on a BorrowedCommands handle. Use RedisAPI.multi() or RedisAPI.multiStringBytes() instead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Calling .multi() or .exec() directly on a BorrowedCommands handle risks leaving a
+            transaction open if an exception is thrown before .exec() is called. Use
+            RedisAPI.multi()/multiStringBytes() which guarantee EXEC or DISCARD is always called.
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+                    //TryStatement[
+                        ResourceList//MethodCall[@MethodName='borrow' or @MethodName='borrowStringBytes']
+                    ]/Block//MethodCall[
+                        (@MethodName='multi' or @MethodName='exec' or @MethodName='discard')
+                        and *[1][pmd-java:typeIs('com.playmonumenta.redissync.RedisAPI.BorrowedCommands')]
+                    ]
+                    ]]>
+                </value>
+            </property>
+        </properties>
+    </rule>
     <rule name="UseJetbrainsAnnotations"
           language="java"
           message="Use org.jetbrains.annotations.*"
