@@ -40,6 +40,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -261,9 +262,9 @@ public class DataEventListener implements Listener {
 			CompletableFuture<?>[] futureArr = futures.toArray(new CompletableFuture[0]);
 			CompletableFuture.allOf(futureArr).get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
 		} catch (TimeoutException ex) {
-			mLogger.severe("Got timeout waiting to commit transactions for player '" + player.getName() + "'. This is very bad!");
+			mLogger.log(Level.SEVERE, "Got timeout waiting to commit transactions for player '" + player.getName() + "'. This is very bad!", ex);
 		} catch (InterruptedException | ExecutionException ex) {
-			mLogger.severe("Failed waiting to commit transactions for player '" + player.getName() + "': " + ex.getMessage());
+			mLogger.log(Level.SEVERE, "Failed waiting to commit transactions for player '" + player.getName() + "'", ex);
 		}
 
 		mLogger.fine("Pending save completed for player=" + player.getName());
@@ -282,8 +283,7 @@ public class DataEventListener implements Listener {
 			try {
 				MonumentaRedisSyncAPI.savePlayer(player);
 			} catch (Exception ex) {
-				mLogger.severe("Failed to save player '" + player.getName() + "': " + ex.getMessage());
-				ex.printStackTrace();
+				mLogger.log(Level.SEVERE, "Failed to save player '" + player.getName() + "'", ex);
 			}
 		}
 	}
@@ -321,8 +321,7 @@ public class DataEventListener implements Listener {
 
 			mLogger.fine(() -> "Processing PlayerAdvancementDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
 		} catch (InterruptedException | ExecutionException ex) {
-			mLogger.severe("Failed to get advancements data for player '" + player.getName() + "'. This is very bad!");
-			ex.printStackTrace();
+			mLogger.log(Level.SEVERE, "Failed to get advancements data for player '" + player.getName() + "'. This is very bad!", ex);
 		}
 	}
 
@@ -359,8 +358,7 @@ public class DataEventListener implements Listener {
 			commands.lpush(advPath, advJsonData);
 			commands.ltrim(advPath, 0, BukkitConfigAPI.getHistoryAmount());
 		}).exceptionally(ex -> {
-			mLogger.severe("Advancements saving for player=" + player.getName() + " failed: " + ex.getMessage());
-			ex.printStackTrace();
+			mLogger.log(Level.SEVERE, "Advancements saving for player=" + player.getName() + " failed", ex);
 			return null;
 		}));
 
@@ -383,13 +381,11 @@ public class DataEventListener implements Listener {
 		try {
 			callable.run(path.resolve(name));
 		} catch (Throwable e) {
-			mLogger.severe("failed to save data to file");
-			e.printStackTrace();
+			mLogger.log(Level.SEVERE, "failed to save data to file", e);
 			try {
 				Files.writeString(path.resolve(name + ".save_error.txt"), exceptionToString(e));
 			} catch (Throwable e2) {
-				mLogger.severe("I give up!");
-				e2.printStackTrace();
+				mLogger.log(Level.SEVERE, "I give up!", e2);
 			}
 		}
 	}
@@ -498,8 +494,7 @@ public class DataEventListener implements Listener {
 								playerWorld = world;
 							}
 						} catch (Exception ex) {
-							mLogger.severe("Got sharddata WorldUUID='" + shardDataJson.get("WorldUUID").getAsString() + "' which is invalid: " + ex.getMessage());
-							ex.printStackTrace();
+							mLogger.log(Level.SEVERE, "Got sharddata WorldUUID='" + shardDataJson.get("WorldUUID").getAsString() + "' which is invalid", ex);
 						}
 					}
 
@@ -576,8 +571,7 @@ public class DataEventListener implements Listener {
 			mLogger.fine(() -> "Processing PlayerDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
 		} catch (Throwable ex) {
 			mLoadFailedPlayers.add(event.getPlayer().getUniqueId());
-			mLogger.severe("!!! Failed to load player data !!!");
-			ex.printStackTrace();
+			mLogger.log(Level.SEVERE, "!!! Failed to load player data !!!", ex);
 
 			final var rootPath = MonumentaRedisSync.getInstance().getDataFolder().toPath()
 				.resolve("data-fail-report-%s-%s-%s".formatted(
@@ -602,8 +596,7 @@ public class DataEventListener implements Listener {
 				});
 			} catch (IOException e) {
 				// there's nothing we can do here if we can't create the directory...
-				mLogger.severe("Failed to create directory for saving player info");
-				e.printStackTrace();
+				mLogger.log(Level.SEVERE, "Failed to create directory for saving player info", e);
 			}
 
 			mLogger.severe("Bail: kicking player early in order to prevent data loss!");
@@ -672,8 +665,7 @@ public class DataEventListener implements Listener {
 				byteConn.lpush(dataPath, data.getData());
 				byteConn.ltrim(dataPath, 0, BukkitConfigAPI.getHistoryAmount());
 			}).exceptionally(ex -> {
-				mLogger.severe("Failed to save player nbt data for player=" + player.getName() + ": " + ex.getMessage());
-				ex.printStackTrace();
+				mLogger.log(Level.SEVERE, "Failed to save player nbt data for player=" + player.getName(), ex);
 				return null;
 			}));
 
@@ -733,13 +725,11 @@ public class DataEventListener implements Listener {
 				commands.lpush(scorePath, scoreboardData);
 				commands.ltrim(scorePath, 0, BukkitConfigAPI.getHistoryAmount());
 			}).exceptionally(ex -> {
-				mLogger.severe("Failed to save player data for player=" + player.getName() + ": " + ex.getMessage());
-				ex.printStackTrace();
+				mLogger.log(Level.SEVERE, "Failed to save player data for player=" + player.getName(), ex);
 				return null;
 			}));
 		} catch (IOException ex) {
-			mLogger.severe("Failed to save player data: " + ex);
-			ex.printStackTrace();
+			mLogger.log(Level.SEVERE, "Failed to save player data for player=" + player.getName(), ex);
 		}
 
 		/* Don't block - store the pending futures for completion later */
