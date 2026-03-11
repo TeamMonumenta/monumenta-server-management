@@ -15,6 +15,7 @@ dependencies {
             classifier = "all"
         }
     }
+    compileOnly(project(":zones"))
 }
 
 monumenta {
@@ -22,7 +23,7 @@ monumenta {
 	name("MonumentaStructureManagement")
     paper(
         "com.playmonumenta.structures.StructuresPlugin", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20",
-        depends = listOf("CommandAPI", "FastAsyncWorldEdit", "ScriptedQuests")
+        depends = listOf("CommandAPI", "FastAsyncWorldEdit", "ScriptedQuests", "MonumentaZones")
     )
 	gitPrefix("structure-management/")
 }

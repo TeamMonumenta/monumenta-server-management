@@ -12,6 +12,7 @@ This project consists of several modules, which are independent plugins:
 | [Network Chat](./network-chat/README.md)                 | A cross-server chat plugin.                |
 | [Structure Management](./structure-management/README.md) | Monumenta's respawning POI w/ FAWE.        |
 | [World Management](./world-management/README.md)         | Tools for managing worlds.                 |
+| [Zones](./zones/README.md)                               | Backend for tracking zones.                |
 
 ## Downloading
 
