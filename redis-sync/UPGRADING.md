@@ -1,4 +1,4 @@
-# Refactoring `RedisAPI.async()` → `borrow()` / `borrowStringBytes()`
+# Refactoring `RedisAPI.async()` -> `borrow()` / `borrowStringBytes()`
 
 ## Background
 
@@ -11,7 +11,7 @@ try-with-resources handles that hold a `ReentrantLock` for the duration of the b
 // OLD (deprecated)
 RedisAPI.getInstance().async().hget("key", "field").toCompletableFuture();
 
-// NEW — lock held only while enqueuing (near-instant), released on try-block exit
+// NEW - lock held only while enqueuing (near-instant), released on try-block exit
 try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
     conn.hget("key", "field").toCompletableFuture();
 }
@@ -24,7 +24,7 @@ try (RedisAPI.BorrowedCommands<String, byte[]> conn = RedisAPI.borrowStringBytes
 
 Key rules:
 - Always use inside a `try-with-resources`.
-- **Do NOT call `.join()`/`.get()` inside the try block** — this holds the lock while
+- **Do NOT call `.join()`/`.get()` inside the try block** - this holds the lock while
   waiting for the network, blocking other threads from using Redis. Capture the future,
   exit the try block, then call `.join()`/`.get()` outside.
 - Do not store the `BorrowedCommands` object or pass it outside the try block.
@@ -34,7 +34,7 @@ Key rules:
 
 ## Common patterns used in the refactor
 
-### Single async command → borrow()
+### Single async command -> borrow()
 ```java
 // Before
 return RedisAPI.getInstance().async().hget(path, field).toCompletableFuture();
@@ -47,12 +47,12 @@ try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 
 ### .join() / .get() must be OUTSIDE the try block
 ```java
-// WRONG — holds the lock while waiting for the network response
+// WRONG - holds the lock while waiting for the network response
 try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
     result = conn.hget(path, field).toCompletableFuture().join();
 }
 
-// CORRECT — lock released immediately after enqueue; block after
+// CORRECT - lock released immediately after enqueue; block after
 CompletableFuture<String> future;
 try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
     future = conn.hget(path, field).toCompletableFuture();
@@ -60,7 +60,7 @@ try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 result = future.join(); // lock already released
 ```
 
-### Atomic transaction → RedisAPI.multi() / multiStringBytes()
+### Atomic transaction -> RedisAPI.multi() / multiStringBytes()
 
 `RedisAPI.multi()` (String/String) and `RedisAPI.multiStringBytes()` (String/byte[])
 both hold the connection lock for the entire MULTI/EXEC block, guaranteeing EXEC or
@@ -132,7 +132,7 @@ CompletableFuture.allOf(futureA, futureB, futureC).whenComplete((unused, ex) -> 
             plugin.getLogger().severe("Redis read failed: " + ex.getMessage());
             return;
         }
-        // .join() is non-blocking here — all futures are already complete
+        // .join() is non-blocking here - all futures are already complete
         String a = futureA.join();
         String b = futureB.join();
         String c = futureC.join();
@@ -140,11 +140,11 @@ CompletableFuture.allOf(futureA, futureB, futureC).whenComplete((unused, ex) -> 
 });
 ```
 
-### Replacing runTaskAsynchronously + .join() with whenComplete() → runTask()
+### Replacing runTaskAsynchronously + .join() with whenComplete() -> runTask()
 
 A common old pattern uses `runTaskAsynchronously` to get off the main thread, calls
 `borrow()` + `.join()` to block until Redis responds, then dispatches back with
-`runTask`. The entire `runTaskAsynchronously` wrapper can be eliminated — `borrow()`
+`runTask`. The entire `runTaskAsynchronously` wrapper can be eliminated - `borrow()`
 enqueues the command and returns immediately (no blocking), so it is safe to call on
 the main thread. Chain `whenComplete` directly inside the `try` block and dispatch
 any Bukkit API work back to the main thread via `runTask` from within the callback.
@@ -184,16 +184,16 @@ private static void myMethod(Plugin plugin) {
 Key points:
 - The intermediate `CompletableFuture` variable can be eliminated by chaining
   `.whenComplete()` directly on `.toCompletableFuture()` inside the `try` block.
-- Always handle the error case in `whenComplete` — the old `.join()` would throw
+- Always handle the error case in `whenComplete` - the old `.join()` would throw
   unchecked, losing the error; `whenComplete` requires explicit handling. Log with
   `plugin.getLogger().severe(...)` and `ex.printStackTrace()`.
-- `whenComplete` callbacks run on a Lettuce I/O thread — always dispatch back to
+- `whenComplete` callbacks run on a Lettuce I/O thread - always dispatch back to
   the main thread via `runTask` before touching any Bukkit/server state.
-- **Check indentation after refactoring** — removing the `runTaskAsynchronously`
+- **Check indentation after refactoring** - removing the `runTaskAsynchronously`
   wrapper reduces nesting by one level; the inner `runTask` lambda body should
   be indented accordingly.
 - Remove any imports that become unused after the refactor (`CompletableFuture`,
-  `java.util.List`, etc.) — PMD will flag them.
+  `java.util.List`, etc.) - PMD will flag them.
 
 ### Adding a multi() future to a pending-saves list
 

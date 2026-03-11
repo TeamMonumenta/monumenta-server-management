@@ -100,7 +100,7 @@ monumenta {
 
 ### Per-project Checkstyle suppressions
 
-Place a standard Checkstyle suppression file at `config/checkstyle/suppressions.xml` relative to the project root. It will be loaded automatically with `optional="true"` — projects without this file are unaffected.
+Place a standard Checkstyle suppression file at `config/checkstyle/suppressions.xml` relative to the project root. It will be loaded automatically with `optional="true"` - projects without this file are unaffected.
 
 Example `suppressions.xml`:
 
