@@ -82,11 +82,7 @@ public class Stash {
 			.withOptionalArguments(nameArg)
 			.withPermission(perms)
 			.executesPlayer((player, args) -> {
-					try {
-						MonumentaRedisSyncAPI.stashInfo(player, args.getByArgument(nameArg));
-					} catch (Exception ex) {
-						throw CommandAPI.failWithString(ex.getMessage());
-					}
+					MonumentaRedisSyncAPI.stashInfo(player, args.getByArgument(nameArg));
 				}
 			).register();
 

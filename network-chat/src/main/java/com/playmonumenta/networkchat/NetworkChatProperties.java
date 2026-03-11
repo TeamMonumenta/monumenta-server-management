@@ -128,7 +128,7 @@ public class NetworkChatProperties {
 					MMLog.info("Created config file.");
 				}
 			} catch (IOException e) {
-				MMLog.warning("Catch exception during create new file for config.yml. Reason: " + e.getMessage());
+				MMLog.warning("Caught exception creating config.yml", e);
 			}
 		}
 
@@ -161,7 +161,7 @@ public class NetworkChatProperties {
 		try {
 			config.save(configFile);
 		} catch (IOException e) {
-			MMLog.warning("Catch exception while save config.yml. Reason: " + e.getMessage());
+			MMLog.warning("Caught exception saving config.yml", e);
 		}
 	}
 }

@@ -1,17 +1,20 @@
 package com.playmonumenta.redissync.example;
 
+import com.google.common.eventbus.Subscribe;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.playmonumenta.redissync.RedisAPI;
-import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.connection.PostLoginEvent;
 import com.velocitypowered.api.proxy.Player;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import com.velocitypowered.api.proxy.Player;
+
 
 public class ExampleVelocityListener {
 	/*################################################################################
@@ -90,8 +93,12 @@ public class ExampleVelocityListener {
 		Player player = event.getPlayer();
 		UUID uuid = player.getUniqueId();
 
+		CompletableFuture<String> rawFuture;
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			rawFuture = conn.get(redisKey(uuid)).toCompletableFuture();
+		}
 		try {
-			String raw = RedisAPI.getInstance().async().get(redisKey(uuid)).get(5, TimeUnit.SECONDS);
+			String raw = rawFuture.get(5, TimeUnit.SECONDS);
 			if (raw == null) {
 				mPlugin.mLogger.info("No data for player {}", player.getUsername());
 			} else {
@@ -112,7 +119,9 @@ public class ExampleVelocityListener {
 
 		CustomData data = mAllPlayerData.remove(uuid);
 		if (data != null) {
-			RedisAPI.getInstance().async().set(redisKey(uuid), data.toJsonObject().toString());
+			try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+				conn.set(redisKey(uuid), data.toJsonObject().toString());
+			}
 		}
 	}
 

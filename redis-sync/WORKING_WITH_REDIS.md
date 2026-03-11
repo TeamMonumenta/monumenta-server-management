@@ -9,30 +9,32 @@ is the one-stop reference for any plugin dev working with Redis.
 
 ## Table of Contents
 
-1. [Threading model — the golden rule](#1-threading-model--the-golden-rule)
+1. [Threading model - the golden rule](#1-threading-model-the-golden-rule)
 2. [APIs at a glance](#2-apis-at-a-glance)
-3. [Low-level access — `RedisAPI`](#3-low-level-access--redisapi)
+3. [Low-level access - `RedisAPI`](#3-low-level-access-redisapi)
+   - [Regular access - `borrow()` / `borrowStringBytes()`](#31-regular-access-borrow-borrowstringbytes)
+   - [Atomic transactions - `multi()`](#32-atomic-transactions-multi)
 4. [High-level APIs](#4-high-level-apis)
    - [MonumentaRedisSyncAPI](#41-monumentaredissyncapi)
    - [RBoardAPI](#42-rboardapi)
    - [RemoteDataAPI](#43-remotedataapi)
    - [LeaderboardAPI](#44-leaderboardapi)
-   - [BukkitConfigAPI / CommonConfig](#45-bukkitconfigapi--commonconfig)
-   - [Advanced / rarely needed APIs](#46-advanced--rarely-needed-apis)
+   - [BukkitConfigAPI / CommonConfig](#45-bukkitconfigapi-commonconfig)
+   - [Advanced / rarely needed APIs](#46-advanced-rarely-needed-apis)
 5. [Core async patterns](#5-core-async-patterns)
-   - [NEVER — block the main thread](#51-never--block-the-main-thread)
-   - [OLD — `runTaskAsynchronously` + `.join()`](#52-old--runtaskasynchronously--join)
-   - [PREFERRED — `.whenComplete()` + Bukkit scheduler](#53-preferred--whencomplete--bukkit-scheduler)
+   - [NEVER - block the main thread](#51-never-block-the-main-thread)
+   - [OLD - `runTaskAsynchronously` + `.join()`](#52-old-runtaskasynchronously-join)
+   - [PREFERRED - `.whenComplete()` + Bukkit scheduler](#53-preferred-whencomplete-bukkit-scheduler)
    - [Error logging for writes](#54-error-logging-for-writes)
    - [Multiple parallel requests with `CompletableFuture.allOf()`](#55-multiple-parallel-requests-with-completablefutureallof)
-   - [Batching on an async thread — `LettuceFutures.awaitAll()`](#56-batching-on-an-async-thread--lettucefuturesawaitall)
-6. [Player plugin data — load / save lifecycle](#6-player-plugin-data--load--save-lifecycle)
+   - [Batching on an async thread - `LettuceFutures.awaitAll()`](#56-batching-on-an-async-thread-lettucefuturesawaitall)
+6. [Player plugin data - load / save lifecycle](#6-player-plugin-data-load-save-lifecycle)
 7. [Key naming conventions](#7-key-naming-conventions)
 8. [Quick reference](#8-quick-reference)
 
 ---
 
-## 1. Threading model — the golden rule
+## 1. Threading model - the golden rule
 
 Minecraft Paper runs a **single main game thread**. Nearly all Bukkit/Paper API
 methods are **not thread-safe** and must be called from the main thread.
@@ -55,7 +57,7 @@ the server.
 | `player.sendMessage(Component)` | Paper queues the packet; safe from any thread |
 | `CommandSender.sendMessage(Component)` | Same |
 | `plugin.getLogger().*` | Standard Java logging; always thread-safe |
-| `Bukkit.getScheduler().runTask(plugin, ...)` | Just enqueues — does not call Bukkit API itself |
+| `Bukkit.getScheduler().runTask(plugin, ...)` | Just enqueues - does not call Bukkit API itself |
 | `Bukkit.getScheduler().runTaskAsynchronously(plugin, ...)` | Same |
 | `player.getUniqueId()` | Immutable; safe |
 | `player.getName()` | Read-only in practice; safe |
@@ -63,11 +65,10 @@ the server.
 When in doubt, use `Bukkit.getScheduler().runTask(plugin, ...)` to get back
 onto the main thread before touching anything else.
 
-The Lettuce library (`RedisAPI.getInstance().async()`) returns
-`RedisFuture<T>`, which extends `CompletableFuture<T>`. Futures complete on
-a Lettuce I/O thread — neither the main thread nor a Bukkit async thread.
-When the callback needs to call Bukkit API, you **must** schedule back onto
-the main thread explicitly.
+`RedisAPI.borrow()` returns a `RedisFuture<T>`, which extends
+`CompletableFuture<T>`. Futures complete on a Lettuce I/O thread - neither
+the main thread nor a Bukkit async thread. When the callback needs to call
+Bukkit API, you **must** schedule back onto the main thread explicitly.
 
 ---
 
@@ -76,7 +77,7 @@ the main thread explicitly.
 | Class | Purpose |
 |---|---|
 | [`RedisAPI`](plugin/src/main/java/com/playmonumenta/redissync/RedisAPI.java) | Raw Lettuce connection. Entry point for all custom Redis commands. |
-| [`MonumentaRedisSyncAPI`](plugin/src/main/java/com/playmonumenta/redissync/MonumentaRedisSyncAPI.java) | Player data, UUID↔name lookup, server transfers, offline data access. |
+| [`MonumentaRedisSyncAPI`](plugin/src/main/java/com/playmonumenta/redissync/MonumentaRedisSyncAPI.java) | Player data, UUID<->name lookup, server transfers, offline data access. |
 | [`RBoardAPI`](plugin/src/main/java/com/playmonumenta/redissync/RBoardAPI.java) | Persistent cross-shard hash board (integers by name+key). |
 | [`RemoteDataAPI`](plugin/src/main/java/com/playmonumenta/redissync/RemoteDataAPI.java) | Per-player string key/value store, accessible from any shard. |
 | [`LeaderboardAPI`](plugin/src/main/java/com/playmonumenta/redissync/LeaderboardAPI.java) | Sorted-set leaderboards. |
@@ -84,18 +85,81 @@ the main thread explicitly.
 
 ---
 
-## 3. Low-level access — `RedisAPI`
+## 3. Low-level access - `RedisAPI`
+
+### 3.1 Regular access - `borrow()` / `borrowStringBytes()`
+
+All Redis commands must go through a `BorrowedCommands` handle obtained from
+`borrow()` or `borrowStringBytes()`. This handle holds a lock that prevents
+other threads from interleaving commands on the shared connection while it is
+open. The lock is held only for the duration of the try block - in practice
+just long enough to enqueue the command, which is near-instant.
 
 ```java
-// Always-valid singleton once MonumentaRedisSync is loaded
-RedisAPI api = RedisAPI.getInstance();
-
 // String keys, String values  (most common)
-RedisAsyncCommands<String, String> cmds = api.async();
+try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+    conn.hget("my:key", "field").whenComplete((value, ex) -> { ... });
+}
 
 // String keys, byte[] values  (binary data, e.g. NBT)
-RedisAsyncCommands<String, byte[]> cmds = api.asyncStringBytes();
+try (RedisAPI.BorrowedCommands<String, byte[]> conn = RedisAPI.borrowStringBytes()) {
+    conn.lindex("my:key", 0).whenComplete((bytes, ex) -> { ... });
+}
 ```
+
+`BorrowedCommands<K, V>` extends Lettuce's `AbstractRedisAsyncCommands<K, V>`,
+so it exposes the full async command set - `hget`, `hset`, `hmget`, `hgetall`,
+`hincrby`, `hdel`, `lpush`, `lindex`, `zadd`, `sadd`, etc. All commands return
+`RedisFuture<T>` (which extends `CompletableFuture<T>`).
+
+**Important rules:**
+- Always use `borrow()` inside a `try-with-resources` statement.
+- **Do not call join() or get() inside this try block!**
+- Do not store the `BorrowedCommands` object or pass it outside the try block.
+- Do not call `multi()` / `exec()` directly on a borrowed connection - use
+  [`RedisAPI.multi()`](#32-atomic-transactions-multi) instead.
+
+> `async()` and `asyncStringBytes()` are still present but **deprecated**.
+> Migrate any call sites to `borrow()` / `borrowStringBytes()`.
+
+---
+
+### 3.2 Atomic transactions - `multi()`
+
+Redis `MULTI`/`EXEC` runs a block of commands atomically - either all succeed
+or all fail. The shared Lettuce connection is a single TCP pipeline, which
+means if multiple threads independently call `multi()` and `exec()`, commands
+from different threads can interleave between them, corrupting the transaction.
+
+`RedisAPI.multi()` solves this by holding the connection lock for the entire
+block, issuing `MULTI` before the lambda and `EXEC` automatically afterwards.
+The connection cannot escape the lambda, and `EXEC` is always called (or
+`DISCARD` on exception).
+
+```java
+// ✅ Atomic transaction - both writes succeed or both fail
+RedisAPI.multi(conn -> {
+    conn.hset("my:key", "field1", "value1");
+    conn.hset("my:key", "field2", "value2");
+}).whenComplete((transactionResult, ex) -> {
+    Bukkit.getScheduler().runTask(plugin, () -> {
+        if (ex != null) {
+            plugin.getLogger().severe("Transaction failed: " + ex.getMessage());
+            return;
+        }
+        // transactionResult contains the result of each command in order
+    });
+});
+```
+
+The `CompletableFuture<TransactionResult>` returned by `multi()` completes when
+Redis has executed the transaction. `TransactionResult` contains the individual
+command results in the order they were issued, accessible by index.
+
+**Why not just call `conn.multi()` / `conn.exec()` inside `borrow()`?**
+You can, but the lock is released when the try block exits - which may happen
+before `exec()` is called if your code throws. `RedisAPI.multi()` guarantees
+`EXEC` or `DISCARD` is always called before the lock is released.
 
 ---
 
@@ -108,17 +172,17 @@ RedisAsyncCommands<String, byte[]> cmds = api.asyncStringBytes();
 #### UUID / name resolution
 
 ```java
-// Thread-safe — reads from an in-memory ConcurrentHashMap, callable from any thread
+// Thread-safe - reads from an in-memory ConcurrentHashMap, callable from any thread
 @Nullable String name = MonumentaRedisSyncAPI.cachedUuidToName(uuid);
 @Nullable UUID   uuid = MonumentaRedisSyncAPI.cachedNameToUuid("PlayerName");
 
-// Async — queries Redis, returns CompletableFuture (completes on Lettuce thread)
+// Async - queries Redis, returns CompletableFuture (completes on Lettuce thread)
 CompletableFuture<String> nameFuture = MonumentaRedisSyncAPI.uuidToName(uuid);
 CompletableFuture<UUID>   uuidFuture = MonumentaRedisSyncAPI.nameToUUID("PlayerName");
 ```
 
 Use cached variants whenever possible. A player on the current shard is
-guaranteed to be in the cache. A player on a different shard might not be —
+guaranteed to be in the cache. A player on a different shard might not be -
 handle the `null` case rather than falling back to a Redis lookup.
 
 #### Server transfers
@@ -133,7 +197,7 @@ MonumentaRedisSyncAPI.sendPlayer(player, "targetShardName", returnLocation);
 
 A convenience wrapper `MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(plugin, future, func)`
 exists but the explicit `.whenComplete()` + `Bukkit.getScheduler().runTask()` pattern
-(see [section 5.3](#53-preferred--whencomplete--bukkit-scheduler)) is preferred in new code.
+(see [section 5.3](#53-preferred-whencomplete-bukkit-scheduler)) is preferred in new code.
 
 ---
 
@@ -142,7 +206,7 @@ exists but the explicit `.whenComplete()` + `Bukkit.getScheduler().runTask()` pa
 [Source](plugin/src/main/java/com/playmonumenta/redissync/RBoardAPI.java)
 
 A cross-shard persistent hash-board. Each **board** is identified by a name
-(only `[-_$0-9A-Za-z]` are valid); each board is a map of `String → long`.
+(only `[-_$0-9A-Za-z]` are valid); each board is a map of `String -> long`.
 Stored at `{serverDomain}:rboard:{name}`.
 
 ```java
@@ -189,7 +253,7 @@ Per-player string key/value store visible from any shard.
 Stored at `{serverDomain}:playerdata:{uuid}:remotedata`.
 
 All methods dispatch immediately (suitable from main or async thread) but
-**complete on a Lettuce thread** — schedule back to main if you need Bukkit API.
+**complete on a Lettuce thread** - schedule back to main if you need Bukkit API.
 
 ```java
 // Read one key
@@ -278,7 +342,7 @@ CompletableFuture<Map<String, Integer>> scoresFuture =
     MonumentaRedisSyncAPI.getPlayerScores(uuid);
 
 scoresFuture.whenComplete((scores, ex) -> {
-    // Already on main thread — no extra scheduling needed
+    // Already on main thread - no extra scheduling needed
     if (ex != null) {
         plugin.getLogger().severe("Failed to get scores: " + ex.getMessage());
         return;
@@ -313,69 +377,50 @@ future.whenComplete((data, ex) -> {
 
 ## 5. Core async patterns
 
-### 5.1 NEVER — block the main thread
+### 5.1 NEVER - block the main thread
 
 ```java
-// ❌ WRONG — blocks main thread, causes server lag
-@EventHandler
-public void onPlayerJoin(PlayerJoinEvent event) {
-    String value = RedisAPI.getInstance().async()
-        .hget("my:key", "field")
-        .toCompletableFuture()
-        .join(); // NEVER call join() / get() on the main thread
+// ❌ WRONG - blocks main thread, causes server lag - even if the caller is async!
+public void myMethod() {
+    String value;
+    try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+        value = conn.hget("my:key", "field")
+            .toCompletableFuture()
+            .join(); // NEVER call join() / get() on the main thread
+    }
 }
 ```
 
 ---
 
-### 5.2 OLD — `runTaskAsynchronously` + `.join()`
-
-You will see this pattern in older code. It is **safe** (`.join()` is only
-called on an async thread, not the main thread) but suboptimal because it
-occupies a Bukkit thread for the entire duration of the blocking wait.
-
-```java
-// OLD pattern — acceptable but avoid in new code
-Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-    String history = RedisAPI.getInstance().async()
-        .hget(stashPath, playerUuid + "-history")
-        .toCompletableFuture()
-        .join();                         // blocks this async thread
-
-    Bukkit.getScheduler().runTask(plugin, () -> {
-        if (history == null) { /* ... */ return; }
-        player.sendMessage(history);
-    });
-});
-```
-
----
-
-### 5.3 PREFERRED — `.whenComplete()` + Bukkit scheduler
+### 5.2 PREFERRED - `.whenComplete()` + Bukkit scheduler
 
 Issue the Redis call from any thread, attach a callback that schedules onto
 the main thread. No threads are blocked, errors are handled explicitly.
 
 ```java
 // PREFERRED pattern
-RedisAPI.getInstance().async()
-    .hget(stashPath, playerUuid + "-history")
-    .whenComplete((history, ex) -> {
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            if (ex != null) {
-                plugin.getLogger().severe("Redis error: " + ex.getMessage());
-                ex.printStackTrace();
-                return;
-            }
-            if (history == null) { /* handle missing data */ return; }
-            player.sendMessage(history);
+try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+    conn.hget(stashPath, playerUuid + "-history")
+        .whenComplete((history, ex) -> {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (ex != null) {
+                    plugin.getLogger().severe("Redis error: " + ex.getMessage());
+                    ex.printStackTrace();
+                    return;
+                }
+                if (history == null) { /* handle missing data */ return; }
+                player.sendMessage(history);
+            });
         });
-    });
+}
 ```
 
-The callback lambda passed to `whenComplete` runs on a Lettuce I/O thread.
-The `Bukkit.getScheduler().runTask(plugin, ...)` call inside it schedules the
-inner lambda to run on the main thread on the next tick.
+The `borrow()` lock is released as soon as the try block exits - immediately
+after the command is enqueued, not when the future completes. The
+`.whenComplete()` callback runs later on a Lettuce I/O thread, and the inner
+`Bukkit.getScheduler().runTask()` schedules the result-handling onto the main
+thread.
 
 **Rule of thumb:** every `whenComplete` that touches Bukkit objects (players,
 worlds, entities, scoreboards) must have a `Bukkit.getScheduler().runTask()`
@@ -386,17 +431,18 @@ wrapper inside it.
 ### 5.4 Error logging for writes
 
 Writes that don't need a result should still log failures. `.exceptionally()` is
-the most concise way — it runs similarly to .whenComplete() but only when there
+the most concise way - it runs similarly to `.whenComplete()` but only when there
 is an exception.
 
 ```java
 // ✅ Write with error logging
-RedisAPI.getInstance().async()
-    .hset("my:key", "field", "value")
-    .exceptionally(ex -> {
-        plugin.getLogger().severe("Redis hset failed: " + ex.getMessage());
-        return null; // return value is required
-    });
+try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+    conn.hset("my:key", "field", "value")
+        .exceptionally(ex -> {
+            plugin.getLogger().severe("Redis hset failed: " + ex.getMessage());
+            return null; // return value is required
+        });
+}
 ```
 
 Alternatively, use `whenComplete` when you want to handle both success and
@@ -410,7 +456,7 @@ RemoteDataAPI.set(uuid, "questFlag", "done")
                 plugin.getLogger().severe("Failed to set quest flag: " + ex.getMessage());
                 return;
             }
-            // confirmed write succeeded — safe to update local state
+            // confirmed write succeeded - safe to update local state
             mLocalFlags.put(uuid, true);
         });
     });
@@ -431,7 +477,7 @@ future is **guaranteed to be complete**, so calling `.join()` on them is
 non-blocking. Error checking can be done in one place in the outer callback.
 
 ```java
-// ✅ Fan-out pattern — all futures dispatched simultaneously
+// ✅ Fan-out pattern - all futures dispatched simultaneously
 CompletableFuture<Long> quarryFuture = RBoardAPI.getAsLong("HuntsBoard", "NextQuarry", 0L);
 CompletableFuture<Long> baitedFuture = RBoardAPI.getAsLong("HuntsBoard", "IsBaited", 0L);
 
@@ -439,11 +485,11 @@ CompletableFuture.allOf(quarryFuture, baitedFuture)
     .whenComplete((unused, ex) -> {
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (ex != null) {
-                // At least one future failed — ex is the first failure encountered
+                // At least one future failed - ex is the first failure encountered
                 plugin.getLogger().severe("Failed to refresh hunts state: " + ex.getMessage());
                 return;
             }
-            // All futures succeeded. .join() is non-blocking here — they are already done.
+            // All futures succeeded. .join() is non-blocking here - they are already done.
             long nextQuarry = quarryFuture.join();
             boolean isBaited = baitedFuture.join() > 0;
             applyHuntsState(nextQuarry, isBaited);
@@ -456,12 +502,12 @@ CompletableFuture.allOf(quarryFuture, baitedFuture)
 **How `allOf` handles errors:** if any constituent future fails, `allOf()`
 completes exceptionally **immediately** with that failure, without waiting for
 the remaining futures. `ex` will be non-null and the early `return` ensures
-`.join()` is never called — those calls cannot throw. If both futures fail,
+`.join()` is never called - those calls cannot throw. If both futures fail,
 `allOf()` captures only the first exception; the second is silently dropped.
 
 ---
 
-### 5.6 Batching on an async thread — `LettuceFutures.awaitAll()`
+### 5.6 Batching on an async thread - `LettuceFutures.awaitAll()`
 
 Some code already runs on an async thread (e.g. inside
 `waitForPlayerToSaveThenAsync`). In that context it is acceptable to block the
@@ -473,12 +519,18 @@ calling `.get()` sequentially.
 ```java
 // ⚠ Acceptable (already on async thread) but fire-then-await, not sequential get()
 DataEventListener.waitForPlayerToSaveThenAsync(player, () -> {
-    RedisAPI api = RedisAPI.getInstance();
+    // Fire all reads at once - each borrow() is very brief
+    RedisFuture<byte[]> dataFuture;
+    RedisFuture<String> scoresFuture;
+    RedisFuture<String> pluginFuture;
 
-    // Fire all reads at once
-    RedisFuture<byte[]>  dataFuture    = api.asyncStringBytes().hget(stashPath, name + "-data");
-    RedisFuture<String>  scoresFuture  = api.async().hget(stashPath, name + "-scores");
-    RedisFuture<String>  pluginFuture  = api.async().hget(stashPath, name + "-plugins");
+    try (RedisAPI.BorrowedCommands<String, byte[]> conn = RedisAPI.borrowStringBytes()) {
+        dataFuture = conn.hget(stashPath, name + "-data");
+    }
+    try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+        scoresFuture = conn.hget(stashPath, name + "-scores");
+        pluginFuture = conn.hget(stashPath, name + "-plugins");
+    }
 
     // Wait for all of them together (one network round-trip worth of latency)
     try {
@@ -492,7 +544,7 @@ DataEventListener.waitForPlayerToSaveThenAsync(player, () -> {
         return;
     }
 
-    // Futures are resolved — .get() does not block here
+    // Futures are resolved - .get() does not block here
     byte[] data    = dataFuture.get();
     String scores  = scoresFuture.get();
     String plugins = pluginFuture.get();
@@ -511,7 +563,7 @@ DataEventListener.waitForPlayerToSaveThenAsync(player, () -> {
 
 ---
 
-## 6. Player plugin data — load / save lifecycle
+## 6. Player plugin data - load / save lifecycle
 
 The most common pattern for plugins that need persistent per-player data.
 Data is stored as a `JsonObject` inside the player's plugin data blob, keyed
@@ -520,7 +572,7 @@ by a unique plugin identifier string.
 ```java
 public class MyPluginListener implements Listener {
 
-    // Must be unique across all plugins — use your plugin name
+    // Must be unique across all plugins - use your plugin name
     private static final String KEY = "MyPlugin";
 
     private final Map<UUID, MyData> mPlayerData = new HashMap<>();
@@ -531,7 +583,7 @@ public class MyPluginListener implements Listener {
     }
 
     /**
-     * Load data on join. Data is retrieved from an in-memory cache — no Redis
+     * Load data on join. Data is retrieved from an in-memory cache - no Redis
      * round-trip occurs here. Must run at MONITOR priority (after redis-sync
      * has populated the cache at lower priorities).
      */
@@ -578,7 +630,7 @@ public class MyPluginListener implements Listener {
 ```
 
 See the full working example at
-[`example/src/main/java/…/ExampleServerListener.java`](example/src/main/java/com/playmonumenta/redissync/example/ExampleServerListener.java).
+[`example/src/main/java/.../ExampleServerListener.java`](example/src/main/java/com/playmonumenta/redissync/example/ExampleServerListener.java).
 
 ---
 
@@ -616,27 +668,39 @@ private static final String REDIS_PATH =
 ## 8. Quick reference
 
 ```java
-// ── Get the low-level async connection ──────────────────────────────────────
-RedisAsyncCommands<String, String> cmds = RedisAPI.getInstance().async();
-RedisAsyncCommands<String, byte[]> bin  = RedisAPI.getInstance().asyncStringBytes();
+// -- Borrow the connection (String/String) ------------------------------------
+try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+    conn.hget(key, field).whenComplete(...);
+    conn.hset(key, field, value).exceptionally(...);
+}
 
-// ── Common hash operations (all return CompletableFuture / RedisFuture) ─────
-cmds.hget(key, field)                     // read one field
-cmds.hmget(key, field1, field2, ...)      // read multiple fields
-cmds.hgetall(key)                         // read entire hash
-cmds.hset(key, field, value)              // write one field
-cmds.hset(key, map)                       // write multiple fields at once
-cmds.hincrby(key, field, delta)           // atomic increment
-cmds.hdel(key, field1, ...)               // delete fields
-cmds.del(key)                             // delete entire key
+// -- Borrow the connection (String/byte[]) ------------------------------------
+try (RedisAPI.BorrowedCommands<String, byte[]> conn = RedisAPI.borrowStringBytes()) {
+    conn.lpush(key, byteArray).whenComplete(...);
+}
 
-// ── Transaction (atomic multi-command block) ─────────────────────────────────
-cmds.multi();
-cmds.hset(...);     // enqueued
-cmds.hset(...);     // enqueued
-cmds.exec();        // fires all; returns CompletableFuture<TransactionResult>
+// -- Common hash operations (all return RedisFuture / CompletableFuture) ------
+conn.hget(key, field)                     // read one field
+conn.hmget(key, field1, field2, ...)      // read multiple fields
+conn.hgetall(key)                         // read entire hash
+conn.hset(key, field, value)              // write one field
+conn.hset(key, map)                       // write multiple fields at once
+conn.hincrby(key, field, delta)           // atomic increment
+conn.hdel(key, field1, ...)               // delete fields
+conn.del(key)                             // delete entire key
 
-// ── Attach callback, schedule to main thread ─────────────────────────────────
+// -- Atomic transaction (MULTI/EXEC) ------------------------------------------
+RedisAPI.multi(conn -> {
+    conn.hset(key, field1, value1);       // enqueued
+    conn.hset(key, field2, value2);       // enqueued
+}).whenComplete((transactionResult, ex) -> {
+    Bukkit.getScheduler().runTask(plugin, () -> {
+        if (ex != null) { /* log/handle */ return; }
+        // transactionResult.get(0), .get(1) - results by command index
+    });
+});
+
+// -- Attach callback, schedule to main thread ---------------------------------
 future.whenComplete((result, ex) -> {
     Bukkit.getScheduler().runTask(plugin, () -> {
         if (ex != null) { /* log/handle */ return; }
@@ -644,30 +708,30 @@ future.whenComplete((result, ex) -> {
     });
 });
 
-// ── Error-only logging for fire-and-forget writes ────────────────────────────
+// -- Error-only logging for fire-and-forget writes ----------------------------
 future.exceptionally(ex -> {
     plugin.getLogger().severe("Redis write failed: " + ex.getMessage());
     return null;
 });
 
-// ── Wait for multiple futures in parallel ────────────────────────────────────
+// -- Wait for multiple futures in parallel ------------------------------------
 CompletableFuture<T> futureA = ...;
 CompletableFuture<T> futureB = ...;
 CompletableFuture.allOf(futureA, futureB)
     .whenComplete((unused, ex) -> {
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (ex != null) { /* log */ return; }
-            // .join() is non-blocking — futures are already complete
+            // .join() is non-blocking - futures are already complete
             T a = futureA.join();
             T b = futureB.join();
         });
     });
 
-// ── Wait for multiple futures on an async thread ────────────────────────────
+// -- Wait for multiple futures on an async thread ----------------------------
 LettuceFutures.awaitAll(10, TimeUnit.SECONDS, redisFuture1, redisFuture2);
 // futures are now resolved; .get() won't block
 
-// ── High-level APIs ──────────────────────────────────────────────────────────
+// -- High-level APIs ----------------------------------------------------------
 RBoardAPI.getAsLong(boardName, key, defaultValue)   // CompletableFuture<Long>
 RBoardAPI.set(boardName, key, value)                // CompletableFuture<Long>
 RBoardAPI.add(boardName, key, delta)                // atomic increment
