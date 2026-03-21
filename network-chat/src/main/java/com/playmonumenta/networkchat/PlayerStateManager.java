@@ -126,7 +126,7 @@ public class PlayerStateManager implements Listener {
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 			conn.hset(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_PLAYER_EVENT_SETTINGS_KEY, playerEventSettingsJson.toString())
 				.exceptionally(ex -> {
-					MMLog.severe("Redis hset failed", ex);
+					MMLog.severe("Failed to save PlayerStateManager settings to redis", ex);
 					return null;
 				});
 		}

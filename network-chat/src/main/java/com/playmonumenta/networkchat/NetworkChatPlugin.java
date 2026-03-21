@@ -310,7 +310,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 			conn.hset(REDIS_CONFIG_PATH, REDIS_MESSAGE_FORMATS_KEY, dataJson.toString())
 				.exceptionally(ex -> {
-					MMLog.severe("Redis hset failed", ex);
+					MMLog.severe("saveFormats failed to set message formats in redis", ex);
 					return null;
 				});
 		}
@@ -372,7 +372,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 			conn.hset(REDIS_CONFIG_PATH, REDIS_CHAT_FILTERS_KEY, dataJson.toString())
 				.exceptionally(ex -> {
-					MMLog.severe("Redis hset failed", ex);
+					MMLog.severe("Failed to save global filters in redis", ex);
 					return null;
 				});
 		}

@@ -103,7 +103,7 @@ public class ChannelManager implements Listener {
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 			conn.smembers(forceloadStreamingChannel, REDIS_FORCELOADED_CHANNEL_PATH)
 				.exceptionally(ex -> {
-					MMLog.severe("Redis smembers failed", ex);
+					MMLog.severe("Failed to mark channel as forceloaded in redis", ex);
 					return null;
 				});
 		}
@@ -115,7 +115,7 @@ public class ChannelManager implements Listener {
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 			conn.hset(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_DEFAULT_CHANNELS_KEY, defaultChannelsJson.toString())
 				.exceptionally(ex -> {
-					MMLog.severe("Redis hset failed", ex);
+					MMLog.severe("Failed to save default channels in redis", ex);
 					return null;
 				});
 		}
@@ -275,7 +275,7 @@ public class ChannelManager implements Listener {
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 			conn.hset(REDIS_CHANNEL_NAME_TO_UUID_PATH, channelName, channelId.toString())
 				.exceptionally(ex -> {
-					MMLog.severe("Redis hset failed", ex);
+					MMLog.severe("Failed to reserve channel name '" + channelName + "' in redis", ex);
 					return null;
 				});
 		}
@@ -412,7 +412,7 @@ public class ChannelManager implements Listener {
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 			conn.hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, oldName)
 				.exceptionally(ex -> {
-					MMLog.severe("Redis hdel failed", ex);
+					MMLog.severe("forceRenameChannel failed to unregister old channel name '" + oldName + "' in redis", ex);
 					return null;
 				});
 		}
@@ -444,7 +444,7 @@ public class ChannelManager implements Listener {
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 			conn.hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, oldName)
 				.exceptionally(ex -> {
-					MMLog.severe("Redis hdel failed", ex);
+					MMLog.severe("renameChannel failed to unregister old channel name '" + oldName + "' in redis", ex);
 					return null;
 				});
 		}
@@ -520,7 +520,7 @@ public class ChannelManager implements Listener {
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 			conn.sadd(REDIS_FORCELOADED_CHANNEL_PATH, channel.getUniqueId().toString())
 				.exceptionally(ex -> {
-					MMLog.severe("Redis sadd failed", ex);
+					MMLog.severe("forceLoadChannel failed to add channel '" + channel.getUniqueId() + "' to redis", ex);
 					return null;
 				});
 		}
