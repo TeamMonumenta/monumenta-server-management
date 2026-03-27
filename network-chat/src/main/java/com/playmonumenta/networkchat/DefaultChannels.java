@@ -64,7 +64,7 @@ public class DefaultChannels {
 				try {
 					defaults.mDefaultsByType.put(key, UUID.fromString(valueJson.getAsString()));
 				} catch (Exception e) {
-					MMLog.warning("Failed to set default for " + key);
+					MMLog.warning("Failed to set default for " + key, e);
 				}
 			}
 		}

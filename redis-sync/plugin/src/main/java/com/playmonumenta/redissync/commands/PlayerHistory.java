@@ -6,7 +6,6 @@ import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.EntitySelectorArgument;
-import java.util.List;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -32,32 +31,33 @@ public class PlayerHistory {
 	}
 
 	private static void playerHistory(Plugin plugin, CommandSender sender, Player target) {
-		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-			// ASYNC
-			RedisAPI api = RedisAPI.getInstance();
-			List<String> history = api.async().lrange(MonumentaRedisSyncAPI.getRedisHistoryPath(target), 0, -1).toCompletableFuture().join();
-
-			Bukkit.getScheduler().runTask(plugin, () -> {
-				// SYNC
-				int idx = 0;
-				for (String hist : history) {
-					String[] split = hist.split("\\|");
-					if (split.length != 3) {
-						sender.sendMessage(Component.text("Got corrupted history with " + split.length + " entries: " + hist, NamedTextColor.RED));
-						continue;
-					}
-
-					sender.sendMessage(
-						Component.text(idx, NamedTextColor.AQUA)
-							.append(Component.space())
-							.append(Component.text(split[0], NamedTextColor.GOLD))
-							.append(Component.space())
-							.append(Component.text(MonumentaRedisSyncAPI.getTimeDifferenceSince(Long.parseLong(split[1])), NamedTextColor.WHITE))
-							.append(Component.text(" ago"))
-					);
-					idx += 1;
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.lrange(MonumentaRedisSyncAPI.getRedisHistoryPath(target), 0, -1).toCompletableFuture().whenComplete((history, ex) -> {
+				if (ex != null) {
+					sender.sendMessage(Component.text("Failed to load player history: " + ex.getMessage(), NamedTextColor.RED));
+					return;
 				}
-			});
+				Bukkit.getScheduler().runTask(plugin, () -> {
+					int idx = 0;
+					for (String hist : history) {
+						String[] split = hist.split("\\|");
+						if (split.length != 3) {
+							sender.sendMessage(Component.text("Got corrupted history with " + split.length + " entries: " + hist, NamedTextColor.RED));
+							continue;
+						}
+
+						sender.sendMessage(
+							Component.text(idx, NamedTextColor.AQUA)
+								.append(Component.space())
+								.append(Component.text(split[0], NamedTextColor.GOLD))
+								.append(Component.space())
+								.append(Component.text(MonumentaRedisSyncAPI.getTimeDifferenceSince(Long.parseLong(split[1])), NamedTextColor.WHITE))
+								.append(Component.text(" ago"))
+						);
+						idx += 1;
+					}
+				});
 		});
+		}
 	}
 }

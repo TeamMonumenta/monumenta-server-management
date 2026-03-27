@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
@@ -162,9 +161,7 @@ public class MessageManager implements Listener {
 		try {
 			message = Message.fromJson(object);
 		} catch (Exception e) {
-			MMLog.severe("Could not read Message from json:");
-			String exceptionMessage = e.getMessage();
-			MMLog.severe(Objects.requireNonNullElse(exceptionMessage, "Exception had no message set"));
+			MMLog.severe("Could not read Message from json", e);
 			return;
 		}
 
@@ -185,9 +182,7 @@ public class MessageManager implements Listener {
 			UUID messageId = UUID.fromString(object.getAsJsonPrimitive("id").getAsString());
 			message = getMessage(messageId);
 		} catch (Exception e) {
-			MMLog.severe("Could not read Message deletion request from json:");
-			String exceptionMessage = e.getMessage();
-			MMLog.severe(Objects.requireNonNullElse(exceptionMessage, "No message set for this exception"));
+			MMLog.severe("Could not read Message deletion request from json", e);
 			return;
 		}
 
@@ -204,9 +199,7 @@ public class MessageManager implements Listener {
 		try {
 			senderId = UUID.fromString(object.getAsJsonPrimitive("id").getAsString());
 		} catch (Exception e) {
-			MMLog.severe("Could not read delete from sender request from json:");
-			String exceptionMessage = e.getMessage();
-			MMLog.severe(Objects.requireNonNullElse(exceptionMessage, "No message was found with this exception"));
+			MMLog.severe("Could not read delete from sender request from json", e);
 			return;
 		}
 

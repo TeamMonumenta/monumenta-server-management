@@ -22,11 +22,7 @@ import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import dev.jorel.commandapi.arguments.GreedyStringArgument;
 import dev.jorel.commandapi.arguments.TextArgument;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
-import io.lettuce.core.RedisFuture;
-import io.lettuce.core.api.async.RedisAsyncCommands;
 import io.lettuce.core.output.ValueStreamingChannel;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -68,7 +64,7 @@ public class ChannelManager implements Listener {
 				mForceLoadedChannels.add(channelId);
 				loadChannel(channelId);
 			} catch (Exception e) {
-				MMLog.warning("Could not force-load channel ID " + value + ".");
+				MMLog.warning("Could not force-load channel ID " + value, e);
 			}
 		}
 	}
@@ -89,24 +85,40 @@ public class ChannelManager implements Listener {
 	public static void reload() {
 		mForceLoadedChannels.clear();
 
-		RedisAPI.getInstance().async().hget(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_DEFAULT_CHANNELS_KEY)
-			.thenApply(dataStr -> {
-			if (dataStr != null) {
-				Gson gson = new Gson();
-				JsonObject dataJson = gson.fromJson(dataStr, JsonObject.class);
-				mDefaultChannels = DefaultChannels.fromJson(dataJson);
-			}
-			return dataStr;
-		});
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hget(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_DEFAULT_CHANNELS_KEY).whenComplete((dataStr, ex) -> {
+				if (ex != null) {
+					MMLog.severe("Failed to load default channels", ex);
+					return;
+				}
+				if (dataStr != null) {
+					Gson gson = new Gson();
+					JsonObject dataJson = gson.fromJson(dataStr, JsonObject.class);
+					mDefaultChannels = DefaultChannels.fromJson(dataJson);
+				}
+			});
+		}
 
 		ValueStreamingChannel<String> forceloadStreamingChannel = new ForceloadStreamingChannel();
-		RedisAPI.getInstance().async().smembers(forceloadStreamingChannel, REDIS_FORCELOADED_CHANNEL_PATH);
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.smembers(forceloadStreamingChannel, REDIS_FORCELOADED_CHANNEL_PATH)
+				.exceptionally(ex -> {
+					MMLog.severe("Failed to mark channel as forceloaded in redis", ex);
+					return null;
+				});
+		}
 	}
 
 	public static void saveDefaultChannels() {
 		JsonObject defaultChannelsJson = mDefaultChannels.toJson();
 
-		RedisAPI.getInstance().async().hset(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_DEFAULT_CHANNELS_KEY, defaultChannelsJson.toString());
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hset(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_DEFAULT_CHANNELS_KEY, defaultChannelsJson.toString())
+				.exceptionally(ex -> {
+					MMLog.severe("Failed to save default channels in redis", ex);
+					return null;
+				});
+		}
 
 		JsonObject wrappedConfigJson = new JsonObject();
 		wrappedConfigJson.add(REDIS_DEFAULT_CHANNELS_KEY, defaultChannelsJson);
@@ -115,7 +127,7 @@ public class ChannelManager implements Listener {
 			                                             wrappedConfigJson,
 			                                             NetworkChatPlugin.getMessageTtl());
 		} catch (Exception e) {
-			MMLog.severe("Failed to broadcast " + NetworkChatPlugin.NETWORK_CHAT_CONFIG_UPDATE);
+			MMLog.severe("Failed to broadcast " + NetworkChatPlugin.NETWORK_CHAT_CONFIG_UPDATE, e);
 		}
 	}
 
@@ -260,7 +272,13 @@ public class ChannelManager implements Listener {
 			throw CommandUtils.fail(sender, "Channel " + channelName + " already exists!");
 		}
 		UUID channelId = channel.getUniqueId();
-		RedisAPI.getInstance().async().hset(REDIS_CHANNEL_NAME_TO_UUID_PATH, channelName, channelId.toString());
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hset(REDIS_CHANNEL_NAME_TO_UUID_PATH, channelName, channelId.toString())
+				.exceptionally(ex -> {
+					MMLog.severe("Failed to reserve channel name '" + channelName + "' in redis", ex);
+					return null;
+				});
+		}
 		mChannelNames.put(channelId, channelName);
 		mChannelIdsByName.put(channelName, channelId);
 		mChannels.put(channelId, channel);
@@ -362,10 +380,14 @@ public class ChannelManager implements Listener {
 				String channelIdStr = channelId.toString();
 
 				// Update Redis
-				RedisAsyncCommands<String, String> redisAsync = RedisAPI.getInstance().async();
-				redisAsync.hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, newName);
-				redisAsync.hdel(REDIS_CHANNELS_PATH, channelIdStr);
-				redisAsync.srem(REDIS_FORCELOADED_CHANNEL_PATH, channelIdStr);
+				RedisAPI.multi(conn -> {
+					conn.hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, newName);
+					conn.hdel(REDIS_CHANNELS_PATH, channelIdStr);
+					conn.srem(REDIS_FORCELOADED_CHANNEL_PATH, channelIdStr);
+				}).exceptionally(ex -> {
+					MMLog.severe("Redis transaction failed (forceRenameChannel delete)", ex);
+					return null;
+				});
 
 				// Broadcast to other shards
 				JsonObject wrappedChannelJson = new JsonObject();
@@ -387,7 +409,13 @@ public class ChannelManager implements Listener {
 		mChannelNames.put(channel.getUniqueId(), newName);
 
 		saveChannel(channel);
-		RedisAPI.getInstance().async().hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, oldName);
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, oldName)
+				.exceptionally(ex -> {
+					MMLog.severe("forceRenameChannel failed to unregister old channel name '" + oldName + "' in redis", ex);
+					return null;
+				});
+		}
 	}
 
 	public static void renameChannel(String oldName, String newName) throws WrapperCommandSyntaxException {
@@ -413,7 +441,13 @@ public class ChannelManager implements Listener {
 		mChannelNames.put(channel.getUniqueId(), newName);
 
 		saveChannel(channel);
-		RedisAPI.getInstance().async().hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, oldName);
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, oldName)
+				.exceptionally(ex -> {
+					MMLog.severe("renameChannel failed to unregister old channel name '" + oldName + "' in redis", ex);
+					return null;
+				});
+		}
 	}
 
 	public static void changeChannelDescription(String newChannelDescription, String channelName) throws WrapperCommandSyntaxException {
@@ -443,10 +477,14 @@ public class ChannelManager implements Listener {
 		String channelIdStr = channelId.toString();
 
 		// Update Redis
-		RedisAsyncCommands<String, String> redisAsync = RedisAPI.getInstance().async();
-		redisAsync.hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, channelName);
-		redisAsync.hdel(REDIS_CHANNELS_PATH, channelIdStr);
-		redisAsync.srem(REDIS_FORCELOADED_CHANNEL_PATH, channelIdStr);
+		RedisAPI.multi(conn -> {
+			conn.hdel(REDIS_CHANNEL_NAME_TO_UUID_PATH, channelName);
+			conn.hdel(REDIS_CHANNELS_PATH, channelIdStr);
+			conn.srem(REDIS_FORCELOADED_CHANNEL_PATH, channelIdStr);
+		}).exceptionally(ex -> {
+			MMLog.severe("Redis transaction failed (deleteChannel)", ex);
+			return null;
+		});
 
 		// Broadcast to other shards
 		JsonObject wrappedChannelJson = new JsonObject();
@@ -458,7 +496,7 @@ public class ChannelManager implements Listener {
 			                                             wrappedChannelJson,
 			                                             NetworkChatPlugin.getMessageTtl());
 		} catch (Exception e) {
-			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CHANNEL_UPDATE);
+			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CHANNEL_UPDATE, e);
 		}
 	}
 
@@ -479,7 +517,13 @@ public class ChannelManager implements Listener {
 	}
 
 	private static void forceLoadChannel(Channel channel) {
-		RedisAPI.getInstance().async().sadd(REDIS_FORCELOADED_CHANNEL_PATH, channel.getUniqueId().toString());
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.sadd(REDIS_FORCELOADED_CHANNEL_PATH, channel.getUniqueId().toString())
+				.exceptionally(ex -> {
+					MMLog.severe("forceLoadChannel failed to add channel '" + channel.getUniqueId() + "' to redis", ex);
+					return null;
+				});
+		}
 		mForceLoadedChannels.add(channel.getUniqueId());
 	}
 
@@ -498,12 +542,16 @@ public class ChannelManager implements Listener {
 
 		// Get the channel from Redis async
 		String channelIdStr = channelId.toString();
-		RedisFuture<String> channelDataFuture = RedisAPI.getInstance().async().hget(REDIS_CHANNELS_PATH, channelIdStr);
-		channelDataFuture.thenApply(channelData -> {
-			Bukkit.getScheduler().runTask(NetworkChatPlugin.getInstance(),
-				() -> loadChannelApply(channelId, channelData));
-			return channelData;
-		});
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hget(REDIS_CHANNELS_PATH, channelIdStr).whenComplete((channelData, ex) -> {
+				if (ex != null) {
+					MMLog.severe("Failed to load channel " + channelIdStr, ex);
+					return;
+				}
+				Bukkit.getScheduler().runTask(NetworkChatPlugin.getInstance(),
+					() -> loadChannelApply(channelId, channelData));
+			});
+		}
 		return loadingChannel;
 	}
 
@@ -569,11 +617,7 @@ public class ChannelManager implements Listener {
 			MMLog.finer("Channel " + channelId.toString() + " loaded, registering...");
 			registerLoadedChannel(channel);
 		} catch (Exception e) {
-			MMLog.severe("Caught exception trying to load channel " + channelId.toString() + ":");
-			StringWriter sw = new StringWriter();
-			PrintWriter pw = new PrintWriter(sw);
-			e.printStackTrace(pw);
-			MMLog.severe(sw.toString());
+			MMLog.severe("Caught exception trying to load channel " + channelId.toString(), e);
 			return;
 		}
 
@@ -609,9 +653,13 @@ public class ChannelManager implements Listener {
 		String channelJsonStr = channelJson.toString();
 
 		MMLog.finer("Saving channel " + channelIdStr + ".");
-		RedisAsyncCommands<String, String> redisAsync = RedisAPI.getInstance().async();
-		redisAsync.hset(REDIS_CHANNEL_NAME_TO_UUID_PATH, channelName, channelIdStr);
-		redisAsync.hset(REDIS_CHANNELS_PATH, channelIdStr, channelJsonStr);
+		RedisAPI.multi(conn -> {
+			conn.hset(REDIS_CHANNEL_NAME_TO_UUID_PATH, channelName, channelIdStr);
+			conn.hset(REDIS_CHANNELS_PATH, channelIdStr, channelJsonStr);
+		}).exceptionally(ex -> {
+			MMLog.severe("Redis transaction failed (saveChannel)", ex);
+			return null;
+		});
 
 		JsonObject wrappedChannelJson = new JsonObject();
 		wrappedChannelJson.addProperty("channelId", channelIdStr);
@@ -624,7 +672,7 @@ public class ChannelManager implements Listener {
 			                                             NetworkChatPlugin.getMessageTtl());
 			MMLog.finer("Broadcast channel " + channelIdStr + " changes.");
 		} catch (Exception e) {
-			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CHANNEL_UPDATE);
+			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CHANNEL_UPDATE, e);
 		}
 		if (!(channel instanceof ChannelInviteOnly)) {
 			forceLoadChannel(channel);
@@ -652,21 +700,25 @@ public class ChannelManager implements Listener {
 	}
 
 	private static void loadAllChannelNames() {
-		RedisFuture<Map<String, String>> channelDataFuture = RedisAPI.getInstance().async().hgetall(REDIS_CHANNEL_NAME_TO_UUID_PATH);
-		channelDataFuture.thenApply(channelStrIdsByName -> {
-			mChannelIdsByName.clear();
-			mChannelNames.clear();
-			if (channelStrIdsByName != null) {
-				for (Map.Entry<String, String> entry : channelStrIdsByName.entrySet()) {
-					String channelName = entry.getKey();
-					String channelIdStr = entry.getValue();
-					UUID channelId = UUID.fromString(channelIdStr);
-					mChannelIdsByName.put(channelName, channelId);
-					mChannelNames.put(channelId, channelName);
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hgetall(REDIS_CHANNEL_NAME_TO_UUID_PATH).whenComplete((channelStrIdsByName, ex) -> {
+				if (ex != null) {
+					MMLog.severe("Failed to load channel names", ex);
+					return;
 				}
-			}
-			return channelStrIdsByName;
-		});
+				mChannelIdsByName.clear();
+				mChannelNames.clear();
+				if (channelStrIdsByName != null) {
+					for (Map.Entry<String, String> entry : channelStrIdsByName.entrySet()) {
+						String channelName = entry.getKey();
+						String channelIdStr = entry.getValue();
+						UUID channelId = UUID.fromString(channelIdStr);
+						mChannelIdsByName.put(channelName, channelId);
+						mChannelNames.put(channelId, channelName);
+					}
+				}
+			});
+		}
 	}
 
 	private static void networkRelayChannelUpdate(JsonObject data) {
@@ -688,7 +740,7 @@ public class ChannelManager implements Listener {
 				}
 			}
 		} catch (Exception e) {
-			MMLog.severe("Got " + NETWORK_CHAT_CHANNEL_UPDATE + " channel with invalid data");
+			MMLog.severe("Got " + NETWORK_CHAT_CHANNEL_UPDATE + " channel with invalid data", e);
 			return;
 		}
 		String logIdName = "ID " + channelId;

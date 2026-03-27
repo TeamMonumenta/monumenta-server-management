@@ -8,6 +8,7 @@ import dev.jorel.commandapi.CommandAPICommand;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Level;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -61,8 +62,8 @@ public class UpgradeAllPlayers {
 				Bukkit.getServer().sendMessage(Component.text("Failed to save upgraded player: " + uuid).color(NamedTextColor.RED));
 			}
 		} catch (Exception ex) {
+			mrs.getLogger().log(Level.SEVERE, "Failed to upgrade player: " + uuid, ex);
 			Bukkit.getServer().sendMessage(Component.text("Failed to upgrade player: " + uuid + " : " + ex.getMessage()).color(NamedTextColor.RED));
-			ex.printStackTrace();
 		}
 	}
 
@@ -97,8 +98,8 @@ public class UpgradeAllPlayers {
 				}
 			}.runTaskTimer(mrs, 0, 1);
 		} catch (Exception ex) {
+			mrs.getLogger().log(Level.SEVERE, "Upgrade failed", ex);
 			Bukkit.getServer().sendMessage(Component.text("Upgrade failed: " + ex.getMessage()).color(NamedTextColor.RED));
-			ex.printStackTrace();
 		}
 	}
 }

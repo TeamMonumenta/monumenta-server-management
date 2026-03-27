@@ -89,7 +89,7 @@ public abstract class Channel {
 			try {
 				mMessageColor = MessagingUtils.colorFromString(messageColorString);
 			} catch (Exception e) {
-				MMLog.warning("Caught exception getting mMessageColor from json: " + e.getMessage());
+				MMLog.warning("Caught exception getting mMessageColor from json", e);
 			}
 		}
 
@@ -122,7 +122,7 @@ public abstract class Channel {
 					playerId = UUID.fromString(playerPermEntry.getKey());
 					playerAccessJson = playerPermEntry.getValue().getAsJsonObject();
 				} catch (Exception e) {
-					MMLog.warning("Caught exception getting ChannelAccess from json: " + e.getMessage());
+					MMLog.warning("Caught exception getting ChannelAccess from json", e);
 					continue;
 				}
 				ChannelAccess playerAccess = ChannelAccess.fromJson(playerAccessJson);

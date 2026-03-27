@@ -45,6 +45,7 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean, pm
     with(project.dependencies) {
         add("errorprone", "com.google.errorprone:error_prone_core:2.29.1")
         add("errorprone", "com.uber.nullaway:nullaway:0.10.18")
+        add("compileOnly", "com.google.errorprone:error_prone_annotations:2.29.1")
     }
 
     project.tasks.withType<_, JavaCompile> {

@@ -95,15 +95,20 @@ public class PlayerStateManager implements Listener {
 	}
 
 	public static void reload() {
-		RedisAPI.getInstance().async().hget(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_PLAYER_EVENT_SETTINGS_KEY)
-			.thenApply(dataStr -> {
-				if (dataStr != null) {
-					Gson gson = new Gson();
-					JsonObject dataJson = gson.fromJson(dataStr, JsonObject.class);
-					loadSettings(dataJson);
-				}
-				return dataStr;
-			});
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hget(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_PLAYER_EVENT_SETTINGS_KEY)
+				.whenComplete((dataStr, ex) -> {
+					if (ex != null) {
+						MMLog.severe("Failed to load player event settings", ex);
+						return;
+					}
+					if (dataStr != null) {
+						Gson gson = new Gson();
+						JsonObject dataJson = gson.fromJson(dataStr, JsonObject.class);
+						loadSettings(dataJson);
+					}
+				});
+		}
 	}
 
 	public static void loadSettings(JsonObject playerEventSettingsJson) {
@@ -118,7 +123,13 @@ public class PlayerStateManager implements Listener {
 		playerEventSettingsJson.add("message_visibility", mMessageVisibility.toJson());
 		playerEventSettingsJson.addProperty("is_default_chat", mIsDefaultChatPlugin);
 
-		RedisAPI.getInstance().async().hset(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_PLAYER_EVENT_SETTINGS_KEY, playerEventSettingsJson.toString());
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hset(NetworkChatPlugin.REDIS_CONFIG_PATH, REDIS_PLAYER_EVENT_SETTINGS_KEY, playerEventSettingsJson.toString())
+				.exceptionally(ex -> {
+					MMLog.severe("Failed to save PlayerStateManager settings to redis", ex);
+					return null;
+				});
+		}
 
 		JsonObject wrappedConfigJson = new JsonObject();
 		wrappedConfigJson.add(REDIS_PLAYER_EVENT_SETTINGS_KEY, playerEventSettingsJson);
@@ -127,7 +138,7 @@ public class PlayerStateManager implements Listener {
 				wrappedConfigJson,
 				NetworkChatPlugin.getMessageTtl());
 		} catch (Exception e) {
-			MMLog.severe("Failed to broadcast " + NetworkChatPlugin.NETWORK_CHAT_CONFIG_UPDATE);
+			MMLog.severe("Failed to broadcast " + NetworkChatPlugin.NETWORK_CHAT_CONFIG_UPDATE, e);
 		}
 	}
 
@@ -257,7 +268,7 @@ public class PlayerStateManager implements Listener {
 			} catch (Exception e) {
 				playerState = new PlayerState(player);
 				mPlayerStates.put(playerId, playerState);
-				MMLog.warning("Player's chat state could not be loaded and was reset " + playerName);
+				MMLog.warning("Player's chat state could not be loaded and was reset " + playerName, e);
 			}
 		}
 
@@ -341,7 +352,7 @@ public class PlayerStateManager implements Listener {
 				oldChatHistory.toJson(),
 				PlayerChatHistory.MAX_OFFLINE_HISTORY_SECONDS);
 		} catch (Exception e) {
-			MMLog.severe("Failed to broadcast " + PlayerChatHistory.NETWORK_CHAT_PLAYER_CHAT_HISTORY);
+			MMLog.severe("Failed to broadcast " + PlayerChatHistory.NETWORK_CHAT_PLAYER_CHAT_HISTORY, e);
 			mPlayerChatHistories.remove(playerId);
 		}
 	}
@@ -416,7 +427,7 @@ public class PlayerStateManager implements Listener {
 				}.runTaskLater(NetworkChatPlugin.getInstance(), 20 * PlayerChatHistory.MAX_OFFLINE_HISTORY_SECONDS);
 				MMLog.info("Got player chat history successfully");
 			} catch (Exception e) {
-				MMLog.severe("Got " + PlayerChatHistory.NETWORK_CHAT_PLAYER_CHAT_HISTORY + " with invalid data");
+				MMLog.severe("Got " + PlayerChatHistory.NETWORK_CHAT_PLAYER_CHAT_HISTORY + " with invalid data", e);
 			}
 		}
 	}

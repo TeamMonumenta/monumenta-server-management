@@ -63,7 +63,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 		try {
 			shardName = NetworkRelayAPI.getShardName();
 		} catch (Exception e) {
-			MMLog.severe("Failed to get shard name");
+			MMLog.severe("Failed to get shard name", e);
 		}
 		if (shardName == null) {
 			throw new RuntimeException("Got null shard name");
@@ -115,7 +115,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 		try {
 			zip = new ZipFile(getFile());
 		} catch (IOException ex) {
-			MMLog.severe("Could not load help data from plugin.");
+			MMLog.severe("Could not load help data from plugin", ex);
 		}
 		ChatCommand.register(this, zip);
 	}
@@ -139,54 +139,68 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 		getServer().getPluginManager().registerEvents(PlayerStateManager.getInstance(), this);
 		getServer().getPluginManager().registerEvents(this, this);
 
-		RedisAPI.getInstance().async().hget(REDIS_CONFIG_PATH, REDIS_MESSAGE_COLORS_KEY)
-			.thenApply(dataStr -> {
-			if (dataStr != null) {
-				Gson gson = new Gson();
-				JsonObject dataJson = gson.fromJson(dataStr, JsonObject.class);
-				colorsFromJson(dataJson);
-			}
-			return dataStr;
-		});
-
-		RedisAPI.getInstance().async().hget(REDIS_CONFIG_PATH, REDIS_MESSAGE_FORMATS_KEY)
-			.thenApply(dataStr -> {
-			if (dataStr != null) {
-				Gson gson = new Gson();
-				JsonObject dataJson = gson.fromJson(dataStr, JsonObject.class);
-				for (Map.Entry<String, JsonElement> entry : dataJson.entrySet()) {
-					String id = entry.getKey();
-					JsonElement element = entry.getValue();
-					if (!element.isJsonPrimitive()
-					  || !element.getAsJsonPrimitive().isString()) {
-						continue;
-					}
-					String value = element.getAsString();
-					mMessageFormats.put(id, value);
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hget(REDIS_CONFIG_PATH, REDIS_MESSAGE_COLORS_KEY)
+				.whenComplete((dataStr, ex) -> {
+				if (ex != null) {
+					MMLog.severe("Failed to load message colors", ex);
+					return;
 				}
-			}
-			return dataStr;
-		});
-
-		RedisAPI.getInstance().async().hget(REDIS_CONFIG_PATH, REDIS_CHAT_FILTERS_KEY)
-			.thenApply(dataStr -> {
-			if (dataStr != null) {
-				Gson gson = new Gson();
-				final JsonObject dataJson = gson.fromJson(dataStr, JsonObject.class);
-				Bukkit.getServer().getScheduler().runTask(INSTANCE,
-					() -> mGlobalChatFilter = ChatFilter.fromJson(Bukkit.getConsoleSender(), dataJson));
-			}
-			return dataStr;
-		});
-
-		RedisAPI.getInstance().async().hget(REDIS_CONFIG_PATH, REDIS_CHAT_MOD_LOG_KEY)
-			.thenApply(dataStr -> {
 				if (dataStr != null) {
-					Bukkit.getServer().getScheduler().runTask(INSTANCE,
-						() -> mChatModLogCommand = dataStr);
+					Gson gson = new Gson();
+					JsonObject dataJson = gson.fromJson(dataStr, JsonObject.class);
+					colorsFromJson(dataJson);
 				}
-				return dataStr;
 			});
+
+			conn.hget(REDIS_CONFIG_PATH, REDIS_MESSAGE_FORMATS_KEY)
+				.whenComplete((dataStr, ex) -> {
+				if (ex != null) {
+					MMLog.severe("Failed to load message formats", ex);
+					return;
+				}
+				if (dataStr != null) {
+					Gson gson = new Gson();
+					JsonObject dataJson = gson.fromJson(dataStr, JsonObject.class);
+					for (Map.Entry<String, JsonElement> entry : dataJson.entrySet()) {
+						String id = entry.getKey();
+						JsonElement element = entry.getValue();
+						if (!element.isJsonPrimitive()
+						  || !element.getAsJsonPrimitive().isString()) {
+							continue;
+						}
+						String value = element.getAsString();
+						mMessageFormats.put(id, value);
+					}
+				}
+			});
+
+			conn.hget(REDIS_CONFIG_PATH, REDIS_CHAT_FILTERS_KEY)
+				.whenComplete((dataStr, ex) -> {
+				if (ex != null) {
+					MMLog.severe("Failed to load chat filters", ex);
+					return;
+				}
+				if (dataStr != null) {
+					Gson gson = new Gson();
+					final JsonObject dataJson = gson.fromJson(dataStr, JsonObject.class);
+					Bukkit.getServer().getScheduler().runTask(INSTANCE,
+						() -> mGlobalChatFilter = ChatFilter.fromJson(Bukkit.getConsoleSender(), dataJson));
+				}
+			});
+
+			conn.hget(REDIS_CONFIG_PATH, REDIS_CHAT_MOD_LOG_KEY)
+				.whenComplete((dataStr, ex) -> {
+					if (ex != null) {
+						MMLog.severe("Failed to load chat mod log command", ex);
+						return;
+					}
+					if (dataStr != null) {
+						Bukkit.getServer().getScheduler().runTask(INSTANCE,
+							() -> mChatModLogCommand = dataStr);
+					}
+				});
+		}
 	}
 
 	@Override
@@ -244,7 +258,13 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			dataJson.addProperty(id, MessagingUtils.colorToString(color));
 		}
 
-		RedisAPI.getInstance().async().hset(REDIS_CONFIG_PATH, REDIS_MESSAGE_COLORS_KEY, dataJson.toString());
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hset(REDIS_CONFIG_PATH, REDIS_MESSAGE_COLORS_KEY, dataJson.toString())
+				.exceptionally(ex -> {
+					MMLog.severe("Redis hset failed", ex);
+					return null;
+				});
+		}
 
 		JsonObject wrappedConfigJson = new JsonObject();
 		wrappedConfigJson.add(REDIS_MESSAGE_COLORS_KEY, dataJson);
@@ -253,7 +273,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			                                             wrappedConfigJson,
 			                                             getMessageTtl());
 		} catch (Exception e) {
-			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CONFIG_UPDATE);
+			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CONFIG_UPDATE, e);
 		}
 	}
 
@@ -287,7 +307,13 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			dataJson.addProperty(id, format);
 		}
 
-		RedisAPI.getInstance().async().hset(REDIS_CONFIG_PATH, REDIS_MESSAGE_FORMATS_KEY, dataJson.toString());
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hset(REDIS_CONFIG_PATH, REDIS_MESSAGE_FORMATS_KEY, dataJson.toString())
+				.exceptionally(ex -> {
+					MMLog.severe("saveFormats failed to set message formats in redis", ex);
+					return null;
+				});
+		}
 
 		JsonObject wrappedConfigJson = new JsonObject();
 		wrappedConfigJson.add(REDIS_MESSAGE_FORMATS_KEY, dataJson);
@@ -296,7 +322,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			                                             wrappedConfigJson,
 			                                             getMessageTtl());
 		} catch (Exception e) {
-			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CONFIG_UPDATE);
+			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CONFIG_UPDATE, e);
 		}
 	}
 
@@ -343,7 +369,13 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 	public static void saveGlobalFilter() {
 		JsonObject dataJson = mGlobalChatFilter.toJson();
 
-		RedisAPI.getInstance().async().hset(REDIS_CONFIG_PATH, REDIS_CHAT_FILTERS_KEY, dataJson.toString());
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hset(REDIS_CONFIG_PATH, REDIS_CHAT_FILTERS_KEY, dataJson.toString())
+				.exceptionally(ex -> {
+					MMLog.severe("Failed to save global filters in redis", ex);
+					return null;
+				});
+		}
 
 		JsonObject wrappedConfigJson = new JsonObject();
 		wrappedConfigJson.add(REDIS_CHAT_FILTERS_KEY, dataJson);
@@ -352,7 +384,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 			                                             wrappedConfigJson,
 			                                             getMessageTtl());
 		} catch (Exception e) {
-			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CONFIG_UPDATE);
+			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CONFIG_UPDATE, e);
 		}
 	}
 

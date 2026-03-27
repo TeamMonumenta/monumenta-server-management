@@ -8,8 +8,8 @@ import com.velocitypowered.api.event.player.ServerPostConnectEvent;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
-import io.lettuce.core.api.async.RedisAsyncCommands;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -31,8 +31,12 @@ public class VelocityListener {
 		@Nullable RegisteredServer server = event.getInitialServer().orElse(null);
 		@Nullable String storedServerName = null;
 
+		CompletableFuture<String> serverFuture;
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			serverFuture = conn.hget(locationsKey(), player.getUniqueId().toString()).toCompletableFuture();
+		}
 		try {
-			storedServerName = RedisAPI.getInstance().async().hget(locationsKey(), player.getUniqueId().toString()).get(6, TimeUnit.SECONDS);
+			storedServerName = serverFuture.get(6, TimeUnit.SECONDS);
 		} catch (Exception ex) {
 			mPlugin.mLogger.warn("Exception while getting player location for '{}': {}", player.getUsername(), ex.getMessage(), ex);
 		}
@@ -87,7 +91,9 @@ public class VelocityListener {
 		if (reconnectServer == null || ProxyConfigAPI.getExcludedServers().contains(reconnectServer)) {
 			return;
 		}
-		RedisAPI.getInstance().async().hset(locationsKey(), player.getUniqueId().toString(), reconnectServer);
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.hset(locationsKey(), player.getUniqueId().toString(), reconnectServer);
+		}
 	}
 
 	@Subscribe
@@ -97,11 +103,10 @@ public class VelocityListener {
 		String name = player.getUsername();
 		UUID uuid = player.getUniqueId();
 
-		RedisAsyncCommands<String, String> async = RedisAPI.getInstance().async();
-		async.multi();
-		async.hset(uuidToNamePath, uuid.toString(), name);
-		async.hset(nameToUUIDPath, name, uuid.toString());
-		async.exec();
+		RedisAPI.multi(conn -> {
+			conn.hset(uuidToNamePath, uuid.toString(), name);
+			conn.hset(nameToUUIDPath, name, uuid.toString());
+		});
 	}
 
 	private String locationsKey() {
