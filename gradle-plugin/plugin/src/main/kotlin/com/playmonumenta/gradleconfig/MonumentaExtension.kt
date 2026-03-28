@@ -111,4 +111,24 @@ interface MonumentaExtension {
     fun publishingCredentials(name: String, token: String)
 
     fun gitPrefix(prefix: String)
+
+    /**
+     * Overrides the server subdirectory that artifacts are deployed into.
+     * Defaults to `"plugins"` for standard Bukkit plugins.
+     * Use `"mods"` for Fabric/mixin projects deployed via Fabric Loader.
+     *
+     * Affects all deploy targets: `server_config/{subdir}`, `dev{n}_shard_{subdir}`, etc.
+     *
+     * @param subdir The subdirectory name, e.g. `"mods"`.
+     */
+    fun serverConfigSubdir(subdir: String)
+
+    /**
+     * Overrides which task's output artifact is deployed.
+     * Defaults to `"shadowJar"` for standard Bukkit plugins.
+     * Use `"reobfJar"` for mixin projects where the production artifact is the reobfuscated JAR.
+     *
+     * @param taskName The task name, e.g. `"reobfJar"`.
+     */
+    fun deployArtifactTask(taskName: String)
 }

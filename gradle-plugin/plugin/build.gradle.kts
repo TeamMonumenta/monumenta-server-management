@@ -28,7 +28,7 @@ dependencies {
     implementation(libs.plugin.yml)
     implementation(libs.git.version)
     implementation(libs.shadow)
-    implementation(libs.paperweight.userdev)
+    compileOnly(libs.paperweight.userdev)
 
     shadowImplementation(libs.jsch)
 }
