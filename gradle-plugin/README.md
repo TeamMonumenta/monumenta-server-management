@@ -15,7 +15,7 @@ A Gradle plugin that provides standardized build configuration for all Monumenta
 ## Building
 
 ```bash
-./gradlew :plugin:build
+../gradlew :plugin:build
 ```
 
 The built JAR is produced at `plugin/build/libs/`.
@@ -29,7 +29,7 @@ Publishing to the Monumenta Maven repository requires credentials:
 ```bash
 export USERNAME=<maven-username>
 export TOKEN=<maven-token>
-./gradlew :plugin:publish
+../gradlew :plugin:publish
 ```
 
 - Tagged commits publish to `https://maven.playmonumenta.com/releases`
@@ -62,7 +62,7 @@ You can publish to your local Maven cache instead:
 
 ```bash
 # In the gradle-plugin directory:
-./gradlew :plugin:publishToMavenLocal
+../gradlew :plugin:publishToMavenLocal
 ```
 
 Then add `mavenLocal()` as the **first** entry in `pluginManagement.repositories` of the consuming project. Repeat the publish step whenever you change the plugin.

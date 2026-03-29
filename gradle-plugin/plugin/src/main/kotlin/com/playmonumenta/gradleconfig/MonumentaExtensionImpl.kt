@@ -400,13 +400,16 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
             "maven-publish"
         )
 
+        val adapterImplProjects = adapterImplementations.map { it.first }.toSet()
         setOf(
             pluginProject,
             adapterApiProject,
             adapterUnsupportedProject,
             *simpleProjects.toTypedArray(),
-            *adapterImplementations.map { it.first }.toTypedArray()
-        ).filterNotNull().forEach { setupProject(it, target, !disableJavadoc, pmdWarningsAsErrors, checkstyleWarningsAsErrors) }
+            *adapterImplProjects.toTypedArray()
+        ).filterNotNull().forEach { proj ->
+            setupProject(proj, target, !disableJavadoc && proj !in adapterImplProjects, pmdWarningsAsErrors, checkstyleWarningsAsErrors)
+        }
 
         if (hasAdapter) {
             val apiProject = adapterApiProject
