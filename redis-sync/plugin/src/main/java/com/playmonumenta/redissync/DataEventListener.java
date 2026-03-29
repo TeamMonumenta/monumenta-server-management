@@ -155,7 +155,7 @@ public class DataEventListener implements Listener {
 
 	/* ******************* Protected API ******************* */
 	protected static void setPlayerAsTransferring(Player player) throws Exception {
-		setPlayerAsTransferring(player,TRANSFER_UNLOCK_TIMEOUT_TICKS);
+		setPlayerAsTransferring(player, TRANSFER_UNLOCK_TIMEOUT_TICKS);
 	}
 
 	@SuppressWarnings("deprecation") // No replacement API exists for getShoulderEntityLeft/Right
@@ -182,7 +182,7 @@ public class DataEventListener implements Listener {
 		 */
 		TRANSFER_UNLOCK_TASKS.put(player.getUniqueId(), Bukkit.getScheduler().runTaskLater(MonumentaRedisSync.getInstance(), () -> {
 			if (isPlayerTransferring(player)) {
-				player.sendMessage(Component.text("Edmund test - Transferring timed out and your player has been unlocked", NamedTextColor.RED));
+				player.sendMessage(Component.text("Transferring timed out and your player has been unlocked", NamedTextColor.RED));
 				setPlayerAsNotTransferring(player);
 			}
 			TRANSFER_UNLOCK_TASKS.remove(player.getUniqueId());
