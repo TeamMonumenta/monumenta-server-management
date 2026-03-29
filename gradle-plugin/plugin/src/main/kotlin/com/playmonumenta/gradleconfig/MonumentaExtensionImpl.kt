@@ -83,7 +83,12 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean, pm
     with(project.extensions.getByType(PmdExtension::class.java)) {
         isConsoleOutput = true
         toolVersion = "7.13.0"
-        ruleSetConfig = project.embeddedResource("/pmd-ruleset.xml")
+        val localRuleset = target.rootProject.file("config/pmd/ruleset.xml")
+        ruleSetConfig = if (localRuleset.exists()) {
+            target.resources.text.fromFile(localRuleset)
+        } else {
+            project.embeddedResource("/pmd-ruleset.xml")
+        }
         isIgnoreFailures = !pmdWarningsAsErrors
     }
 
