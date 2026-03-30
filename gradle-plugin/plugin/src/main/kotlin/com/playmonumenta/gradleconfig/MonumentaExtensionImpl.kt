@@ -11,6 +11,7 @@ import org.gradle.api.Project
 import org.gradle.api.plugins.BasePluginExtension
 import org.gradle.api.plugins.ExtraPropertiesExtension
 import org.gradle.api.plugins.JavaPluginExtension
+import com.diffplug.gradle.spotless.SpotlessExtension
 import org.gradle.api.plugins.quality.Checkstyle
 import org.gradle.api.plugins.quality.CheckstyleExtension
 import org.gradle.api.plugins.quality.PmdExtension
@@ -29,6 +30,7 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean, pm
         "checkstyle",
         "net.ltgt.errorprone",
         "net.ltgt.nullaway",
+        "com.diffplug.spotless",
     )
 
     with(project.repositories) {
@@ -104,6 +106,22 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean, pm
         it.maxHeapSize.set("1g")
         it.configProperties?.set("checkstyle.suppressions.file",
             project.rootProject.file("config/checkstyle/suppressions.xml").absolutePath)
+    }
+
+    with(project.extensions.getByType(SpotlessExtension::class.java)) {
+        format("misc") {
+            it.target("*.kts")
+            it.trimTrailingWhitespace()
+            it.endWithNewline()
+        }
+        java {
+            // Regular imports first (alphabetical), then static imports — matches Checkstyle's
+            // THIRD_PARTY_PACKAGE###STATIC ordering. Note: "\\#" is the Spotless static import
+            // marker (parsed as \# at runtime); plain "#" would not match static imports.
+            it.importOrder("", "\\#")
+            it.removeUnusedImports()
+            it.endWithNewline()
+        }
     }
 
     project.charset("UTF-8")
