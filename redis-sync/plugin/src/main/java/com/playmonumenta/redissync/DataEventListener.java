@@ -115,7 +115,7 @@ public class DataEventListener implements Listener {
 	}
 
 	private static final Map<UUID, BukkitTask> TRANSFER_UNLOCK_TASKS = new HashMap<>(); // TODO Never queried
-	private static final int TRANSFER_UNLOCK_TIMEOUT_TICKS = 10 * 20;
+	protected static final int TRANSFER_UNLOCK_TIMEOUT_TICKS = 10 * 20;
 	private static final Component LOAD_ERROR_MSG =
 		Component.text("Critical error occurred when loading playerdata! Please notify a moderator.", NamedTextColor.RED);
 	@SuppressWarnings("NullAway") // Required to avoid many null checks, this class will always be instantiated if this plugin is loaded
@@ -154,9 +154,12 @@ public class DataEventListener implements Listener {
 	}
 
 	/* ******************* Protected API ******************* */
+	protected static void setPlayerAsTransferring(Player player) throws Exception {
+		setPlayerAsTransferring(player, TRANSFER_UNLOCK_TIMEOUT_TICKS);
+	}
 
 	@SuppressWarnings("deprecation") // No replacement API exists for getShoulderEntityLeft/Right
-	protected static void setPlayerAsTransferring(Player player) throws Exception {
+	protected static void setPlayerAsTransferring(Player player, int timeoutTicks) throws Exception {
 		if (INSTANCE.mTransferringPlayers.contains(player.getUniqueId())) {
 			throw new Exception("Player " + player.getName() + " is already transferring");
 		}
@@ -183,7 +186,7 @@ public class DataEventListener implements Listener {
 				setPlayerAsNotTransferring(player);
 			}
 			TRANSFER_UNLOCK_TASKS.remove(player.getUniqueId());
-		}, TRANSFER_UNLOCK_TIMEOUT_TICKS));
+		}, timeoutTicks));
 	}
 
 	protected static void setPlayerReturnParams(Player player, @Nullable Location returnLoc, @Nullable Float returnYaw, @Nullable Float returnPitch) {

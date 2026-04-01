@@ -14,6 +14,7 @@ import dev.jorel.commandapi.wrappers.Rotation;
 import io.lettuce.core.KeyValue;
 import io.lettuce.core.RedisFuture;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -235,10 +236,15 @@ public class MonumentaRedisSyncAPI {
 
 		player.sendMessage(Component.text("Transferring you to " + target, NamedTextColor.GOLD));
 
+		int timeoutTicks = DataEventListener.TRANSFER_UNLOCK_TIMEOUT_TICKS;
+		if (!Arrays.asList(NetworkRelayIntegration.getOnlineTransferTargets()).contains(target)) {
+			timeoutTicks = 25;
+		}
+
 		savePlayer(player);
 
 		/* Lock player during transfer and prevent data saving when they log out */
-		DataEventListener.setPlayerAsTransferring(player);
+		DataEventListener.setPlayerAsTransferring(player, timeoutTicks);
 
 		DataEventListener.waitForPlayerToSaveThenSync(player, () -> {
 			/*
