@@ -93,6 +93,7 @@ public class MonumentaRedisSync extends JavaPlugin {
 		// TODO: Set the default log level back to INFO, this is only for temporary debugging of the new redis borrow() system
 		setLogLevel(Level.FINE);
 		mRedisAPI = new RedisAPI(BukkitConfigAPI.getRedisHost(), BukkitConfigAPI.getRedisPort());
+		RedisAPI.setLogger(getLogger());
 		getServer().getPluginManager().registerEvents(new DataEventListener(this.getLogger(), mVersionAdapter), this);
 		getServer().getPluginManager().registerEvents(new ScoreboardCleanupListener(this, this.getLogger(), mVersionAdapter), this);
 		getServer().getPluginManager().registerEvents(AccountTransferManager.getInstance(), this);
