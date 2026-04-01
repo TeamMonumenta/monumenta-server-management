@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.logging.Logger;
 
 public class RedisAPI {
 	private static final class StringByteCodec implements RedisCodec<String, byte[]> {
@@ -61,6 +62,30 @@ public class RedisAPI {
 	public static final RedisCodec<String, String> STRING_STRING_CODEC = StringCodec.UTF8;
 	public static final RedisCodec<String, byte[]> STRING_BYTE_CODEC = StringByteCodec.INSTANCE;
 
+	/** @deprecated No longer has any effect; logging goes through {@link MonumentaRedisSync#getLogger()} directly. */
+	@Deprecated
+	static void setLogger(Logger logger) {
+	}
+
+	private static Logger logger() {
+		return MonumentaRedisSync.getInstance().getLogger();
+	}
+
+	private static String callerFrames() {
+		StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+		// skip: 0=getStackTrace, 1=callerFrames, 2=the RedisAPI entry method itself
+		int start = 3;
+		int end = Math.min(start + 5, stack.length);
+		StringBuilder sb = new StringBuilder();
+		for (int i = start; i < end; i++) {
+			if (sb.length() > 0) {
+				sb.append(" <- ");
+			}
+			sb.append(stack[i]);
+		}
+		return sb.toString();
+	}
+
 	@SuppressWarnings("NullAway") // Required to avoid many null checks, this class will always be instantiated if this plugin is loaded
 	private static RedisAPI INSTANCE = null;
 
@@ -98,7 +123,9 @@ public class RedisAPI {
 
 		@Override
 		public void close() {
+			logger().fine("[BorrowedCommands] releasing lock");
 			mLock.unlock();
+			logger().fine("[BorrowedCommands] lock released");
 		}
 	}
 
@@ -109,7 +136,10 @@ public class RedisAPI {
 	@MustBeClosed
 	public static BorrowedCommands<String, String> borrow() {
 		RedisAPI api = INSTANCE;
+		logger().fine("[borrow] caller: " + callerFrames());
+		logger().fine("[borrow] acquiring lock...");
 		api.mLock.lock();
+		logger().fine("[borrow] lock acquired");
 		return new BorrowedCommands<>(api.mConnection, STRING_STRING_CODEC, api.mLock);
 	}
 
@@ -120,7 +150,10 @@ public class RedisAPI {
 	@MustBeClosed
 	public static BorrowedCommands<String, byte[]> borrowStringBytes() {
 		RedisAPI api = INSTANCE;
+		logger().fine("[borrowStringBytes] caller: " + callerFrames());
+		logger().fine("[borrowStringBytes] acquiring lock...");
 		api.mBytesLock.lock();
+		logger().fine("[borrowStringBytes] lock acquired");
 		return new BorrowedCommands<>(api.mStringByteConnection, STRING_BYTE_CODEC, api.mBytesLock);
 	}
 
@@ -140,7 +173,10 @@ public class RedisAPI {
 	 */
 	public static CompletableFuture<TransactionResult> multi(Consumer<BorrowedCommands<String, String>> block) {
 		RedisAPI api = INSTANCE;
+		logger().fine("[multi] caller: " + callerFrames());
+		logger().fine("[multi] acquiring lock...");
 		api.mLock.lock();
+		logger().fine("[multi] lock acquired");
 		try {
 			BorrowedCommands<String, String> conn = new BorrowedCommands<>(api.mConnection, STRING_STRING_CODEC, api.mLock);
 			conn.multi();
@@ -150,7 +186,9 @@ public class RedisAPI {
 			api.mConnection.async().discard();
 			throw e;
 		} finally {
+			logger().fine("[multi] releasing lock");
 			api.mLock.unlock();
+			logger().fine("[multi] lock released");
 		}
 	}
 
@@ -163,7 +201,10 @@ public class RedisAPI {
 	 */
 	public static CompletableFuture<TransactionResult> multiStringBytes(Consumer<BorrowedCommands<String, byte[]>> block) {
 		RedisAPI api = INSTANCE;
+		logger().fine("[multiStringBytes] caller: " + callerFrames());
+		logger().fine("[multiStringBytes] acquiring lock...");
 		api.mBytesLock.lock();
+		logger().fine("[multiStringBytes] lock acquired");
 		try {
 			BorrowedCommands<String, byte[]> conn = new BorrowedCommands<>(api.mStringByteConnection, STRING_BYTE_CODEC, api.mBytesLock);
 			conn.multi();
@@ -173,7 +214,9 @@ public class RedisAPI {
 			api.mStringByteConnection.async().discard();
 			throw e;
 		} finally {
+			logger().fine("[multiStringBytes] releasing lock");
 			api.mBytesLock.unlock();
+			logger().fine("[multiStringBytes] lock released");
 		}
 	}
 
@@ -207,12 +250,14 @@ public class RedisAPI {
 	/** @deprecated Use {@link #borrow()} instead. */
 	@Deprecated
 	public RedisAsyncCommands<String, String> async() {
+		logger().fine("[async] caller: " + callerFrames());
 		return mConnection.async();
 	}
 
 	/** @deprecated Use {@link #borrowStringBytes()} instead. */
 	@Deprecated
 	public RedisAsyncCommands<String, byte[]> asyncStringBytes() {
+		logger().fine("[asyncStringBytes] caller: " + callerFrames());
 		return mStringByteConnection.async();
 	}
 
