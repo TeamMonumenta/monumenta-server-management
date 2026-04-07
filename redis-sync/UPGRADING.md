@@ -140,6 +140,77 @@ CompletableFuture.allOf(futureA, futureB, futureC).whenComplete((unused, ex) -> 
 });
 ```
 
+### DANGER: do not block the Lettuce I/O thread inside whenComplete()
+
+`whenComplete()` callbacks run on the **Lettuce I/O thread** — the single thread
+that both sends commands to and reads responses from Redis. Blocking it, or
+keeping it busy for a long time, stalls every other pending Redis response on the
+server.
+
+**Deadlock** — issuing a new Redis command and calling `.join()`/`.get()` on it
+inside a `whenComplete()` callback:
+
+```java
+// ❌ DEADLOCK - callback blocks the I/O thread waiting for a response it
+//    can never deliver to itself
+future.whenComplete((result, ex) -> {
+    try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+        String value = conn.hget("key", "field")
+            .toCompletableFuture()
+            .join(); // blocks forever - deadlock
+    }
+});
+```
+
+**Fix option 1 — chain another `.whenComplete()`** (the current callback returns
+immediately; the new callback fires later on the I/O thread):
+
+```java
+// ✅ Non-blocking chain
+future.whenComplete((result, ex) -> {
+    if (ex != null) { /* log */ return; }
+    try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+        conn.hget("key", "field").whenComplete((value, ex2) -> {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (ex2 != null) { /* log */ return; }
+                doSomething(value);
+            });
+        });
+    }
+});
+```
+
+**Fix option 2 — schedule onto a Bukkit async thread** (safe to block there):
+
+```java
+// ✅ Hand off to async thread before blocking
+future.whenComplete((result, ex) -> {
+    if (ex != null) { /* log */ return; }
+    Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        CompletableFuture<String> next;
+        try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+            next = conn.hget("key", "field").toCompletableFuture();
+        }
+        String value = next.join(); // safe on a Bukkit async thread
+        Bukkit.getScheduler().runTask(plugin, () -> doSomething(value));
+    });
+});
+```
+
+**Guideline:** keep `whenComplete()` callbacks short and non-blocking. Even
+work that never calls `.join()` / `.get()` — large JSON parsing, loops over
+big data sets, multiple chained Redis calls — should be handed off to a Bukkit
+async thread via `runTaskAsynchronously()` so the I/O thread is freed
+immediately.
+
+**Safe exception — `.join()` on already-complete futures:** inside a
+`CompletableFuture.allOf()` callback, the constituent futures are **guaranteed
+complete** before the callback fires, so `.join()` returns instantly without
+blocking. This is safe. Never call `.join()` on a future unless you have such a
+guarantee.
+
+---
+
 ### Replacing runTaskAsynchronously + .join() with whenComplete() -> runTask()
 
 A common old pattern uses `runTaskAsynchronously` to get off the main thread, calls
