@@ -15,7 +15,7 @@ A Gradle plugin that provides standardized build configuration for all Monumenta
 ## Building
 
 ```bash
-./gradlew :plugin:build
+../gradlew :plugin:build
 ```
 
 The built JAR is produced at `plugin/build/libs/`.
@@ -29,7 +29,7 @@ Publishing to the Monumenta Maven repository requires credentials:
 ```bash
 export USERNAME=<maven-username>
 export TOKEN=<maven-token>
-./gradlew :plugin:publish
+../gradlew :plugin:publish
 ```
 
 - Tagged commits publish to `https://maven.playmonumenta.com/releases`
@@ -62,7 +62,7 @@ You can publish to your local Maven cache instead:
 
 ```bash
 # In the gradle-plugin directory:
-./gradlew :plugin:publishToMavenLocal
+../gradlew :plugin:publishToMavenLocal
 ```
 
 Then add `mavenLocal()` as the **first** entry in `pluginManagement.repositories` of the consuming project. Repeat the publish step whenever you change the plugin.
@@ -114,6 +114,25 @@ Example `suppressions.xml`:
     <suppress files=".*[\\/]SomeGeneratedFile\.java"
               checks=".*"/>
 </suppressions>
+```
+
+### Per-project PMD ruleset override
+
+Place a custom PMD ruleset file at `config/pmd/ruleset.xml` relative to the project root. If this file exists it will be used instead of the embedded default ruleset. Projects without this file are unaffected.
+
+This is useful when the default ruleset contains rules that produce false positives for a specific project (e.g. mixin handler methods that are unreachable from Java source). The override file can reference any standard PMD rule categories directly:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="My Project PMD Ruleset"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.net/ruleset_2_0_0.xsd">
+  <description>Default ruleset minus rules that are false positives for this project.</description>
+
+  <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
+  <!-- ... include whichever rules apply; simply omit false-positive rules ... -->
+</ruleset>
 ```
 
 ### PMD violations as errors

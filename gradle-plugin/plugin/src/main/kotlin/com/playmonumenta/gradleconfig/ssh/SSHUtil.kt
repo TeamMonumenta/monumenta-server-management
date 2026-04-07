@@ -1,7 +1,9 @@
 package com.playmonumenta.gradleconfig.ssh
 
 import org.gradle.api.Project
-import org.gradle.jvm.tasks.Jar
+import org.gradle.api.Task
+import org.gradle.api.file.RegularFile
+import org.gradle.api.provider.Provider
 import java.nio.charset.StandardCharsets
 
 private fun getUsername(): String {
@@ -10,9 +12,11 @@ private fun getUsername(): String {
     if (envVar != null)
         return envVar
 
-    val git = Runtime.getRuntime().exec("git config user.name")
+    val git = ProcessBuilder("git", "config", "user.name")
+        .redirectErrorStream(true)
+        .start()
     git.waitFor()
-    return git.inputStream.readAllBytes().toString(StandardCharsets.UTF_8).lowercase().trim();
+    return git.inputStream.readAllBytes().toString(StandardCharsets.UTF_8).lowercase().trim()
 }
 
 fun attemptLockout(session: SessionHandler, domain: String, shard: String, time: Int) {
@@ -63,14 +67,14 @@ class ShardLockInfo(
 
 fun easyConfigureDeployTask(
     proj: Project,
-    shadowJarTask: Jar,
+    dependsOn: Task,
     name: String,
     category: String,
     action: () -> Unit
 ) {
-    proj.tasks.create(name) {
+    proj.tasks.register(name) {
         it.group = category
-        it.dependsOn(shadowJarTask)
+        it.dependsOn(dependsOn)
         it.doLast {
             action()
         }
@@ -79,7 +83,8 @@ fun easyConfigureDeployTask(
 
 fun easyCreateNormalDeploy(
     project: Project,
-    shadowJarTask: Jar,
+    dependsOn: Task,
+    deployFile: Provider<RegularFile>,
     ssh: RemoteConfig,
     name: String,
     projectName: String,
@@ -89,147 +94,157 @@ fun easyCreateNormalDeploy(
     if (paths.isEmpty())
         throw IllegalArgumentException("paths must be non-empty")
 
-    easyConfigureDeployTask(project, shadowJarTask, "$name-deploy-lock", "Deploy (locking)") {
+    easyConfigureDeployTask(project, dependsOn, "$name-deploy-lock", "Deploy (locking)") {
         with(SessionHandler(ssh)) {
             lockConfig?.doLock(this)
 
             for (path in paths)
                 execute("cd $path && rm -f ${projectName}-*.jar ${projectName}.jar")
             for (path in paths)
-                put(shadowJarTask.archiveFile.get().asFile, "${path}/${projectName}-${project.version}.jar")
+                put(deployFile.get().asFile, "${path}/${projectName}-${project.version}.jar")
         }
     }
 
-    easyConfigureDeployTask(project, shadowJarTask, "$name-deploy", "Deploy") {
+    easyConfigureDeployTask(project, dependsOn, "$name-deploy", "Deploy") {
         with(SessionHandler(ssh)) {
             for (path in paths)
                 execute("cd $path && rm -f ${projectName}-*.jar ${projectName}.jar")
             for (path in paths)
-                put(shadowJarTask.archiveFile.get().asFile, "${path}/${projectName}-${project.version}.jar")
+                put(deployFile.get().asFile, "${path}/${projectName}-${project.version}.jar")
         }
     }
 }
 
 fun easyCreateSymlinkDeploy(
     project: Project,
-    shadowJarTask: Jar,
+    dependsOn: Task,
+    deployFile: Provider<RegularFile>,
     ssh: RemoteConfig,
     name: String,
-    fileName: String,
+    symlinkBaseName: String,
     lockConfig: ShardLockInfo?,
     vararg paths: String
 ) {
     if (paths.isEmpty())
         throw IllegalArgumentException("paths must be non-empty")
 
-    easyConfigureDeployTask(project, shadowJarTask, "$name-deploy-lock", "Deploy (locking)") {
+    easyConfigureDeployTask(project, dependsOn, "$name-deploy-lock", "Deploy (locking)") {
         with(SessionHandler(ssh)) {
             lockConfig?.doLock(this)
 
+            val versionedFileName = deployFile.get().asFile.name
             for (path in paths)
-                put(shadowJarTask.archiveFile.get().asFile, path)
+                put(deployFile.get().asFile, path)
             for (path in paths)
-                execute("cd $path && rm -f $fileName.jar && ln -s ${shadowJarTask.archiveFileName.get()} $fileName.jar")
+                execute("cd $path && rm -f $symlinkBaseName.jar && ln -s $versionedFileName $symlinkBaseName.jar")
         }
     }
 
-    easyConfigureDeployTask(project, shadowJarTask, "$name-deploy", "Deploy") {
+    easyConfigureDeployTask(project, dependsOn, "$name-deploy", "Deploy") {
         with(SessionHandler(ssh)) {
+            val versionedFileName = deployFile.get().asFile.name
             for (path in paths)
-                put(shadowJarTask.archiveFile.get().asFile, path)
+                put(deployFile.get().asFile, path)
             for (path in paths)
-                execute("cd $path && rm -f $fileName.jar && ln -s ${shadowJarTask.archiveFileName.get()} $fileName.jar")
+                execute("cd $path && rm -f $symlinkBaseName.jar && ln -s $versionedFileName $symlinkBaseName.jar")
         }
     }
 }
 
-fun easySetup(project: Project, shadowJarTask: Jar) {
+fun easySetup(project: Project, dependsOn: Task, deployFile: Provider<RegularFile>, projectName: String, serverConfigSubdir: String = "plugins") {
     val basicssh = easyCreateRemote("basicssh", 8822)
     val adminssh = easyCreateRemote("adminssh", 9922)
-    val projectName = shadowJarTask.archiveBaseName.get()
 
     for (i in 1..4) {
         easyCreateNormalDeploy(
             project,
-            shadowJarTask,
+            dependsOn,
+            deployFile,
             basicssh,
             "dev$i",
             projectName,
             ShardLockInfo("build", "dev$i", 30),
-            "/home/epic/dev${i}_shard_plugins"
+            "/home/epic/dev${i}_shard_${serverConfigSubdir}"
         )
     }
 
     easyCreateNormalDeploy(
         project,
-        shadowJarTask,
+        dependsOn,
+        deployFile,
         basicssh,
         "futurama",
         projectName,
         ShardLockInfo("build", "futurama", 30),
-        "/home/epic/futurama_shard_plugins"
+        "/home/epic/futurama_shard_${serverConfigSubdir}"
     )
 
     easyCreateNormalDeploy(
         project,
-        shadowJarTask,
+        dependsOn,
+        deployFile,
         basicssh,
         "mob",
         projectName,
         ShardLockInfo("build", "mob", 30),
-        "/home/epic/mob_shard_plugins"
+        "/home/epic/mob_shard_${serverConfigSubdir}"
     )
 
     easyCreateSymlinkDeploy(
         project,
-        shadowJarTask,
+        dependsOn,
+        deployFile,
         basicssh,
         "stage",
         projectName,
         ShardLockInfo("stage", "*", 30),
-        "/home/epic/stage/m17/server_config/plugins",
-        "/home/epic/stage/m18/server_config/plugins"
+        "/home/epic/stage/m17/server_config/${serverConfigSubdir}",
+        "/home/epic/stage/m18/server_config/${serverConfigSubdir}"
     )
 
     easyCreateSymlinkDeploy(
         project,
-        shadowJarTask,
+        dependsOn,
+        deployFile,
         basicssh,
         "volt",
         projectName,
         ShardLockInfo("volt", "*", 30),
-        "/home/epic/volt/m17/server_config/plugins",
-        "/home/epic/volt/m18/server_config/plugins"
+        "/home/epic/volt/m17/server_config/${serverConfigSubdir}",
+        "/home/epic/volt/m18/server_config/${serverConfigSubdir}"
     )
 
     easyCreateSymlinkDeploy(
         project,
-        shadowJarTask,
+        dependsOn,
+        deployFile,
         adminssh,
         "m119",
         projectName,
         ShardLockInfo("build", "m119", 30),
-        "/home/epic/project_epic/m119/plugins"
+        "/home/epic/project_epic/m119/${serverConfigSubdir}"
     )
 
     easyCreateSymlinkDeploy(
         project,
-        shadowJarTask,
+        dependsOn,
+        deployFile,
         adminssh,
         "build",
         projectName,
         ShardLockInfo("build", "*", 0, true),
-        "/home/epic/project_epic/server_config/plugins"
+        "/home/epic/project_epic/server_config/${serverConfigSubdir}"
     )
 
     easyCreateSymlinkDeploy(
         project,
-        shadowJarTask,
+        dependsOn,
+        deployFile,
         adminssh,
         "play",
         projectName,
         ShardLockInfo("play", "*", 0, true),
-        "/home/epic/play/m17/server_config/plugins",
-        "/home/epic/play/m18/server_config/plugins"
+        "/home/epic/play/m17/server_config/${serverConfigSubdir}",
+        "/home/epic/play/m18/server_config/${serverConfigSubdir}"
     )
 }

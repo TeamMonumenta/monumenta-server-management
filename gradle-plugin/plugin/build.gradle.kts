@@ -29,6 +29,7 @@ dependencies {
     implementation(libs.git.version)
     implementation(libs.shadow)
     implementation(libs.paperweight.userdev)
+    implementation(libs.spotless)
 
     shadowImplementation(libs.jsch)
 }

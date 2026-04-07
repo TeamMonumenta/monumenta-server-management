@@ -3,7 +3,6 @@ package com.playmonumenta.gradleconfig
 import com.palantir.gradle.gitversion.VersionDetails
 import com.playmonumenta.gradleconfig.ssh.easySetup
 import groovy.lang.Closure
-import io.papermc.paperweight.userdev.PaperweightUserDependenciesExtension
 import net.ltgt.gradle.errorprone.CheckSeverity
 import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
 import net.minecrell.pluginyml.bungee.BungeePluginDescription
@@ -12,6 +11,7 @@ import org.gradle.api.Project
 import org.gradle.api.plugins.BasePluginExtension
 import org.gradle.api.plugins.ExtraPropertiesExtension
 import org.gradle.api.plugins.JavaPluginExtension
+import com.diffplug.gradle.spotless.SpotlessExtension
 import org.gradle.api.plugins.quality.Checkstyle
 import org.gradle.api.plugins.quality.CheckstyleExtension
 import org.gradle.api.plugins.quality.PmdExtension
@@ -30,6 +30,7 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean, pm
         "checkstyle",
         "net.ltgt.errorprone",
         "net.ltgt.nullaway",
+        "com.diffplug.spotless",
     )
 
     with(project.repositories) {
@@ -84,7 +85,12 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean, pm
     with(project.extensions.getByType(PmdExtension::class.java)) {
         isConsoleOutput = true
         toolVersion = "7.13.0"
-        ruleSetConfig = project.embeddedResource("/pmd-ruleset.xml")
+        val localRuleset = target.rootProject.file("config/pmd/ruleset.xml")
+        ruleSetConfig = if (localRuleset.exists()) {
+            target.resources.text.fromFile(localRuleset)
+        } else {
+            project.embeddedResource("/pmd-ruleset.xml")
+        }
         isIgnoreFailures = !pmdWarningsAsErrors
     }
 
@@ -100,6 +106,22 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean, pm
         it.maxHeapSize.set("1g")
         it.configProperties?.set("checkstyle.suppressions.file",
             project.rootProject.file("config/checkstyle/suppressions.xml").absolutePath)
+    }
+
+    with(project.extensions.getByType(SpotlessExtension::class.java)) {
+        format("misc") {
+            it.target("*.kts")
+            it.trimTrailingWhitespace()
+            it.endWithNewline()
+        }
+        java {
+            // Regular imports first (alphabetical), then static imports — matches Checkstyle's
+            // THIRD_PARTY_PACKAGE###STATIC ordering. Note: "\\#" is the Spotless static import
+            // marker (parsed as \# at runtime); plain "#" would not match static imports.
+            it.importOrder("", "\\#")
+            it.removeUnusedImports()
+            it.endWithNewline()
+        }
     }
 
     project.charset("UTF-8")
@@ -132,7 +154,9 @@ private fun setupVersion(project: Project, prefix: String?) {
     project.applyPlugin("com.palantir.git-version")
     val extra = project.extensions.getByType(ExtraPropertiesExtension::class.java)
 
+    @Suppress("UNCHECKED_CAST")
     val gitVersion = extra.get("gitVersion") as Closure<String>
+    @Suppress("UNCHECKED_CAST")
     val versionDetails = extra.get("versionDetails") as Closure<VersionDetails>
 
     project.group = "com.playmonumenta"
@@ -160,6 +184,8 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
     private var disableJavadoc: Boolean = false
     private var pmdWarningsAsErrors: Boolean = false
     private var checkstyleWarningsAsErrors: Boolean = false
+    private var serverConfigSubdir: String = "plugins"
+    private var deployArtifactTaskName: String = "shadowJar"
 
     private val deferActions: MutableList<() -> Unit> = ArrayList()
 
@@ -337,8 +363,9 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
         project.addImplementation(apiProject)
         project.applyPlugin("com.playmonumenta.paperweight-aw.userdev")
 
-        project.dependencies.extensions.getByType(PaperweightUserDependenciesExtension::class.java)
-            .paperDevBundle("${devBundle}-R0.1-SNAPSHOT")
+        val paperweightDepsExt = project.dependencies.extensions.getByName("paperweight")
+        paperweightDepsExt.javaClass.getMethod("paperDevBundle", String::class.java)
+            .invoke(paperweightDepsExt, "${devBundle}-R0.1-SNAPSHOT")
 
         pluginProject.addRuntimeOnly(
             pluginProject.dependencies.project(
@@ -382,8 +409,8 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
             throw IllegalStateException("name(...) must be called")
         }
 
-        if (this.pluginId == null) {
-            throw IllegalStateException("id(...) must be called")
+        if (this.pluginId == null && (isBukkitConfigured || isBungeeConfigured)) {
+            throw IllegalStateException("id(...) must be called before paper(...) or waterfall(...)")
         }
 
         pluginProject.applyPlugin(
@@ -391,13 +418,16 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
             "maven-publish"
         )
 
+        val adapterImplProjects = adapterImplementations.map { it.first }.toSet()
         setOf(
             pluginProject,
             adapterApiProject,
             adapterUnsupportedProject,
             *simpleProjects.toTypedArray(),
-            *adapterImplementations.map { it.first }.toTypedArray()
-        ).filterNotNull().forEach { setupProject(it, target, !disableJavadoc, pmdWarningsAsErrors, checkstyleWarningsAsErrors) }
+            *adapterImplProjects.toTypedArray()
+        ).filterNotNull().forEach { proj ->
+            setupProject(proj, target, !disableJavadoc && proj !in adapterImplProjects, pmdWarningsAsErrors, checkstyleWarningsAsErrors)
+        }
 
         if (hasAdapter) {
             val apiProject = adapterApiProject
@@ -439,10 +469,31 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
             archivesName.set(pluginName)
         }
 
-        easySetup(pluginProject, pluginProject.tasks.getByName("shadowJar") as Jar)
+        when (deployArtifactTaskName) {
+            "shadowJar" -> {
+                val shadowJar = pluginProject.tasks.getByName("shadowJar") as Jar
+                easySetup(pluginProject, shadowJar, shadowJar.archiveFile, shadowJar.archiveBaseName.get(), serverConfigSubdir)
+            }
+            "reobfJar" -> {
+                val reobfJar = pluginProject.tasks.getByName("reobfJar")
+                val outputJar = pluginProject.layout.file(
+                    reobfJar.outputs.files.elements.map { it.single().asFile }
+                )
+                easySetup(pluginProject, reobfJar, outputJar, pluginName!!, serverConfigSubdir)
+            }
+            else -> throw IllegalStateException("deployArtifactTask(\"$deployArtifactTaskName\") is not supported; use \"shadowJar\" or \"reobfJar\"")
+        }
     }
 
     override fun gitPrefix(prefix: String) {
         gitPrefix = prefix
+    }
+
+    override fun serverConfigSubdir(subdir: String) {
+        serverConfigSubdir = subdir
+    }
+
+    override fun deployArtifactTask(taskName: String) {
+        deployArtifactTaskName = taskName
     }
 }
