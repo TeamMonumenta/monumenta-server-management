@@ -12,6 +12,7 @@ import org.gradle.api.plugins.BasePluginExtension
 import org.gradle.api.plugins.ExtraPropertiesExtension
 import org.gradle.api.plugins.JavaPluginExtension
 import com.diffplug.gradle.spotless.SpotlessExtension
+import com.diffplug.spotless.LineEnding
 import org.gradle.api.plugins.quality.Checkstyle
 import org.gradle.api.plugins.quality.CheckstyleExtension
 import org.gradle.api.plugins.quality.PmdExtension
@@ -109,6 +110,7 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean, pm
     }
 
     with(project.extensions.getByType(SpotlessExtension::class.java)) {
+        lineEndings = LineEnding.UNIX
         format("misc") {
             it.target("*.kts")
             it.trimTrailingWhitespace()
