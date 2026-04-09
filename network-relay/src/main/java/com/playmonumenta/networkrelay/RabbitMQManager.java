@@ -170,8 +170,8 @@ public class RabbitMQManager {
 
 		/* Declare queue arguments */
 		Map<String, Object> queueArgs = new HashMap<>();
-		// To prevent messages from piling up while a shard is offline - delete a queue after 5 minutes
-		queueArgs.put("x-expires", 300000); // 5 minutes of inactivity (shard not responding/down) until the queue deletes itself
+		// To prevent messages from piling up while a shard is offline - delete a queue after 20 minutes
+		queueArgs.put("x-expires", 1200000); // 20 minutes of inactivity (shard not responding/down) until the queue deletes itself
 		/* Declare the queue for this shard */
 		mChannel.queueDeclare(shardName, false, false, false, queueArgs);
 		/* Bind the queue to the exchange */
