@@ -3,242 +3,174 @@ package com.playmonumenta.common;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import java.util.function.Supplier;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.config.Configurator;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class MMLog {
-	private static final class CustomLogger extends Logger {
-		private final Logger mLogger;
-		private Level mLevel;
-
-		private CustomLogger(Logger logger, Level level) {
-			super(logger.getName(), logger.getResourceBundleName());
-			mLogger = logger;
-			mLevel = level;
-		}
-
-		@Override
-		public void setLevel(Level level) {
-			mLevel = level;
-		}
-
-		@Override
-		public Level getLevel() {
-			return mLevel;
-		}
-
-		@Override
-		public void finest(Supplier<String> msg) {
-			if (mLevel.equals(Level.FINEST)) {
-				mLogger.info(msg);
-			}
-		}
-
-		@Override
-		public void finest(String msg) {
-			if (mLevel.equals(Level.FINEST)) {
-				mLogger.info(msg);
-			}
-		}
-
-		public void finest(String msg, Throwable thrown) {
-			if (mLevel.equals(Level.FINEST)) {
-				mLogger.log(Level.INFO, msg, thrown);
-			}
-		}
-
-		@Override
-		public void finer(Supplier<String> msg) {
-			if (mLevel.equals(Level.FINER) || mLevel.equals(Level.FINEST)) {
-				mLogger.info(msg);
-			}
-		}
-
-		@Override
-		public void finer(String msg) {
-			if (mLevel.equals(Level.FINER) || mLevel.equals(Level.FINEST)) {
-				mLogger.info(msg);
-			}
-		}
-
-		public void finer(String msg, Throwable thrown) {
-			if (mLevel.equals(Level.FINER) || mLevel.equals(Level.FINEST)) {
-				mLogger.log(Level.INFO, msg, thrown);
-			}
-		}
-
-		@Override
-		public void fine(Supplier<String> msg) {
-			if (mLevel.equals(Level.FINE) || mLevel.equals(Level.FINER) || mLevel.equals(Level.FINEST)) {
-				mLogger.info(msg);
-			}
-		}
-
-		@Override
-		public void fine(String msg) {
-			if (mLevel.equals(Level.FINE) || mLevel.equals(Level.FINER) || mLevel.equals(Level.FINEST)) {
-				mLogger.info(msg);
-			}
-		}
-
-		public void fine(String msg, Throwable thrown) {
-			if (mLevel.equals(Level.FINE) || mLevel.equals(Level.FINER) || mLevel.equals(Level.FINEST)) {
-				mLogger.log(Level.INFO, msg, thrown);
-			}
-		}
-
-		@Override
-		public void info(Supplier<String> msg) {
-			mLogger.info(msg);
-		}
-
-		@Override
-		public void info(String msg) {
-			mLogger.info(msg);
-		}
-
-		public void info(String msg, Throwable thrown) {
-			mLogger.log(Level.INFO, msg, thrown);
-		}
-
-		@Override
-		public void warning(Supplier<String> msg) {
-			mLogger.warning(msg);
-		}
-
-		@Override
-		public void warning(String msg) {
-			mLogger.warning(msg);
-		}
-
-		@Override
-		public void severe(Supplier<String> msg) {
-			mLogger.severe(msg);
-		}
-
-		@Override
-		public void severe(String msg) {
-			mLogger.severe(msg);
-		}
-
-		@Override
-		public void log(Level level, String msg, Throwable thrown) {
-			if (level.intValue() >= Level.INFO.intValue()) {
-				mLogger.log(level, msg, thrown);
-			} else if (level.intValue() >= mLevel.intValue()) {
-				mLogger.log(Level.INFO, msg, thrown);
-			}
-		}
-	}
-
-	private final CustomLogger mCustomLogger;
+	private final Logger mLogger;
 
 	public MMLog(JavaPlugin plugin, String commandName) {
-		mCustomLogger = new CustomLogger(plugin.getLogger(), Level.INFO);
+		mLogger = LogManager.getLogger(plugin.getName());
 		new CommandAPICommand(commandName)
 			.withSubcommand(new CommandAPICommand("changeloglevel")
 				.withPermission(CommandPermission.fromString(commandName + ".changeloglevel"))
 				.withSubcommand(new CommandAPICommand("INFO")
 					.executes((sender, args) -> {
-						mCustomLogger.setLevel(Level.INFO);
+						Configurator.setLevel(mLogger.getName(), Level.INFO);
 					}))
-				.withSubcommand(new CommandAPICommand("FINE")
+				.withSubcommand(new CommandAPICommand("DEBUG")
 					.executes((sender, args) -> {
-						mCustomLogger.setLevel(Level.FINE);
+						Configurator.setLevel(mLogger.getName(), Level.DEBUG);
 					}))
-				.withSubcommand(new CommandAPICommand("FINER")
+				.withSubcommand(new CommandAPICommand("TRACE")
 					.executes((sender, args) -> {
-						mCustomLogger.setLevel(Level.FINER);
-					}))
-				.withSubcommand(new CommandAPICommand("FINEST")
-					.executes((sender, args) -> {
-						mCustomLogger.setLevel(Level.FINEST);
+						Configurator.setLevel(mLogger.getName(), Level.TRACE);
 					}))
 			).register();
 	}
 
 	public Logger asLogger() {
-		return mCustomLogger;
+		return mLogger;
 	}
 
 	public void setLevel(Level level) {
-		mCustomLogger.setLevel(level);
+		Configurator.setLevel(mLogger.getName(), level);
 	}
 
 	public boolean isLevelEnabled(Level level) {
-		return level.intValue() >= mCustomLogger.getLevel().intValue();
+		return mLogger.isEnabled(level);
 	}
 
+	/** @deprecated Use {@link #trace(Supplier)} instead. */
+	@Deprecated
 	public void finest(Supplier<String> msg) {
-		mCustomLogger.finest(msg);
+		if (mLogger.isTraceEnabled()) {
+			mLogger.trace(msg.get());
+		}
 	}
 
+	/** @deprecated Use {@link #trace(String)} instead. */
+	@Deprecated
 	public void finest(String msg) {
-		mCustomLogger.finest(msg);
+		mLogger.trace(msg);
 	}
 
+	/** @deprecated Use {@link #trace(String, Throwable)} instead. */
+	@Deprecated
 	public void finest(String msg, Throwable throwable) {
-		mCustomLogger.finest(msg, throwable);
+		mLogger.trace(msg, throwable);
 	}
 
+	/** @deprecated Use {@link #trace(Supplier)} instead. */
+	@Deprecated
 	public void finer(Supplier<String> msg) {
-		mCustomLogger.finer(msg);
+		if (mLogger.isTraceEnabled()) {
+			mLogger.trace(msg.get());
+		}
 	}
 
+	/** @deprecated Use {@link #trace(String)} instead. */
+	@Deprecated
 	public void finer(String msg) {
-		mCustomLogger.finer(msg);
+		mLogger.trace(msg);
 	}
 
+	/** @deprecated Use {@link #trace(String, Throwable)} instead. */
+	@Deprecated
 	public void finer(String msg, Throwable throwable) {
-		mCustomLogger.finer(msg, throwable);
+		mLogger.trace(msg, throwable);
 	}
 
+	/** @deprecated Use {@link #debug(Supplier)} instead. */
+	@Deprecated
 	public void fine(Supplier<String> msg) {
-		mCustomLogger.fine(msg);
+		if (mLogger.isDebugEnabled()) {
+			mLogger.debug(msg.get());
+		}
 	}
 
+	/** @deprecated Use {@link #debug(String)} instead. */
+	@Deprecated
 	public void fine(String msg) {
-		mCustomLogger.fine(msg);
+		mLogger.debug(msg);
 	}
 
+	/** @deprecated Use {@link #debug(String, Throwable)} instead. */
+	@Deprecated
 	public void fine(String msg, Throwable throwable) {
-		mCustomLogger.fine(msg, throwable);
+		mLogger.debug(msg, throwable);
+	}
+
+	public void trace(Supplier<String> msg) {
+		if (mLogger.isTraceEnabled()) {
+			mLogger.trace(msg.get());
+		}
+	}
+
+	public void trace(String msg) {
+		mLogger.trace(msg);
+	}
+
+	public void trace(String msg, Throwable throwable) {
+		mLogger.trace(msg, throwable);
+	}
+
+	public void debug(Supplier<String> msg) {
+		if (mLogger.isDebugEnabled()) {
+			mLogger.debug(msg.get());
+		}
+	}
+
+	public void debug(String msg) {
+		mLogger.debug(msg);
+	}
+
+	public void debug(String msg, Throwable throwable) {
+		mLogger.debug(msg, throwable);
 	}
 
 	public void info(String msg) {
-		mCustomLogger.info(msg);
+		mLogger.info(msg);
 	}
 
 	public void info(Supplier<String> msg) {
-		mCustomLogger.info(msg);
+		if (mLogger.isInfoEnabled()) {
+			mLogger.info(msg.get());
+		}
 	}
 
 	public void info(String msg, Throwable throwable) {
-		mCustomLogger.info(msg, throwable);
+		mLogger.info(msg, throwable);
 	}
 
 	public void warning(Supplier<String> msg) {
-		mCustomLogger.warning(msg);
+		if (mLogger.isWarnEnabled()) {
+			mLogger.warn(msg.get());
+		}
 	}
 
 	public void warning(String msg) {
-		mCustomLogger.warning(msg);
+		mLogger.warn(msg);
 	}
 
 	public void warning(String msg, Throwable throwable) {
-		mCustomLogger.log(Level.WARNING, msg, throwable);
+		mLogger.warn(msg, throwable);
 	}
 
 	public void severe(Supplier<String> msg) {
-		mCustomLogger.severe(msg);
+		if (mLogger.isErrorEnabled()) {
+			mLogger.error(msg.get());
+		}
 	}
 
 	public void severe(String msg) {
-		mCustomLogger.severe(msg);
+		mLogger.error(msg);
 	}
 
 	public void severe(String msg, Throwable throwable) {
-		mCustomLogger.log(Level.SEVERE, msg, throwable);
+		mLogger.error(msg, throwable);
 	}
 }

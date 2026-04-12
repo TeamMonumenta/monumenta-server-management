@@ -7,6 +7,7 @@ plugins {
 dependencies {
 	compileOnly(libs.annotations)
 	compileOnly(libs.commandapi)
+	compileOnly(libs.log4j.core)
 }
 
 monumenta {

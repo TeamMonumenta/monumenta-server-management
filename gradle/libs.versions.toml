@@ -10,6 +10,7 @@ placeholderapi = "2.11.6"
 velocity = "3.3.0-SNAPSHOT"
 viaversion = "5.2.0"
 slf4j = "1.7.36"
+log4j = "2.17.1"
 mixinapi = "1.0.2"
 lettuce = "6.3.2.RELEASE"
 fawe = "2.9.1"
@@ -30,6 +31,7 @@ placeholderapi = { module = "me.clip:placeholderapi", version.ref = "placeholder
 velocity = { module = "com.velocitypowered:velocity-api", version.ref = "velocity" }
 viaversion = { module = "com.viaversion:viaversion-api", version.ref = "viaversion" }
 slf4j = { module = "org.slf4j:jul-to-slf4j", version.ref = "slf4j" }
+log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
 lettuce = { module = "io.lettuce:lettuce-core", version.ref = "lettuce" }
 mixinapi = { module = "com.playmonumenta.papermixins:plugin-api", version.ref = "mixinapi" }
 fawe-core = { module = "com.fastasyncworldedit:FastAsyncWorldEdit-Core", version.ref = "fawe" }
