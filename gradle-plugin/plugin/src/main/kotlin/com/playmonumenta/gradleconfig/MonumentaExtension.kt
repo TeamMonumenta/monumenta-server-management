@@ -42,6 +42,13 @@ interface MonumentaExtension {
     fun disableMaven()
 
     /**
+     * Disables server deployment for this project.
+     * Use for library subprojects (e.g. plugin-api) that are bundled into another artifact
+     * and should not be deployed standalone to the server.
+     */
+    fun disableDeploy()
+
+    /**
      * Disables javadoc for this project.
      */
     fun disableJavadoc()
