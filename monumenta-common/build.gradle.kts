@@ -8,6 +8,8 @@ dependencies {
 	compileOnly(libs.annotations)
 	compileOnly(libs.commandapi)
 	compileOnly(libs.log4j.core)
+	compileOnly(libs.velocity)
+	annotationProcessor(libs.velocity)
 }
 
 monumenta {
