@@ -183,6 +183,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
     private var pluginName: String? = null
     private var pluginId: String? = null
     private var disableMaven: Boolean = false
+    private var disableDeploy: Boolean = false
     private var disableJavadoc: Boolean = false
     private var pmdWarningsAsErrors: Boolean = false
     private var checkstyleWarningsAsErrors: Boolean = false
@@ -237,6 +238,10 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
 
     override fun disableMaven() {
         disableMaven = true
+    }
+
+    override fun disableDeploy() {
+        disableDeploy = true
     }
 
     override fun disableJavadoc() {
@@ -471,19 +476,21 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
             archivesName.set(pluginName)
         }
 
-        when (deployArtifactTaskName) {
-            "shadowJar" -> {
-                val shadowJar = pluginProject.tasks.getByName("shadowJar") as Jar
-                easySetup(pluginProject, shadowJar, shadowJar.archiveFile, shadowJar.archiveBaseName.get(), serverConfigSubdir)
+        if (!disableDeploy) {
+            when (deployArtifactTaskName) {
+                "shadowJar" -> {
+                    val shadowJar = pluginProject.tasks.getByName("shadowJar") as Jar
+                    easySetup(pluginProject, shadowJar, shadowJar.archiveFile, shadowJar.archiveBaseName.get(), serverConfigSubdir)
+                }
+                "reobfJar" -> {
+                    val reobfJar = pluginProject.tasks.getByName("reobfJar")
+                    val outputJar = pluginProject.layout.file(
+                        reobfJar.outputs.files.elements.map { it.single().asFile }
+                    )
+                    easySetup(pluginProject, reobfJar, outputJar, pluginName!!, serverConfigSubdir)
+                }
+                else -> throw IllegalStateException("deployArtifactTask(\"$deployArtifactTaskName\") is not supported; use \"shadowJar\" or \"reobfJar\"")
             }
-            "reobfJar" -> {
-                val reobfJar = pluginProject.tasks.getByName("reobfJar")
-                val outputJar = pluginProject.layout.file(
-                    reobfJar.outputs.files.elements.map { it.single().asFile }
-                )
-                easySetup(pluginProject, reobfJar, outputJar, pluginName!!, serverConfigSubdir)
-            }
-            else -> throw IllegalStateException("deployArtifactTask(\"$deployArtifactTaskName\") is not supported; use \"shadowJar\" or \"reobfJar\"")
         }
     }
 
