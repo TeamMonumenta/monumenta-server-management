@@ -13,7 +13,7 @@ Problems:
 - Level changes via `ChangeLogLevel` only updated the shadow variable inside `CustomLogger`; the actual underlying JUL handler was never changed.
 - Level tracking logic was duplicated across every plugin.
 
-The new approach is a shared `com.playmonumenta.common.MMLog` class backed by **log4j2** (`LogManager.getLogger(pluginId)`). Both Paper and Velocity use log4j2 as their logging backend (JUL calls from Bukkit are bridged into it). Using log4j2 directly means:
+The new approach is a shared `com.playmonumenta.common.MMLog` class backed by **log4j2** (`LogManager.getLogger(pluginName)`). Both Paper and Velocity use log4j2 as their logging backend (JUL calls from Bukkit are bridged into it). Using log4j2 directly means:
 
 - `Configurator.setLevel()` actually works — it changes the logger's effective level in log4j2's hierarchy.
 - Debug messages appear at `DEBUG` or `TRACE` level, not as fake `INFO`.
@@ -39,7 +39,7 @@ The new approach is a shared `com.playmonumenta.common.MMLog` class backed by **
 On Paper, each plugin registers `/changeloglevel <label> TRACE|DEBUG|INFO|WARN|ERROR`.
 On Velocity, the command is `/changeloglevelvelocity <label> TRACE|DEBUG|INFO|WARN|ERROR` to avoid conflicts.
 
-The label is derived automatically from the `MMLog` instance (`MMLog.getName()` returns the `pluginId` passed to its constructor), so `registerCommand` does not take a separate label argument. Use the plugin's display name as returned by `JavaPlugin.getName()` on Paper (e.g. `MonumentaNetworkRelay`, `MonumentaCommon`) — this keeps the command argument, permission node, and any `log4j2.xml` `<Logger name="...">` entries all consistent.
+The label is derived automatically from the `MMLog` instance (`MMLog.getName()` returns the `pluginName` passed to its constructor), so `registerCommand` does not take a separate label argument. Use the plugin's display name as returned by `JavaPlugin.getName()` on Paper (e.g. `MonumentaNetworkRelay`, `MonumentaCommon`) — this keeps the command argument, permission node, and any `log4j2.xml` `<Logger name="...">` entries all consistent.
 Permission is `<label>.changeloglevel` (all lowercase), e.g. `/changeloglevel MonumentaNetworkRelay INFO` requires `monumentanetworkrelay.changeloglevel`.
 
 **Admin note:** old subcommand argument names have changed:
@@ -238,9 +238,9 @@ public class MMLog {
      * Call once from the platform-specific plugin entry point before any logging.
      * On Paper pass {@code getName()}; on Velocity pass the string from the {@code @Plugin} annotation.
      */
-    public static void init(String pluginId) {
+    public static void init(String pluginName) {
         if (INSTANCE == null) {
-            INSTANCE = new com.playmonumenta.common.MMLog(pluginId);
+            INSTANCE = new com.playmonumenta.common.MMLog(pluginName);
         }
     }
 
