@@ -5,6 +5,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.velocitypowered.api.command.BrigadierCommand;
 import com.velocitypowered.api.command.CommandManager;
 import com.velocitypowered.api.command.CommandSource;
+import net.kyori.adventure.text.Component;
 import org.apache.logging.log4j.Level;
 
 /**
@@ -42,26 +43,31 @@ public final class MMLogVelocity {
 				.then(BrigadierCommand.literalArgumentBuilder("TRACE")
 					.executes(ctx -> {
 						log.setLevel(Level.TRACE);
+						ctx.getSource().sendMessage(Component.text("Log level for " + label + " set to TRACE"));
 						return 1;
 					}))
 				.then(BrigadierCommand.literalArgumentBuilder("DEBUG")
 					.executes(ctx -> {
 						log.setLevel(Level.DEBUG);
+						ctx.getSource().sendMessage(Component.text("Log level for " + label + " set to DEBUG"));
 						return 1;
 					}))
 				.then(BrigadierCommand.literalArgumentBuilder("INFO")
 					.executes(ctx -> {
 						log.setLevel(Level.INFO);
+						ctx.getSource().sendMessage(Component.text("Log level for " + label + " set to INFO"));
 						return 1;
 					}))
 				.then(BrigadierCommand.literalArgumentBuilder("WARN")
 					.executes(ctx -> {
 						log.setLevel(Level.WARN);
+						ctx.getSource().sendMessage(Component.text("Log level for " + label + " set to WARN"));
 						return 1;
 					}))
 				.then(BrigadierCommand.literalArgumentBuilder("ERROR")
 					.executes(ctx -> {
 						log.setLevel(Level.ERROR);
+						ctx.getSource().sendMessage(Component.text("Log level for " + label + " set to ERROR"));
 						return 1;
 					})));
 
