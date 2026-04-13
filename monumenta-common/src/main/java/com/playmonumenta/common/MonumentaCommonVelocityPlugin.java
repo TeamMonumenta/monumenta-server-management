@@ -24,7 +24,7 @@ public class MonumentaCommonVelocityPlugin {
 
 	@Subscribe
 	public void onProxyInit(ProxyInitializeEvent event) {
-		MMLog log = new MMLog(MonumentaCommonPlugin.PLUGIN_ID);
-		MMLogVelocity.registerCommand(log, mServer.getCommandManager(), this, "monumentaCommon");
+		MMLog log = new MMLog("MonumentaCommon");
+		MMLogVelocity.registerCommand(log, mServer.getCommandManager(), this);
 	}
 }

@@ -5,15 +5,15 @@ import dev.jorel.commandapi.CommandPermission;
 import org.apache.logging.log4j.Level;
 
 /**
- * Paper-side helper for registering the {@code /changeLogLevel} command.
+ * Paper-side helper for registering the {@code /changeloglevel} command.
  *
  * <p>This class is intentionally separate from {@link MMLog} so that loading {@link MMLog} on
  * Velocity does not trigger resolution of CommandAPI classes, which are absent on that platform.
  *
  * <p>Call from the Paper plugin entry point after constructing {@link MMLog}:
  * <pre>{@code
- * MMLog log = new MMLog("MyPlugin");
- * MMLogPaper.registerCommand(log, "myPlugin");
+ * MMLog log = new MMLog("MonumentaMyPlugin");
+ * MMLogPaper.registerCommand(log);
  * }</pre>
  */
 public final class MMLogPaper {
@@ -21,17 +21,20 @@ public final class MMLogPaper {
 	}
 
 	/**
-	 * Registers {@code /changeLogLevel <label> TRACE|DEBUG|INFO|WARN|ERROR} via CommandAPI.
+	 * Registers {@code /changeloglevel <name> TRACE|DEBUG|INFO|WARN|ERROR} via CommandAPI,
+	 * where {@code <name>} is {@link MMLog#getName()} — the same {@code pluginName} passed to the
+	 * constructor (e.g. {@code "MonumentaNetworkRelay"}).
 	 *
-	 * <p>The required permission is {@code <label>.changeloglevel}
-	 * (e.g. {@code networkRelay.changeloglevel}).
+	 * <p>The required permission is {@code <name>.changeloglevel} (all lowercase).
+	 * Using the logger name directly ensures the command argument and any
+	 * {@code log4j2.xml} {@code <Logger name="...">} entries refer to the same logger.
 	 *
-	 * @param log   the {@link MMLog} instance whose level will be changed
-	 * @param label identifier shown as the first argument (e.g. {@code "networkRelay"})
+	 * @param log the {@link MMLog} instance whose level will be changed
 	 */
-	public static void registerCommand(MMLog log, String label) {
+	public static void registerCommand(MMLog log) {
+		String label = log.getName();
 		String permission = label + ".changeloglevel";
-		new CommandAPICommand("changeLogLevel")
+		new CommandAPICommand("changeloglevel")
 			.withPermission(CommandPermission.fromString(permission))
 			.withSubcommand(new CommandAPICommand(label)
 				.withSubcommand(new CommandAPICommand("TRACE")

@@ -14,26 +14,25 @@ import org.apache.logging.log4j.core.config.Configurator;
  * {@code onProxyInit()} (Velocity), then call the appropriate {@code register*Command} method
  * to expose a level-change command in-game.
  *
- * <p>Paper registers {@code /changeLogLevel <label> TRACE|DEBUG|INFO|WARN|ERROR}.
- * Velocity registers {@code /changeLogLevelVelocity <label> TRACE|DEBUG|INFO|WARN|ERROR}.
+ * <p>Paper registers {@code /changeloglevel <label> TRACE|DEBUG|INFO|WARN|ERROR}.
+ * Velocity registers {@code /changeloglevelvelocity <label> TRACE|DEBUG|INFO|WARN|ERROR}.
  *
- * <p>Paper example (plugin entry point):
+ * <p>Paper example — derive the name from the plugin itself so it can never diverge from
+ * plugin.yml:
  * <pre>{@code
- * public MMLog mLog;
- *
  * public void onEnable() {
- *     mLog = new MMLog("MyPlugin");
- *     MMLogPaper.registerCommand(mLog, "myPlugin");
+ *     MMLog log = new MMLog(getName());   // getName() == plugin.yml "name:" field
+ *     MMLogPaper.registerCommand(log);
  * }
  * }</pre>
  *
- * <p>Velocity example (plugin entry point):
+ * <p>Velocity example — pass the string directly; it lives right next to the {@code @Plugin}
+ * annotation so drift is easy to spot:
  * <pre>{@code
- * public MMLog mLog;
- *
+ * // @Plugin(name = "MyPlugin", ...)
  * public void onProxyInit(ProxyInitializeEvent event) {
- *     mLog = new MMLog("MyPlugin");
- *     MMLogVelocity.registerCommand(mLog, mServer.getCommandManager(), this, "myPlugin");
+ *     MMLog log = new MMLog("MyPlugin");
+ *     MMLogVelocity.registerCommand(log, mServer.getCommandManager(), this);
  * }
  * }</pre>
  *
@@ -50,21 +49,29 @@ public class MMLog {
 	private final Logger mLogger;
 
 	/**
-	 * Creates a logger backed by log4j2 using {@code pluginId} as the logger name.
+	 * Creates a logger backed by log4j2 using {@code pluginName} as the logger name.
 	 *
-	 * <p>Use the same {@code pluginId} on both Paper and Velocity so that log4j2 level
-	 * changes (e.g. via config or the {@code changeLogLevel} command) apply regardless of
-	 * which platform the plugin is running on. The conventional value is the plugin's display
-	 * name as returned by {@code JavaPlugin.getName()} on Paper (e.g. {@code "MyPlugin"}).
+	 * <p>Use the same {@code pluginName} on both Paper and Velocity so that log4j2 level
+	 * changes (e.g. via config or the {@code changeloglevel} command) apply regardless of
+	 * which platform the plugin is running on. The value must match {@code JavaPlugin.getName()}
+	 * on Paper (e.g. {@code "MonumentaNetworkRelay"}) and must be passed as-is to
+	 * {@code MMLogPaper.registerCommand} / {@code MMLogVelocity.registerCommand} so that
+	 * in-game commands and {@code log4j2.xml} {@code <Logger name="...">} entries all refer
+	 * to the same logger.
 	 *
-	 * @param pluginId log4j2 logger name; should match across Paper and Velocity deployments
+	 * @param pluginName log4j2 logger name; should match across Paper and Velocity deployments
 	 */
-	public MMLog(String pluginId) {
-		mLogger = LogManager.getLogger(pluginId);
+	public MMLog(String pluginName) {
+		mLogger = LogManager.getLogger(pluginName);
 	}
 
 	public Logger asLogger() {
 		return mLogger;
+	}
+
+	/** Returns the log4j2 logger name (the {@code pluginName} passed to the constructor). */
+	public String getName() {
+		return mLogger.getName();
 	}
 
 	public void setLevel(Level level) {

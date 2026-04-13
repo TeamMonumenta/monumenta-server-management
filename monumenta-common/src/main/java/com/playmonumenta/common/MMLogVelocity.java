@@ -9,7 +9,7 @@ import net.kyori.adventure.text.Component;
 import org.apache.logging.log4j.Level;
 
 /**
- * Velocity-side helper for registering the {@code /changeLogLevelVelocity} command.
+ * Velocity-side helper for registering the {@code /changeloglevelvelocity} command.
  *
  * <p>This class is intentionally separate from {@link MMLog} so that loading {@link MMLog} on
  * Paper does not trigger resolution of Velocity API classes, which are absent on that platform.
@@ -17,7 +17,7 @@ import org.apache.logging.log4j.Level;
  * <p>Call from the Velocity plugin entry point after constructing {@link MMLog}:
  * <pre>{@code
  * MMLog log = new MMLog("MyPlugin");
- * MMLogVelocity.registerCommand(log, mServer.getCommandManager(), this, "myPlugin");
+ * MMLogVelocity.registerCommand(log, mServer.getCommandManager(), this);
  * }</pre>
  */
 public final class MMLogVelocity {
@@ -25,19 +25,23 @@ public final class MMLogVelocity {
 	}
 
 	/**
-	 * Registers {@code /changeLogLevelVelocity <label> TRACE|DEBUG|INFO|WARN|ERROR} via Brigadier.
+	 * Registers {@code /changeloglevelvelocity <name> TRACE|DEBUG|INFO|WARN|ERROR} via Brigadier,
+	 * where {@code <name>} is {@link MMLog#getName()} — the same {@code pluginName} passed to the
+	 * constructor (e.g. {@code "MonumentaNetworkRelay"}).
 	 *
-	 * <p>Uses a distinct command name ({@code changeLogLevelVelocity}) so it never conflicts with
-	 * the Paper command. The required permission is {@code <label>.changeloglevel}.
+	 * <p>Uses a distinct command name ({@code changeloglevelvelocity}) so it never conflicts with
+	 * the Paper command. The required permission is {@code <name>.changeloglevel} (all lowercase).
+	 * Using the logger name directly ensures the command argument and any
+	 * {@code log4j2.xml} {@code <Logger name="...">} entries refer to the same logger.
 	 *
 	 * @param log            the {@link MMLog} instance whose level will be changed
 	 * @param commandManager the Velocity proxy's command manager
 	 * @param plugin         the Velocity plugin instance registering the command
-	 * @param label          identifier shown as the first argument (e.g. {@code "networkRelay"})
 	 */
-	public static void registerCommand(MMLog log, CommandManager commandManager, Object plugin, String label) {
+	public static void registerCommand(MMLog log, CommandManager commandManager, Object plugin) {
+		String label = log.getName();
 		String permission = label + ".changeloglevel";
-		LiteralArgumentBuilder<CommandSource> root = BrigadierCommand.literalArgumentBuilder("changeLogLevelVelocity")
+		LiteralArgumentBuilder<CommandSource> root = BrigadierCommand.literalArgumentBuilder("changeloglevelvelocity")
 			.requires(source -> source.hasPermission(permission))
 			.then(BrigadierCommand.literalArgumentBuilder(label)
 				.then(BrigadierCommand.literalArgumentBuilder("TRACE")

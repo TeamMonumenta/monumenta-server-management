@@ -22,15 +22,15 @@ Each Monumenta plugin has a named logger. By default all loggers follow the serv
 
 On a Paper server:
 ```
-/changeLogLevel <label> <LEVEL>
+/changeloglevel <label> <LEVEL>
 ```
 
 On a Velocity proxy:
 ```
-/changeLogLevelVelocity <label> <LEVEL>
+/changeloglevelvelocity <label> <LEVEL>
 ```
 
-Replace `<label>` with the plugin's label (e.g. `networkRelay`, `scriptedQuests`) and `<LEVEL>` with one of the levels above. The change takes effect immediately and lasts until the server restarts. Requires the `<label>.changeloglevel` permission.
+Replace `<label>` with the plugin's full name — the same string used as the log4j2 logger name (e.g. `MonumentaNetworkRelay`, `ScriptedQuests`) — and `<LEVEL>` with one of the levels above. The change takes effect immediately and lasts until the server restarts. Requires the `<label>.changeloglevel` permission (all lowercase, e.g. `monumentanetworkrelay.changeloglevel`).
 
 ### Set a plugin's default level permanently (log4j2 config)
 
@@ -47,7 +47,7 @@ To persist a non-INFO default across restarts, add a `<Logger>` entry to the ser
 </Loggers>
 ```
 
-- `name` — the plugin's logger name (same as the `<label>` used in the command)
+- `name` — the plugin's logger name; must exactly match the `<label>` used in the command (e.g. `MonumentaNetworkRelay`)
 - `level` — the desired default level
 - `additivity="false"` — prevents log messages appearing twice
 - `AppenderRef ref="Async"` — routes output through the same appender chain as everything else
