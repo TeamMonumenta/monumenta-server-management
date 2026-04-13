@@ -166,8 +166,7 @@ public final class RemotePlayerManagerVelocity extends RemotePlayerManagerAbstra
 		try {
 			mServer.getEventManager().fire(remotePE).get(5, TimeUnit.SECONDS);
 		} catch (Exception ex) {
-			MMLog.severe("Timeout for 5 seconds when gathering player plugin data");
-			ex.printStackTrace();
+			MMLog.severe("Timeout for 5 seconds when gathering player plugin data", ex);
 		}
 		return remotePE.getPluginData();
 	}

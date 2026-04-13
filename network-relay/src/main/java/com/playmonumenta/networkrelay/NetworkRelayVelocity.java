@@ -4,6 +4,7 @@ import com.google.inject.Inject;
 import com.playmonumenta.networkrelay.commands.WhereIsCommandVelocity;
 import com.playmonumenta.networkrelay.config.BungeeConfig;
 import com.playmonumenta.networkrelay.config.CommonConfig;
+import com.playmonumenta.networkrelay.util.MMLog;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
@@ -16,7 +17,6 @@ import java.util.concurrent.TimeUnit;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
-import org.slf4j.bridge.SLF4JBridgeHandler;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurateException;
 import org.spongepowered.configurate.objectmapping.ConfigSerializable;
@@ -32,6 +32,7 @@ import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 	description = "",
 	authors = {""},
 	dependencies = {
+		@Dependency(id = "monumenta-common"),
 		@Dependency(id = "viaversion", optional = true)
 	}
 )
@@ -39,7 +40,6 @@ public class NetworkRelayVelocity {
 	public static @MonotonicNonNull NetworkRelayVelocity INSTANCE;
 	public final ProxyServer mServer;
 	public final Logger mLogger;
-	public final java.util.logging.Logger mOldLogger;
 	private @Nullable RabbitMQManager mRabbitMQManager = null;
 	private final YamlConfigurationLoader mLoader; // Config reader & writer
 	private @Nullable CommentedConfigurationNode mBaseConfig; // backing config node for the class
@@ -61,10 +61,7 @@ public class NetworkRelayVelocity {
 		// init RabbitMQ single thread mimic - usb
 		NetworkRelayVelocityExecutor.getInstance();
 
-		// TODO: remove this when we migrate completely to slf4j
-		java.util.logging.Logger julLogger = java.util.logging.Logger.getLogger("MonumentaNetworkRelay");
-		julLogger.addHandler(new SLF4JBridgeHandler());
-		this.mOldLogger = new CustomLogger(julLogger, java.util.logging.Level.parse(mConfig.mLogLevel));
+		MMLog.initVelocity(mServer, this);
 
 		INSTANCE = this;
 	}
@@ -81,10 +78,9 @@ public class NetworkRelayVelocity {
 		this.mServer.getEventManager().register(this, new NetworkMessageListenerVelocity(mConfig.mRunRecievedCommands, mConfig.mAutoRegisterServersToProxy, mConfig.mAutoUnregisterInactiveServersFromProxy));
 		try {
 			String shardName = System.getenv("NETWORK_RELAY_NAME") == null ? mConfig.mShardName : System.getenv("NETWORK_RELAY_NAME");
-			mRabbitMQManager = new RabbitMQManager(new RabbitMQManagerAbstractionVelocity(this), mOldLogger, shardName, mConfig.mRabbitUri, mConfig.mHeartbeatInterval, mConfig.mDestinationTimeout, mConfig.mDefaultTtl);
+			mRabbitMQManager = new RabbitMQManager(new RabbitMQManagerAbstractionVelocity(this), shardName, mConfig.mRabbitUri, mConfig.mHeartbeatInterval, mConfig.mDestinationTimeout, mConfig.mDefaultTtl);
 		} catch (Exception e) {
-			mLogger.error("RabbitMQ manager failed to initialize. This plugin will not function");
-			e.printStackTrace();
+			MMLog.severe("RabbitMQ manager failed to initialize. This plugin will not function", e);
 		}
 		VelocityShardPingManager.schedulePingUpdates(this);
 

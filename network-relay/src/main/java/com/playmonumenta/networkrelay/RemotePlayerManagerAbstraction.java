@@ -244,27 +244,27 @@ public abstract class RemotePlayerManagerAbstraction {
 		// Update the player before calling events
 		this.updatePlayer(player);
 
-		MMLog.fine(() -> "Old player: " + oldPlayer);
-		MMLog.fine(() -> "New player: " + player);
+		MMLog.debug(() -> "Old player: " + oldPlayer);
+		MMLog.debug(() -> "New player: " + player);
 
 		if (player.mIsOnline && (oldPlayer == null || !oldPlayer.mIsOnline)) {
 			this.callPlayerLoadEvent(player);
-			MMLog.fine(() -> "Loaded player: " + player.mName + " remote=" + isRemote + " serverType=" + serverType);
+			MMLog.debug(() -> "Loaded player: " + player.mName + " remote=" + isRemote + " serverType=" + serverType);
 			return true;
 		}
 
 		boolean shouldBroadcast = false;
 		if (!player.mIsOnline && (oldPlayer == null || oldPlayer.mIsOnline)) {
 			this.callPlayerUnloadEvent(player);
-			MMLog.fine(() -> "Unloaded player: " + player.mName + " remote=" + isRemote + " serverType=" + serverType);
+			MMLog.debug(() -> "Unloaded player: " + player.mName + " remote=" + isRemote + " serverType=" + serverType);
 			shouldBroadcast = true;
 		} else if (!player.isSimilar(oldPlayer)) {
 			this.callPlayerUpdatedEvent(player);
-			MMLog.fine(() -> "Updated player: " + player.mName + " remote=" + isRemote + " serverType=" + serverType);
+			MMLog.debug(() -> "Updated player: " + player.mName + " remote=" + isRemote + " serverType=" + serverType);
 			shouldBroadcast = true;
 		} else if (!isRemote && forceBroadcast) {
 			// Broadcast local data, regardless of if data changed or not
-			MMLog.fine(() -> "Broadcasted player: " + player.mName + " remote=false serverType=" + serverType);
+			MMLog.debug(() -> "Broadcasted player: " + player.mName + " remote=false serverType=" + serverType);
 			shouldBroadcast = true;
 		}
 
@@ -282,26 +282,26 @@ public abstract class RemotePlayerManagerAbstraction {
 		if (playerServerData == null) {
 			return;
 		}
-		MMLog.fine(() -> "Registering player: " + playerServerData);
+		MMLog.debug(() -> "Registering player: " + playerServerData);
 		String serverType = playerServerData.getServerType();
 		String serverId = playerServerData.getServerId();
 		UUID playerId = playerServerData.mUuid;
 		String playerName = playerServerData.mName;
 		boolean isOnline = playerServerData.mIsOnline;
 		if (!isOnline) {
-			MMLog.fine(() -> "Player is offline instead; unregistering them");
+			MMLog.debug(() -> "Player is offline instead; unregistering them");
 		}
 
 		// Handle UUID/name checks
 		RemotePlayerData allPlayerData = mRemotePlayersByUuid.get(playerId);
 		if (allPlayerData == null) {
-			MMLog.fine(() -> "Player: " + playerName + " was previously offline network-wide");
+			MMLog.debug(() -> "Player: " + playerName + " was previously offline network-wide");
 			if (isOnline) {
 				allPlayerData = new RemotePlayerData(playerId, playerName);
 				mRemotePlayersByUuid.put(playerId, allPlayerData);
 				mRemotePlayersByName.put(playerName, allPlayerData);
 			} else {
-				MMLog.fine(() -> "Nothing to do!");
+				MMLog.debug(() -> "Nothing to do!");
 				return;
 			}
 		}
@@ -309,7 +309,7 @@ public abstract class RemotePlayerManagerAbstraction {
 		RemotePlayerAbstraction oldPlayerServerData = allPlayerData.register(playerServerData);
 		if (oldPlayerServerData != null) {
 			String oldServerId = oldPlayerServerData.getServerId();
-			MMLog.fine(() -> "Player: " + playerName + " was previously on server type " + serverType + ", ID " + oldServerId);
+			MMLog.debug(() -> "Player: " + playerName + " was previously on server type " + serverType + ", ID " + oldServerId);
 			Map<UUID, RemotePlayerData> allRemoteServerPlayerData = mRemotePlayersByServer.get(oldServerId);
 			if (allRemoteServerPlayerData != null && (isOnline || oldServerId.equals(serverId))) {
 				allRemoteServerPlayerData.remove(oldPlayerServerData.mUuid);
@@ -334,7 +334,7 @@ public abstract class RemotePlayerManagerAbstraction {
 		if (mRemotePlayersByServer.containsKey(serverId)) {
 			return false;
 		}
-		MMLog.fine(() -> "Registering server ID " + serverId);
+		MMLog.debug(() -> "Registering server ID " + serverId);
 		mRemotePlayersByServer.put(serverId, new ConcurrentSkipListMap<>());
 		refreshRemotePlayers(serverId);
 		return true;
@@ -347,7 +347,7 @@ public abstract class RemotePlayerManagerAbstraction {
 			return false;
 		}
 
-		MMLog.fine(() -> "Unregistering server ID " + serverId);
+		MMLog.debug(() -> "Unregistering server ID " + serverId);
 		String serverType = RabbitMQManager.getInstance().getOnlineDestinationType(serverId);
 		if (serverType == null) {
 			throw new IllegalStateException("ERROR: Server type for server ID cleared before unregistering players from that server: id:" + serverId);

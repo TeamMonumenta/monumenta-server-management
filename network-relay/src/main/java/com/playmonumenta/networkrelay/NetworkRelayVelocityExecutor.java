@@ -76,8 +76,7 @@ public class NetworkRelayVelocityExecutor {
 			try {
 				mTask.run();
 			} catch (Exception ex) {
-				MMLog.severe("Error executing task in RabbitMQ");
-				ex.printStackTrace();
+				MMLog.severe("Error executing task in RabbitMQ", ex);
 			}
 		}
 	}

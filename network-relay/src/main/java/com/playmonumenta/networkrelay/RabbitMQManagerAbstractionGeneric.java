@@ -1,6 +1,7 @@
 package com.playmonumenta.networkrelay;
 
 import com.google.gson.JsonObject;
+import com.playmonumenta.networkrelay.util.MMLog;
 import java.util.TimerTask;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -40,7 +41,7 @@ public class RabbitMQManagerAbstractionGeneric implements RabbitMQManagerAbstrac
 
 	@Override
 	public void stopServer() {
-		mPlugin.getLogger().info("Lost connection to network relay / rabbitmq");
+		MMLog.info("Lost connection to network relay / rabbitmq");
 		System.exit(0);
 	}
 

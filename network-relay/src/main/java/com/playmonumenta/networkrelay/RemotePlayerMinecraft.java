@@ -15,14 +15,14 @@ public class RemotePlayerMinecraft extends RemotePlayerAbstraction {
 		super(serverId, uuid, name, isOnline, isHidden);
 		mWorld = world;
 
-		MMLog.fine(() -> "Created RemotePlayerMinecraft for " + mName + " from " + mServerId + ": " + (mIsOnline ? "online" : "offline"));
+		MMLog.debug(() -> "Created RemotePlayerMinecraft for " + mName + " from " + mServerId + ": " + (mIsOnline ? "online" : "offline"));
 	}
 
 	protected RemotePlayerMinecraft(JsonObject remoteData) {
 		super(remoteData);
 		mWorld = remoteData.get("world").getAsString();
 
-		MMLog.fine(() -> "Received RemotePlayerMinecraft for " + mName + " from " + mServerId + ": " + (mIsOnline ? "online" : "offline"));
+		MMLog.debug(() -> "Received RemotePlayerMinecraft for " + mName + " from " + mServerId + ": " + (mIsOnline ? "online" : "offline"));
 	}
 
 	@Override

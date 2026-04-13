@@ -1,7 +1,7 @@
 package com.playmonumenta.networkrelay.shardhealth.g1;
 
 import com.google.common.collect.EvictingQueue;
-import com.playmonumenta.networkrelay.NetworkRelay;
+import com.playmonumenta.networkrelay.util.MMLog;
 import com.sun.management.GarbageCollectionNotificationInfo;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryUsage;
@@ -126,7 +126,7 @@ public class G1Listener {
 
 				if (type.isEmpty()) {
 					try {
-						NetworkRelay.getInstance().getLogger().warning("Unknown GC cycle type: " + info.getGcName());
+						MMLog.warning("Unknown GC cycle type: " + info.getGcName());
 					} catch (RuntimeException ignored) {
 						// Unable to get plugin instance this early
 					}
@@ -149,7 +149,7 @@ public class G1Listener {
 					);
 
 					try {
-						NetworkRelay.getInstance().getLogger().info("Recorded gc event: " + wrappedInfo);
+						MMLog.info("Recorded gc event: " + wrappedInfo);
 					} catch (RuntimeException ignored) {
 						// Unable to get plugin instance this early
 					}

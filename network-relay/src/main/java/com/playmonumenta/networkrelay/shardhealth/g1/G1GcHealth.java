@@ -3,8 +3,7 @@ package com.playmonumenta.networkrelay.shardhealth.g1;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-import com.playmonumenta.networkrelay.NetworkRelay;
-import java.util.logging.Level;
+import com.playmonumenta.networkrelay.util.MMLog;
 import org.jetbrains.annotations.Nullable;
 
 public record G1GcHealth(
@@ -83,7 +82,7 @@ public record G1GcHealth(
 			try {
 				object.addProperty(component.getName(), (Number) component.getAccessor().invoke(this));
 			} catch (ReflectiveOperationException e) {
-				NetworkRelay.getInstance().getLogger().log(Level.WARNING, "while serializing gc health", e);
+				MMLog.warning("while serializing gc health", e);
 			}
 		}
 

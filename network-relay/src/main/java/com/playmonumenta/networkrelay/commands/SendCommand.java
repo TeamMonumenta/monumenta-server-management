@@ -2,6 +2,7 @@ package com.playmonumenta.networkrelay.commands;
 
 import com.playmonumenta.networkrelay.NetworkRelayAPI;
 import com.playmonumenta.networkrelay.util.ArgUtils;
+import com.playmonumenta.networkrelay.util.MMLog;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import dev.jorel.commandapi.arguments.GreedyStringArgument;
@@ -19,10 +20,9 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ProxiedCommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
 
 public class SendCommand {
-	public SendCommand(Plugin plugin) {
+	public SendCommand() {
 		TextArgument targetArg = new TextArgument("target shard(s)");
 		targetArg.replaceSuggestions(ArgumentSuggestions.stringCollection(info -> getTargetSuggestions()));
 
@@ -35,12 +35,12 @@ public class SendCommand {
 				String target = args.getByArgument(targetArg);
 				String command = args.getByArgument(commandArg);
 
-				run(plugin, sender, target, command);
+				run(sender, target, command);
 			})
 			.register();
 	}
 
-	private void run(Plugin plugin, CommandSender sender, String target, String command) {
+	private void run(CommandSender sender, String target, String command) {
 		if (!BroadcastCommand.isEnabled()) {
 			sender.sendMessage("This command is not enabled");
 			return;
@@ -75,7 +75,7 @@ public class SendCommand {
 		if (!(sender instanceof Player) || sender.isOp()) {
 			sender.sendMessage(Component.text("Sending command '" + command + "' to " + targetShards, NamedTextColor.GRAY));
 		}
-		plugin.getLogger().fine("Broadcasting command '" + command + "' to " + targetShards);
+		MMLog.debug("Broadcasting command '" + command + "' to " + targetShards);
 
 		for (String targetShard : targetShards) {
 			try {

@@ -1,5 +1,6 @@
 package com.playmonumenta.networkrelay;
 
+import com.playmonumenta.networkrelay.util.MMLog;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
@@ -9,7 +10,7 @@ public class PlaceholderAPIIntegration extends PlaceholderExpansion {
 
 	public PlaceholderAPIIntegration(NetworkRelay plugin) {
 		super();
-		plugin.getLogger().info("Enabling PlaceholderAPI integration");
+		MMLog.info("Enabling PlaceholderAPI integration");
 		mPlugin = plugin;
 	}
 

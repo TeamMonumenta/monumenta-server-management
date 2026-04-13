@@ -5,6 +5,7 @@ plugins {
 }
 
 repositories {
+	mavenLocal()
 	mavenCentral()
 	maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
 	maven("https://repo.viaversion.com")
@@ -13,8 +14,11 @@ repositories {
 dependencies {
 	testImplementation(libs.snakeyaml)
 	implementation(libs.rabbitmq)
+	compileOnly(libs.monumenta.common)
+	testRuntimeOnly(libs.monumenta.common)
 	compileOnly(libs.annotations)
 	compileOnly(libs.commandapi)
+	compileOnly(libs.log4j.core)
 	compileOnly(libs.placeholderapi)
 	compileOnly(libs.velocity)
 	compileOnly(libs.viaversion)
@@ -35,7 +39,7 @@ monumenta {
 	name("MonumentaNetworkRelay")
 	paper(
 		"com.playmonumenta.networkrelay.NetworkRelay", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20",
-		depends = listOf("CommandAPI"),
+		depends = listOf("CommandAPI", "MonumentaCommon"),
 		softDepends = listOf(
 			"PlaceholderAPI",
 			"ViaVersion"

@@ -1,16 +1,15 @@
 package com.playmonumenta.networkrelay;
 
 import com.playmonumenta.networkrelay.config.GenericConfig;
+import com.playmonumenta.networkrelay.util.MMLog;
 import java.io.File;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.jetbrains.annotations.Nullable;
 
 public class NetworkRelayGeneric {
 	private @Nullable static NetworkRelayGeneric INSTANCE = null;
-	private final CustomLogger mLogger;
 	private final Consumer<Object> mCallEventMethod;
 	private @Nullable RabbitMQManager mRabbitMQManager = null;
 
@@ -37,24 +36,22 @@ public class NetworkRelayGeneric {
 							   String serverType,
 	                           BiConsumer<Integer, Consumer<Object>> registerEventMethod,
 	                           Consumer<Object> callEventMethod) {
-		mLogger = new CustomLogger(parentLogger, Level.INFO);
+		MMLog.initFallback(parentLogger);
 		mCallEventMethod = callEventMethod;
-		GenericConfig config = new GenericConfig(mLogger, configFile, defaultOwnerClass, resourcePath);
+		GenericConfig config = new GenericConfig(parentLogger, configFile, defaultOwnerClass, resourcePath);
 
 		new NetworkMessageListenerGeneric(registerEventMethod, serverType);
 
 		try {
 			mRabbitMQManager = new RabbitMQManager(
 				new RabbitMQManagerAbstractionGeneric(this),
-				getLogger(),
 				config.mShardName,
 				config.mRabbitUri,
 				config.mHeartbeatInterval,
 				config.mDestinationTimeout,
 				config.mDefaultTtl);
 		} catch (Exception e) {
-			getLogger().severe("RabbitMQ manager failed to initialize. This plugin will not function");
-			e.printStackTrace();
+			MMLog.severe("RabbitMQ manager failed to initialize. This plugin will not function", e);
 		}
 
 		INSTANCE = this;
@@ -77,10 +74,6 @@ public class NetworkRelayGeneric {
 		if (mRabbitMQManager != null) {
 			mRabbitMQManager.stop();
 		}
-	}
-
-	public CustomLogger getLogger() {
-		return mLogger;
 	}
 
 	protected void callEvent(Object event) {

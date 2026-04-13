@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import com.playmonumenta.networkrelay.util.MMLog;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
@@ -23,7 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,7 +35,6 @@ public class RabbitMQManager {
 
 	private final Thread mPrimaryThread;
 	private final Gson mGson = new Gson();
-	private final Logger mLogger;
 	private final Channel mChannel;
 	private final Connection mConnection;
 	private final RabbitMQManagerAbstractionInterface mAbstraction;
@@ -114,20 +113,19 @@ public class RabbitMQManager {
 		public void shutdownCompleted(ShutdownSignalException cause) {
 			String msg = "RabbitMQ connection shut down; cause='" + cause.getCause() + "' message='" + cause.getMessage() + "'";
 			if (mShutdown) {
-				mLogger.info(msg);
+				MMLog.info(msg);
 			} else {
-				mLogger.warning(msg);
+				MMLog.warning(msg);
 			}
 		}
 	}
 
 	// Must be called on primary thread
-	protected RabbitMQManager(RabbitMQManagerAbstractionInterface abstraction, Logger logger, String shardName, String rabbitURI, int heartbeatInterval, int destinationTimeout, long defaultTTL) throws Exception {
+	protected RabbitMQManager(RabbitMQManagerAbstractionInterface abstraction, String shardName, String rabbitURI, int heartbeatInterval, int destinationTimeout, long defaultTTL) throws Exception {
 		// Once this project is running on Java 19 or higher, switch to Thread.threadId() instead
 		// (does not exist in this version)
 		mPrimaryThread = Thread.currentThread();
 		mAbstraction = abstraction;
-		mLogger = logger;
 		mShardName = shardName;
 		mHeartbeatInterval = heartbeatInterval;
 		mDestinationTimeout = destinationTimeout;
@@ -199,7 +197,7 @@ public class RabbitMQManager {
 					throw new Exception("Rabbit message missing 'data': " + message);
 				}
 			} catch (Exception ex) {
-				mLogger.warning(ex.getMessage());
+				MMLog.warning("Failed to parse rabbit message", ex);
 				/* Parsing this message failed - but ack it anyway, because it's not going to parse next time either */
 				mChannel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
 				return;
@@ -221,8 +219,8 @@ public class RabbitMQManager {
 
 			/* Process the packet on the main thread */
 			mAbstraction.scheduleProcessPacket(() -> {
-				mLogger.finer("Processing message from=" + source + " channel=" + channel);
-				mLogger.finest(() -> "content=" + mGson.toJson(root));
+				MMLog.trace("Processing message from=" + source + " channel=" + channel);
+				MMLog.trace(() -> "content=" + mGson.toJson(root));
 
 				/* Check for heartbeat data - online status */
 				boolean isDestShutdown = false;
@@ -295,9 +293,9 @@ public class RabbitMQManager {
 							}
 							msg.append(". Current queue size is ").append(queue.size());
 							if (queue.size() > 100) {
-								mLogger.warning(msg.toString());
+								MMLog.warning(msg.toString());
 							} else {
-								mLogger.info(msg.toString());
+								MMLog.info(msg.toString());
 							}
 						} else {
 							/*
@@ -305,7 +303,7 @@ public class RabbitMQManager {
 							 * Have everything needed to send online event and deliver the message
 							 */
 
-							mLogger.fine("Shard " + source + " is online");
+							MMLog.debug("Shard " + source + " is online");
 							mAbstraction.sendDestOnlineEvent(source);
 
 							/* Deliver this current message */
@@ -315,7 +313,7 @@ public class RabbitMQManager {
 							Deque<QueuedMessage> queue = mDestinationQueuedMessages.remove(source);
 							if (queue != null) {
 								for (QueuedMessage msg : queue) {
-									mLogger.fine(() -> "Delivering queued message from " + source + " now that it is marked as online");
+									MMLog.debug(() -> "Delivering queued message from " + source + " now that it is marked as online");
 									mAbstraction.sendMessageEvent(msg.getChannel(), source, msg.getData());
 								}
 							}
@@ -335,7 +333,7 @@ public class RabbitMQManager {
 					 * If the channel disconnects, we just won't ack this message
 					 * It will be redelivered later
 					 */
-					mLogger.warning("Failed to acknowledge rabbit message '" + message + "'");
+					MMLog.warning("Failed to acknowledge rabbit message '" + message + "'");
 				}
 			});
 		};
@@ -345,14 +343,14 @@ public class RabbitMQManager {
 		                      consumerTag -> {
 			mConsumerAlive = false;
 			if (mShutdown) {
-				mLogger.info("RabbitMQ consumer has terminated");
+				MMLog.info("RabbitMQ consumer has terminated");
 			} else {
-				mLogger.severe("RabbitMQ consumer has terminated unexpectedly - stopping the shard...");
+				MMLog.severe("RabbitMQ consumer has terminated unexpectedly - stopping the shard...");
 				mAbstraction.stopServer();
 			}
 		});
 
-		mLogger.info("Started RabbitMQ consumer");
+		MMLog.info("Started RabbitMQ consumer");
 
 		INSTANCE = this;
 	}
@@ -363,13 +361,13 @@ public class RabbitMQManager {
 			try {
 				mAbstraction.stopHeartbeatRunnable();
 			} catch (Exception ex) {
-				mLogger.warning("Failed to cancel heartbeat runnable: " + ex.getMessage());
+				MMLog.warning("Failed to cancel heartbeat runnable: " + ex.getMessage());
 			}
 
 			try {
 				mChannel.basicCancel(CONSUMER_TAG);
 			} catch (Exception ex) {
-				mLogger.warning("Failed to cancel rabbit consumer: " + ex.getMessage());
+				MMLog.warning("Failed to cancel rabbit consumer: " + ex.getMessage());
 			}
 			try {
 				JsonObject root = new JsonObject();
@@ -383,12 +381,12 @@ public class RabbitMQManager {
 
 				sendNetworkMessageInternal("*", NetworkRelayAPI.HEARTBEAT_CHANNEL, root, properties);
 			} catch (Exception ex) {
-				mLogger.warning("Failed to send shutdown heartbeat: " + ex.getMessage());
+				MMLog.warning("Failed to send shutdown heartbeat: " + ex.getMessage());
 			}
 			try {
 				mConnection.close();
 			} catch (Exception ex) {
-				mLogger.warning("Failed to close rabbit channel: " + ex.getMessage());
+				MMLog.warning("Failed to close rabbit channel: " + ex.getMessage());
 			}
 		}
 	}
@@ -431,7 +429,7 @@ public class RabbitMQManager {
 			Instant now = Instant.now();
 			// * 500 because of converting seconds to milliseconds (*1000) divided by 2 (half the heartbeat interval as threshold to send early)
 			if (now.minusMillis(mHeartbeatInterval * 500L).compareTo(mLastHeartbeat) >= 0) {
-				mLogger.finer("Adding heartbeat data to broadcast message instead of sending heartbeat");
+				MMLog.trace("Adding heartbeat data to broadcast message instead of sending heartbeat");
 				addHeartbeatDataToMessage(root);
 				mLastHeartbeat = now;
 			}
@@ -448,8 +446,8 @@ public class RabbitMQManager {
 				mChannel.basicPublish("", destination, properties, msg);
 			}
 
-			mLogger.finer("Sent message destination=" + destination + " channel=" + channel);
-			mLogger.finest(() -> "content=" + mGson.toJson(root));
+			MMLog.trace("Sent message destination=" + destination + " channel=" + channel);
+			MMLog.trace(() -> "content=" + mGson.toJson(root));
 		} catch (Exception e) {
 			throw new Exception(String.format("Error sending message destination=" + destination + " channel=" + channel), e);
 		}
@@ -506,7 +504,7 @@ public class RabbitMQManager {
 
 			sendNetworkMessageInternal("*", NetworkRelayAPI.HEARTBEAT_CHANNEL, root, properties);
 		} catch (Exception ex) {
-			mLogger.warning("Failed to send heartbeat: " + ex.getMessage());
+			MMLog.warning("Failed to send heartbeat: " + ex.getMessage());
 		}
 	}
 
@@ -516,7 +514,7 @@ public class RabbitMQManager {
 	}
 
 	private void sendDestOfflineEvent(String dest) {
-		mLogger.fine("Shard " + dest + " is offline");
+		MMLog.debug("Shard " + dest + " is offline");
 		mAbstraction.sendDestOfflineEvent(dest);
 	}
 
@@ -525,7 +523,7 @@ public class RabbitMQManager {
 	}
 
 	public void setServerFinishedStarting() {
-		mLogger.info("Server has finished starting, will start processing messages now");
+		MMLog.info("Server has finished starting, will start processing messages now");
 		mServerFinishedStarting = true;
 	}
 }
