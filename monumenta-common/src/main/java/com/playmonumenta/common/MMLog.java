@@ -1,12 +1,5 @@
 package com.playmonumenta.common;
 
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.tree.LiteralCommandNode;
-import com.velocitypowered.api.command.BrigadierCommand;
-import com.velocitypowered.api.command.CommandManager;
-import com.velocitypowered.api.command.CommandSource;
-import dev.jorel.commandapi.CommandAPICommand;
-import dev.jorel.commandapi.CommandPermission;
 import java.util.function.Supplier;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -30,7 +23,7 @@ import org.apache.logging.log4j.core.config.Configurator;
  *
  * public void onEnable() {
  *     mLog = new MMLog("MyPlugin");
- *     mLog.registerPaperCommand("myPlugin");
+ *     MMLogPaper.registerCommand(mLog, "myPlugin");
  * }
  * }</pre>
  *
@@ -40,7 +33,7 @@ import org.apache.logging.log4j.core.config.Configurator;
  *
  * public void onProxyInit(ProxyInitializeEvent event) {
  *     mLog = new MMLog("MyPlugin");
- *     mLog.registerVelocityCommand(mServer.getCommandManager(), this, "myPlugin");
+ *     MMLogVelocity.registerCommand(mLog, mServer.getCommandManager(), this, "myPlugin");
  * }
  * }</pre>
  *
@@ -68,89 +61,6 @@ public class MMLog {
 	 */
 	public MMLog(String pluginId) {
 		mLogger = LogManager.getLogger(pluginId);
-	}
-
-	/**
-	 * Registers {@code /changeLogLevel <label> TRACE|DEBUG|INFO|WARN|ERROR} via CommandAPI.
-	 *
-	 * <p>Call once from the Paper plugin's {@code onEnable()}. The required permission is
-	 * {@code <label>.changeloglevel} (e.g. {@code networkRelay.changeloglevel}).
-	 *
-	 * @param label identifier for this plugin shown as the first argument (e.g. "networkRelay")
-	 */
-	public void registerPaperCommand(String label) {
-		String permission = label + ".changeloglevel";
-		new CommandAPICommand("changeLogLevel")
-			.withPermission(CommandPermission.fromString(permission))
-			.withSubcommand(new CommandAPICommand(label)
-				.withSubcommand(new CommandAPICommand("TRACE")
-					.executes((sender, args) -> {
-						setLevel(Level.TRACE);
-					}))
-				.withSubcommand(new CommandAPICommand("DEBUG")
-					.executes((sender, args) -> {
-						setLevel(Level.DEBUG);
-					}))
-				.withSubcommand(new CommandAPICommand("INFO")
-					.executes((sender, args) -> {
-						setLevel(Level.INFO);
-					}))
-				.withSubcommand(new CommandAPICommand("WARN")
-					.executes((sender, args) -> {
-						setLevel(Level.WARN);
-					}))
-				.withSubcommand(new CommandAPICommand("ERROR")
-					.executes((sender, args) -> {
-						setLevel(Level.ERROR);
-					})))
-			.register();
-	}
-
-	/**
-	 * Registers {@code /changeLogLevelVelocity <label> TRACE|DEBUG|INFO|WARN|ERROR} via Brigadier.
-	 *
-	 * <p>Call once from the Velocity plugin's {@code onProxyInit()}. Uses a distinct command name
-	 * ({@code changeLogLevelVelocity}) so it never conflicts with the Paper command. The required
-	 * permission is {@code <label>.changeloglevel}.
-	 *
-	 * @param commandManager the Velocity proxy's command manager
-	 * @param plugin         the Velocity plugin instance registering the command
-	 * @param label          identifier for this plugin shown as the first argument
-	 */
-	public void registerVelocityCommand(CommandManager commandManager, Object plugin, String label) {
-		String permission = label + ".changeloglevel";
-		LiteralArgumentBuilder<CommandSource> root = BrigadierCommand.literalArgumentBuilder("changeLogLevelVelocity")
-			.requires(source -> source.hasPermission(permission))
-			.then(BrigadierCommand.literalArgumentBuilder(label)
-				.then(BrigadierCommand.literalArgumentBuilder("TRACE")
-					.executes(ctx -> {
-						setLevel(Level.TRACE);
-						return 1;
-					}))
-				.then(BrigadierCommand.literalArgumentBuilder("DEBUG")
-					.executes(ctx -> {
-						setLevel(Level.DEBUG);
-						return 1;
-					}))
-				.then(BrigadierCommand.literalArgumentBuilder("INFO")
-					.executes(ctx -> {
-						setLevel(Level.INFO);
-						return 1;
-					}))
-				.then(BrigadierCommand.literalArgumentBuilder("WARN")
-					.executes(ctx -> {
-						setLevel(Level.WARN);
-						return 1;
-					}))
-				.then(BrigadierCommand.literalArgumentBuilder("ERROR")
-					.executes(ctx -> {
-						setLevel(Level.ERROR);
-						return 1;
-					})));
-
-		LiteralCommandNode<CommandSource> rootNode = root.build();
-		BrigadierCommand cmd = new BrigadierCommand(rootNode);
-		commandManager.register(commandManager.metaBuilder(cmd).plugin(plugin).build(), cmd);
 	}
 
 	public Logger asLogger() {

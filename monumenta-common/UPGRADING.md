@@ -19,7 +19,7 @@ The new approach is a shared `com.playmonumenta.common.MMLog` class backed by **
 - Debug messages appear at `DEBUG` or `TRACE` level, not as fake `INFO`.
 - No manual level tracking, no re-leveling hack.
 
-`monumenta-common` ships as a single jar that loads as a plugin on both **Paper** and **Velocity**. Other plugins declare it as a hard dependency and construct their own `MMLog` instance. The `changeLogLevel` command is registered per-plugin; the platform-specific registration path (CommandAPI on Paper, BrigadierCommand on Velocity) is handled inside `MMLog`.
+`monumenta-common` ships as a single jar that loads as a plugin on both **Paper** and **Velocity**. Other plugins declare it as a hard dependency and construct their own `MMLog` instance. The `changeLogLevel` command is registered per-plugin; the platform-specific registration path (CommandAPI on Paper, BrigadierCommand on Velocity) is handled by `MMLogPaper` and `MMLogVelocity` respectively — separate helper classes that are only loaded on their respective platforms.
 
 ### Level mapping (JUL -> log4j2)
 
@@ -55,9 +55,17 @@ Update any server scripts or admin tooling that used the old names.
 
 ### Key files
 
-- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MMLog.java` — the shared log class; the authoritative API reference
+- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MMLog.java` — core log class (log4j2 only, no platform imports)
+- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MMLogPaper.java` — Paper command registration helper (CommandAPI)
+- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MMLogVelocity.java` — Velocity command registration helper (Velocity API)
 - `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MonumentaCommonPlugin.java` — Paper entry point
 - `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MonumentaCommonVelocityPlugin.java` — Velocity entry point
+
+### Why command registration is split into separate classes
+
+`MMLog` is loaded on both Paper and Velocity. HotSpot's bytecode verifier eagerly loads all classes referenced in method bodies when a class is first loaded. If `MMLog` contained `registerPaperCommand()` (CommandAPI) and `registerVelocityCommand()` (Velocity API) in the same class file, loading it on either platform would fail with `NoClassDefFoundError` for the other platform's classes.
+
+`MMLogPaper` and `MMLogVelocity` are separate class files. Each is only loaded when explicitly referenced, which only happens in platform-specific code paths.
 
 ---
 
@@ -90,18 +98,11 @@ dependencies {
 }
 ```
 
-**If the plugin has tests**, also add (see Step 6 for why both are needed):
-
-```toml
-# gradle/libs.versions.toml
-velocity = "3.3.0-SNAPSHOT"
-velocity = { module = "com.velocitypowered:velocity-api", version.ref = "velocity" }
-```
+**If the plugin has tests**, also add:
 
 ```kotlin
 // plugin/build.gradle.kts
 testRuntimeOnly(libs.monumenta.common)
-testRuntimeOnly(libs.velocity)
 ```
 
 **Temporarily disable `-Werror`** in the root `build.gradle.kts`. The migration will introduce deprecation warnings at existing call sites; re-enable once all are resolved (Part 3):
@@ -177,12 +178,13 @@ import com.example.myplugin.utils.MMLog;
 public static final String PLUGIN_ID = "MyPlugin"; // must match getName() / plugin.yml name
 ```
 
-Replace the `CustomLogger` construction and `ChangeLogLevel.register()` call in `onLoad()` with a single line:
+Replace the `CustomLogger` construction and `ChangeLogLevel.register()` call in `onLoad()` with two lines:
 
 ```java
 @Override
 public void onLoad() {
-    MMLog.init("myPlugin");
+    MMLog.init();
+    com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog(), "myPlugin");
     // registers: /changeLogLevel myPlugin TRACE|DEBUG|INFO|WARN|ERROR
     // permission: myplugin.changeloglevel
     // ... rest of onLoad
@@ -197,20 +199,21 @@ For a Velocity-only plugin with no Paper counterpart, hold a `mLog` field direct
 
 ```java
 import com.playmonumenta.common.MMLog;
+import com.playmonumenta.common.MMLogVelocity;
 
 public MMLog mLog;
 
 @Subscribe
 public void onProxyInit(ProxyInitializeEvent event) {
     mLog = new MMLog(MyPlugin.PLUGIN_ID);
-    mLog.registerVelocityCommand(mServer.getCommandManager(), this, "myPlugin");
+    MMLogVelocity.registerCommand(mLog, mServer.getCommandManager(), this, "myPlugin");
     // registers: /changeLogLevelVelocity myPlugin TRACE|DEBUG|INFO|WARN|ERROR
 }
 ```
 
 #### Velocity (dual Paper+Velocity plugins)
 
-Call `MMLog.initVelocity(mServer, this, label)` from the Velocity plugin constructor (after `mServer` is available). The static facade is shared between platforms; `initVelocity` initializes it with command registration, just as `init(label)` does on Paper. See Step 5 for the full facade template.
+Call `MMLog.init()` from the Velocity plugin constructor, then register the command. See Step 5 for the full facade template.
 
 ### Step 5 — Replace `utils/MMLog.java` (static facade)
 
@@ -218,7 +221,9 @@ The static facade holds a private `INSTANCE` of `com.playmonumenta.common.MMLog`
 
 > **Code style note:** the project requires braces and indented bodies on all methods — no single-line `{ body }` forms. The delegation methods below are shown compact for readability.
 
-**Paper-only plugins:**
+**All plugins (Paper-only or dual Paper+Velocity):**
+
+The static facade must not call `MMLogPaper` or `MMLogVelocity` directly — doing so would pull those platform-specific classes into the facade's bytecode, causing the same cross-platform `NoClassDefFoundError` described above. Instead, the facade only creates the instance; command registration is the caller's responsibility.
 
 ```java
 package com.example.myplugin.utils;
@@ -230,17 +235,21 @@ import org.jetbrains.annotations.Nullable;
 public class MMLog {
     private static @Nullable com.playmonumenta.common.MMLog INSTANCE = null;
 
-    /** Called from onLoad() on Paper. */
-    public static void init(String label) {
+    /** Call once from the platform-specific plugin entry point before any logging. */
+    public static void init() {
         if (INSTANCE == null) {
             INSTANCE = new com.playmonumenta.common.MMLog(com.example.myplugin.MyPlugin.PLUGIN_ID);
-            INSTANCE.registerPaperCommand(label);
         }
     }
 
     /** For use in tests — pass Mockito.mock(com.playmonumenta.common.MMLog.class) */
     public static void init(com.playmonumenta.common.MMLog log) {
         INSTANCE = log;
+    }
+
+    /** Returns the instance for command registration from platform-specific code. */
+    public static com.playmonumenta.common.MMLog getLog() {
+        return get();
     }
 
     private static com.playmonumenta.common.MMLog get() {
@@ -283,47 +292,18 @@ public class MMLog {
 }
 ```
 
-**Dual Paper+Velocity plugins** — `monumenta-common` now loads on both Paper and Velocity, so `com.playmonumenta.common.MMLog` can be held directly in the static field on both platforms. No delegate interface is needed.
-
-Add `initVelocity` alongside `init`. Call `initVelocity` from the Velocity plugin constructor (after `mServer` is available) in place of the old JUL bridge + `initFallback` setup:
+Then in the **Paper plugin entry point** (`onLoad`):
 
 ```java
-package com.example.myplugin.utils;
+MMLog.init();
+com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog(), "myPlugin");
+```
 
-import java.util.function.Supplier;
-import org.apache.logging.log4j.Level;
-import org.jetbrains.annotations.Nullable;
+And in the **Velocity plugin constructor**:
 
-public class MMLog {
-    private static @Nullable com.playmonumenta.common.MMLog INSTANCE = null;
-
-    /** Called from onLoad() on Paper. */
-    public static void init(String label) {
-        if (INSTANCE == null) {
-            INSTANCE = new com.playmonumenta.common.MMLog(com.example.myplugin.MyPlugin.PLUGIN_ID);
-            INSTANCE.registerPaperCommand(label);
-        }
-    }
-
-    /** Called from the Velocity plugin constructor. */
-    public static void initVelocity(com.velocitypowered.api.proxy.ProxyServer server, Object plugin, String label) {
-        if (INSTANCE == null) {
-            INSTANCE = new com.playmonumenta.common.MMLog(com.example.myplugin.MyPlugin.PLUGIN_ID);
-            INSTANCE.registerVelocityCommand(server.getCommandManager(), plugin, label);
-        }
-    }
-
-    private static com.playmonumenta.common.MMLog get() {
-        if (INSTANCE == null) {
-            throw new RuntimeException("MyPlugin logger invoked before being initialized!");
-        }
-        return INSTANCE;
-    }
-
-    public static void setLevel(Level level)              { get().setLevel(level); }
-    public static boolean isLevelEnabled(Level level)     { return get().isLevelEnabled(level); }
-    // ... same delegation methods as the Paper-only template above
-}
+```java
+MMLog.init();
+com.playmonumenta.common.MMLogVelocity.registerCommand(MMLog.getLog(), mServer.getCommandManager(), this, "myPlugin");
 ```
 
 On the Velocity plugin class, add `@Dependency(id = "monumenta-common")` alongside any existing dependencies:
@@ -351,7 +331,7 @@ import org.mockito.Mockito;
 MMLog.init(Mockito.mock(com.playmonumenta.common.MMLog.class));
 ```
 
-**Why not construct a real instance?** `com.playmonumenta.common.MMLog`'s constructor is safe to call (it only calls `LogManager.getLogger()`), but loading the class in a test environment triggers eager class loading of Velocity API types referenced in `registerVelocityCommand()`. On a real Paper server the JVM resolves those references lazily (the method is never called), but test class loaders are stricter. The fix is already covered in Step 1: `testRuntimeOnly(libs.velocity)` puts the Velocity API on the test classpath so class loading succeeds. Once that dependency is present, both the mock approach and direct construction work.
+**Why not construct a real instance?** `com.playmonumenta.common.MMLog`'s constructor is safe to call (it only calls `LogManager.getLogger()`). Direct construction works fine in tests — no platform classes are loaded by `MMLog` itself. The mock approach is also valid if you want to avoid any log4j2 initialization overhead.
 
 ---
 
