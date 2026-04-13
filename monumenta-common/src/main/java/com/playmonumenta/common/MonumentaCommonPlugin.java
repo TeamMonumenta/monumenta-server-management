@@ -8,7 +8,7 @@ public class MonumentaCommonPlugin extends JavaPlugin {
 	@Override
 	public void onEnable() {
 		MMLog log = new MMLog(PLUGIN_ID);
-		log.registerPaperCommand("monumenta", "common");
+		log.registerPaperCommand("monumentaCommon");
 		getLogger().info("MonumentaCommon enabled");
 	}
 

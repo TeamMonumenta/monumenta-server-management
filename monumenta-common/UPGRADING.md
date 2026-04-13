@@ -36,9 +36,11 @@ The new approach is a shared `com.playmonumenta.common.MMLog` class backed by **
 
 ### changeLogLevel command
 
-Each plugin registers `/[commandPath...] changeLogLevel TRACE|DEBUG|INFO|WARN|ERROR`.
+On Paper, each plugin registers `/changeLogLevel <label> TRACE|DEBUG|INFO|WARN|ERROR`.
+On Velocity, the command is `/changeLogLevelVelocity <label> TRACE|DEBUG|INFO|WARN|ERROR` to avoid conflicts.
 
-Permission is the command path elements joined with dots plus `.changeloglevel` (all lowercase), e.g. `/monumenta myPlugin changeLogLevel INFO` requires `monumenta.myplugin.changeloglevel`.
+The label is a single lowerCamelCase identifier (e.g. `networkRelay`, `monumentaCommon`, `redisSync`).
+Permission is `<label>.changeloglevel` (all lowercase), e.g. `/changeLogLevel networkRelay INFO` requires `networkrelay.changeloglevel`.
 
 **Admin note:** old subcommand argument names have changed:
 
@@ -67,7 +69,7 @@ Update any server scripts or admin tooling that used the old names.
 
 ```toml
 [versions]
-monumenta-common = "95e3b80-SNAPSHOT"   # update to current hash
+monumenta-common = "f231e8a-SNAPSHOT"   # update to current hash
 
 [libraries]
 monumenta-common = { module = "com.playmonumenta:monumenta-common", version.ref = "monumenta-common" }
@@ -180,9 +182,9 @@ Replace the `CustomLogger` construction and `ChangeLogLevel.register()` call in 
 ```java
 @Override
 public void onLoad() {
-    MMLog.init("monumenta", "myPlugin");
-    // registers: /monumenta myPlugin changeLogLevel TRACE|DEBUG|INFO|WARN|ERROR
-    // permission: monumenta.myplugin.changeloglevel
+    MMLog.init("myPlugin");
+    // registers: /changeLogLevel myPlugin TRACE|DEBUG|INFO|WARN|ERROR
+    // permission: myplugin.changeloglevel
     // ... rest of onLoad
 }
 ```
@@ -201,20 +203,20 @@ public MMLog mLog;
 @Subscribe
 public void onProxyInit(ProxyInitializeEvent event) {
     mLog = new MMLog(MyPlugin.PLUGIN_ID);
-    mLog.registerVelocityCommand(mServer.getCommandManager(), this, "monumenta", "myPlugin");
-    // registers the same /monumenta myPlugin changeLogLevel command via Brigadier
+    mLog.registerVelocityCommand(mServer.getCommandManager(), this, "myPlugin");
+    // registers: /changeLogLevelVelocity myPlugin TRACE|DEBUG|INFO|WARN|ERROR
 }
 ```
 
 #### Velocity (dual Paper+Velocity plugins)
 
-Call `MMLog.initVelocity(mServer, this)` from the Velocity plugin constructor (after `mServer` is available). The static facade is shared between platforms; `initVelocity` initializes it with command registration, just as `init(plugin)` does on Paper. See Step 5 for the full facade template.
+Call `MMLog.initVelocity(mServer, this, label)` from the Velocity plugin constructor (after `mServer` is available). The static facade is shared between platforms; `initVelocity` initializes it with command registration, just as `init(label)` does on Paper. See Step 5 for the full facade template.
 
 ### Step 5 — Replace `utils/MMLog.java` (static facade)
 
 The static facade holds a private `INSTANCE` of `com.playmonumenta.common.MMLog` and delegates all calls to it. All existing call sites (`MMLog.info("msg")` etc.) compile unchanged.
 
-> **Code style note:** the project requires braces and indented bodies on all methods — no single-line `{ body }` forms. The delegation methods below are shown compact for readability; expand each one to multi-line when writing the actual file.
+> **Code style note:** the project requires braces and indented bodies on all methods — no single-line `{ body }` forms. The delegation methods below are shown compact for readability.
 
 **Paper-only plugins:**
 
@@ -229,10 +231,10 @@ public class MMLog {
     private static @Nullable com.playmonumenta.common.MMLog INSTANCE = null;
 
     /** Called from onLoad() on Paper. */
-    public static void init(String... commandPath) {
+    public static void init(String label) {
         if (INSTANCE == null) {
             INSTANCE = new com.playmonumenta.common.MMLog(com.example.myplugin.MyPlugin.PLUGIN_ID);
-            INSTANCE.registerPaperCommand(commandPath);
+            INSTANCE.registerPaperCommand(label);
         }
     }
 
@@ -296,18 +298,18 @@ public class MMLog {
     private static @Nullable com.playmonumenta.common.MMLog INSTANCE = null;
 
     /** Called from onLoad() on Paper. */
-    public static void init() {
+    public static void init(String label) {
         if (INSTANCE == null) {
             INSTANCE = new com.playmonumenta.common.MMLog(com.example.myplugin.MyPlugin.PLUGIN_ID);
-            INSTANCE.registerPaperCommand("monumenta", "myPlugin");
+            INSTANCE.registerPaperCommand(label);
         }
     }
 
     /** Called from the Velocity plugin constructor. */
-    public static void initVelocity(com.velocitypowered.api.proxy.ProxyServer server, Object plugin) {
+    public static void initVelocity(com.velocitypowered.api.proxy.ProxyServer server, Object plugin, String label) {
         if (INSTANCE == null) {
             INSTANCE = new com.playmonumenta.common.MMLog(com.example.myplugin.MyPlugin.PLUGIN_ID);
-            INSTANCE.registerVelocityCommand(server.getCommandManager(), plugin, "monumenta", "myPlugin");
+            INSTANCE.registerVelocityCommand(server.getCommandManager(), plugin, label);
         }
     }
 
@@ -355,13 +357,9 @@ MMLog.init(Mockito.mock(com.playmonumenta.common.MMLog.class));
 
 ## Part 3 -- Upgrading MMLog call sites
 
-> **STOP. Do not begin this section until:**
-> 1. All other refactoring work (Parts 1 and 2) is complete across all affected plugins.
-> 2. The changes have been reviewed and **explicitly approved** by Byron.
->
-> The deprecated aliases exist precisely so this can be deferred. Touching call sites before the structural work is reviewed creates unnecessary noise in diffs and risks merge conflicts. This section must not be started based on your own judgment — wait for a direct instruction to proceed.
+**Recommended order:** complete Parts 1 and 2 fully across all affected plugins and get them merged before starting Part 3. The deprecated aliases exist so this step can be deferred — touching call sites while the structural work is still in progress adds noise to diffs and increases the chance of merge conflicts.
 
-Once approved, work through each plugin's deprecation warnings. There are three categories:
+Once the structural changes are merged, work through each plugin's deprecation warnings. There are three categories:
 
 ### Deprecated `MMLog` level methods
 
