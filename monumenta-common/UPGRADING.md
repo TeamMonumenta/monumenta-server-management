@@ -1,0 +1,422 @@
+# Upgrading to monumenta-common
+
+---
+
+## Part 1 -- Background
+
+### What changed and why
+
+Each Monumenta plugin previously maintained its own `CustomLogger` — a `java.util.logging.Logger` subclass with a manually-managed shadow level field that re-routed `FINE`/`FINER`/`FINEST` messages to `logger.info()` to bypass JUL's INFO threshold. Each plugin also had its own `ChangeLogLevel` command and a static `MMLog` facade over it.
+
+Problems:
+- Debug messages appeared at INFO level with no indication they were debug output.
+- Level changes via `ChangeLogLevel` only updated the shadow variable inside `CustomLogger`; the actual underlying JUL handler was never changed.
+- Level tracking logic was duplicated across every plugin.
+
+The new approach is a shared `com.playmonumenta.common.MMLog` class backed by **log4j2** (`LogManager.getLogger(pluginId)`). Both Paper and Velocity use log4j2 as their logging backend (JUL calls from Bukkit are bridged into it). Using log4j2 directly means:
+
+- `Configurator.setLevel()` actually works — it changes the logger's effective level in log4j2's hierarchy.
+- Debug messages appear at `DEBUG` or `TRACE` level, not as fake `INFO`.
+- No manual level tracking, no re-leveling hack.
+
+`monumenta-common` ships as a single jar that loads as a plugin on both **Paper** and **Velocity**. Other plugins declare it as a hard dependency and construct their own `MMLog` instance. The `changeLogLevel` command is registered per-plugin; the platform-specific registration path (CommandAPI on Paper, BrigadierCommand on Velocity) is handled inside `MMLog`.
+
+### Level mapping (JUL -> log4j2)
+
+| Old method   | New method   | log4j2 level |
+|--------------|--------------|--------------|
+| `finest()`   | `trace()`    | TRACE        |
+| `finer()`    | `trace()`    | TRACE        |
+| `fine()`     | `debug()`    | DEBUG        |
+| `info()`     | `info()`     | INFO         |
+| `warning()`  | `warning()`  | WARN         |
+| `severe()`   | `severe()`   | ERROR        |
+
+`finest()`, `finer()`, and `fine()` are kept as `@Deprecated` aliases so existing call sites compile without immediate changes.
+
+### changeLogLevel command
+
+Each plugin registers `/[commandPath...] changeLogLevel TRACE|DEBUG|INFO|WARN|ERROR`.
+
+Permission is the command path elements joined with dots plus `.changeloglevel` (all lowercase), e.g. `/monumenta myPlugin changeLogLevel INFO` requires `monumenta.myplugin.changeloglevel`.
+
+**Admin note:** old subcommand argument names have changed:
+
+| Old      | New     |
+|----------|---------|
+| `FINE`   | `DEBUG` |
+| `FINER`  | `TRACE` |
+| `FINEST` | `TRACE` |
+| `INFO`   | `INFO`  |
+
+Update any server scripts or admin tooling that used the old names.
+
+### Key files
+
+- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MMLog.java` — the shared log class; the authoritative API reference
+- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MonumentaCommonPlugin.java` — Paper entry point
+- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MonumentaCommonVelocityPlugin.java` — Velocity entry point
+
+---
+
+## Part 2 -- Upgrading a plugin
+
+### Step 1 — Gradle setup
+
+**`gradle/libs.versions.toml`** — add the version and library entry. Use the current SNAPSHOT commit hash from the local Maven repo (check `monumenta-server-management/gradle/libs.versions.toml` for the current hash):
+
+```toml
+[versions]
+monumenta-common = "95e3b80-SNAPSHOT"   # update to current hash
+
+[libraries]
+monumenta-common = { module = "com.playmonumenta:monumenta-common", version.ref = "monumenta-common" }
+```
+
+**`plugin/build.gradle.kts`** — add `mavenLocal()` to repositories (the common plugin is published locally) and add the compile-only dependency:
+
+```kotlin
+repositories {
+    mavenLocal()
+    // ... existing repos ...
+}
+
+dependencies {
+    compileOnly(libs.monumenta.common)
+    compileOnly(libs.log4j.core)             // for org.apache.logging.log4j.Level in the static facade
+    // ... existing dependencies ...
+}
+```
+
+**If the plugin has tests**, also add (see Step 6 for why both are needed):
+
+```toml
+# gradle/libs.versions.toml
+velocity = "3.3.0-SNAPSHOT"
+velocity = { module = "com.velocitypowered:velocity-api", version.ref = "velocity" }
+```
+
+```kotlin
+// plugin/build.gradle.kts
+testRuntimeOnly(libs.monumenta.common)
+testRuntimeOnly(libs.velocity)
+```
+
+**Temporarily disable `-Werror`** in the root `build.gradle.kts`. The migration will introduce deprecation warnings at existing call sites; re-enable once all are resolved (Part 3):
+
+```kotlin
+allprojects {
+    tasks.withType<JavaCompile> {
+        // options.compilerArgs.add("-Werror")
+    }
+}
+```
+
+### Step 2 — Declare the runtime dependency
+
+`monumenta-common` must be listed as a hard dependency so the server loads it before your plugin.
+
+**Paper** — in the top-level `build.gradle.kts` `monumenta {}` block, add `"MonumentaCommon"` to the `depends` list:
+
+```kotlin
+monumenta {
+    paper(
+        "com.example.myplugin.MyPlugin",
+        BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
+        "1.20",
+        depends = listOf("CommandAPI", "MonumentaCommon"),
+        // ...
+    )
+}
+```
+
+**Velocity** — in the `@Plugin` annotation on the Velocity plugin class, add a `@Dependency`:
+
+```java
+@Plugin(
+    id = "my-plugin",
+    name = "MyPlugin",
+    // ...
+    dependencies = {
+        @Dependency(id = "monumenta-common")
+    }
+)
+```
+
+### Step 3 — Delete old files
+
+Remove:
+- `src/.../CustomLogger.java`
+- `src/.../commands/ChangeLogLevel.java` (or `ChangeLogLevelCommand.java`)
+
+### Step 4 — Update the main plugin class
+
+#### Paper (`JavaPlugin` subclass)
+
+Remove:
+```java
+// imports
+import com.example.myplugin.CustomLogger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+// field
+private @MonotonicNonNull CustomLogger mLogger;
+
+// getLogger() override
+@Override
+public Logger getLogger() { ... }
+```
+
+Add to the class:
+```java
+import com.example.myplugin.utils.MMLog;
+
+public static final String PLUGIN_ID = "MyPlugin"; // must match getName() / plugin.yml name
+```
+
+Replace the `CustomLogger` construction and `ChangeLogLevel.register()` call in `onLoad()` with a single line:
+
+```java
+@Override
+public void onLoad() {
+    MMLog.init("monumenta", "myPlugin");
+    // registers: /monumenta myPlugin changeLogLevel TRACE|DEBUG|INFO|WARN|ERROR
+    // permission: monumenta.myplugin.changeloglevel
+    // ... rest of onLoad
+}
+```
+
+The `PLUGIN_ID` constant is the log4j2 logger name. It must match `JavaPlugin.getName()` (the plugin's display name in plugin.yml). The facade's `init()` uses it internally (see Step 5).
+
+#### Velocity (Velocity-only plugins)
+
+For a Velocity-only plugin with no Paper counterpart, hold a `mLog` field directly on the plugin class and initialize it in the constructor using `PLUGIN_ID` so log4j2 uses a consistent logger name:
+
+```java
+import com.playmonumenta.common.MMLog;
+
+public MMLog mLog;
+
+@Subscribe
+public void onProxyInit(ProxyInitializeEvent event) {
+    mLog = new MMLog(MyPlugin.PLUGIN_ID);
+    mLog.registerVelocityCommand(mServer.getCommandManager(), this, "monumenta", "myPlugin");
+    // registers the same /monumenta myPlugin changeLogLevel command via Brigadier
+}
+```
+
+#### Velocity (dual Paper+Velocity plugins)
+
+Call `MMLog.initVelocity(mServer, this)` from the Velocity plugin constructor (after `mServer` is available). The static facade is shared between platforms; `initVelocity` initializes it with command registration, just as `init(plugin)` does on Paper. See Step 5 for the full facade template.
+
+### Step 5 — Replace `utils/MMLog.java` (static facade)
+
+The static facade holds a private `INSTANCE` of `com.playmonumenta.common.MMLog` and delegates all calls to it. All existing call sites (`MMLog.info("msg")` etc.) compile unchanged.
+
+> **Code style note:** the project requires braces and indented bodies on all methods — no single-line `{ body }` forms. The delegation methods below are shown compact for readability; expand each one to multi-line when writing the actual file.
+
+**Paper-only plugins:**
+
+```java
+package com.example.myplugin.utils;
+
+import java.util.function.Supplier;
+import org.apache.logging.log4j.Level;
+import org.jetbrains.annotations.Nullable;
+
+public class MMLog {
+    private static @Nullable com.playmonumenta.common.MMLog INSTANCE = null;
+
+    /** Called from onLoad() on Paper. */
+    public static void init(String... commandPath) {
+        if (INSTANCE == null) {
+            INSTANCE = new com.playmonumenta.common.MMLog(com.example.myplugin.MyPlugin.PLUGIN_ID);
+            INSTANCE.registerPaperCommand(commandPath);
+        }
+    }
+
+    /** For use in tests — pass Mockito.mock(com.playmonumenta.common.MMLog.class) */
+    public static void init(com.playmonumenta.common.MMLog log) {
+        INSTANCE = log;
+    }
+
+    private static com.playmonumenta.common.MMLog get() {
+        if (INSTANCE == null) {
+            throw new RuntimeException("MyPlugin logger invoked before being initialized!");
+        }
+        return INSTANCE;
+    }
+
+    public static void setLevel(Level level)              { get().setLevel(level); }
+    public static boolean isLevelEnabled(Level level)     { return get().isLevelEnabled(level); }
+
+    public static void trace(Supplier<String> msg)        { get().trace(msg); }
+    public static void trace(String msg)                  { get().trace(msg); }
+    public static void trace(String msg, Throwable t)     { get().trace(msg, t); }
+    public static void debug(Supplier<String> msg)        { get().debug(msg); }
+    public static void debug(String msg)                  { get().debug(msg); }
+    public static void debug(String msg, Throwable t)     { get().debug(msg, t); }
+    public static void info(String msg)                   { get().info(msg); }
+    public static void info(Supplier<String> msg)         { get().info(msg); }
+    public static void warning(Supplier<String> msg)      { get().warning(msg); }
+    public static void warning(String msg)                { get().warning(msg); }
+    public static void warning(String msg, Throwable t)   { get().warning(msg, t); }
+    public static void severe(Supplier<String> msg)       { get().severe(msg); }
+    public static void severe(String msg)                 { get().severe(msg); }
+    public static void severe(String msg, Throwable t)    { get().severe(msg, t); }
+
+    /** @deprecated Use {@link #trace(Supplier)} instead. */
+    @Deprecated public static void finest(Supplier<String> msg) { get().trace(msg); }
+    /** @deprecated Use {@link #trace(String)} instead. */
+    @Deprecated public static void finest(String msg)           { get().trace(msg); }
+    /** @deprecated Use {@link #trace(Supplier)} instead. */
+    @Deprecated public static void finer(Supplier<String> msg)  { get().trace(msg); }
+    /** @deprecated Use {@link #trace(String)} instead. */
+    @Deprecated public static void finer(String msg)            { get().trace(msg); }
+    /** @deprecated Use {@link #debug(Supplier)} instead. */
+    @Deprecated public static void fine(Supplier<String> msg)   { get().debug(msg); }
+    /** @deprecated Use {@link #debug(String)} instead. */
+    @Deprecated public static void fine(String msg)             { get().debug(msg); }
+}
+```
+
+**Dual Paper+Velocity plugins** — `monumenta-common` now loads on both Paper and Velocity, so `com.playmonumenta.common.MMLog` can be held directly in the static field on both platforms. No delegate interface is needed.
+
+Add `initVelocity` alongside `init`. Call `initVelocity` from the Velocity plugin constructor (after `mServer` is available) in place of the old JUL bridge + `initFallback` setup:
+
+```java
+package com.example.myplugin.utils;
+
+import java.util.function.Supplier;
+import org.apache.logging.log4j.Level;
+import org.jetbrains.annotations.Nullable;
+
+public class MMLog {
+    private static @Nullable com.playmonumenta.common.MMLog INSTANCE = null;
+
+    /** Called from onLoad() on Paper. */
+    public static void init() {
+        if (INSTANCE == null) {
+            INSTANCE = new com.playmonumenta.common.MMLog(com.example.myplugin.MyPlugin.PLUGIN_ID);
+            INSTANCE.registerPaperCommand("monumenta", "myPlugin");
+        }
+    }
+
+    /** Called from the Velocity plugin constructor. */
+    public static void initVelocity(com.velocitypowered.api.proxy.ProxyServer server, Object plugin) {
+        if (INSTANCE == null) {
+            INSTANCE = new com.playmonumenta.common.MMLog(com.example.myplugin.MyPlugin.PLUGIN_ID);
+            INSTANCE.registerVelocityCommand(server.getCommandManager(), plugin, "monumenta", "myPlugin");
+        }
+    }
+
+    private static com.playmonumenta.common.MMLog get() {
+        if (INSTANCE == null) {
+            throw new RuntimeException("MyPlugin logger invoked before being initialized!");
+        }
+        return INSTANCE;
+    }
+
+    public static void setLevel(Level level)              { get().setLevel(level); }
+    public static boolean isLevelEnabled(Level level)     { return get().isLevelEnabled(level); }
+    // ... same delegation methods as the Paper-only template above
+}
+```
+
+On the Velocity plugin class, add `@Dependency(id = "monumenta-common")` alongside any existing dependencies:
+
+```java
+@Plugin(
+    id = "my-plugin",
+    // ...
+    dependencies = {
+        @Dependency(id = "monumenta-common"),
+        @Dependency(id = "some-optional-dep", optional = true)
+    }
+)
+```
+
+### Step 6 — Update tests (if applicable)
+
+If the plugin has tests that exercise code paths that log via `MMLog`, initialize the facade before running. Use the `init(com.playmonumenta.common.MMLog log)` overload (already in the facade template) with a Mockito mock:
+
+```java
+import com.example.myplugin.utils.MMLog;
+import org.mockito.Mockito;
+
+// In @BeforeAll / setUp():
+MMLog.init(Mockito.mock(com.playmonumenta.common.MMLog.class));
+```
+
+**Why not construct a real instance?** `com.playmonumenta.common.MMLog`'s constructor is safe to call (it only calls `LogManager.getLogger()`), but loading the class in a test environment triggers eager class loading of Velocity API types referenced in `registerVelocityCommand()`. On a real Paper server the JVM resolves those references lazily (the method is never called), but test class loaders are stricter. The fix is already covered in Step 1: `testRuntimeOnly(libs.velocity)` puts the Velocity API on the test classpath so class loading succeeds. Once that dependency is present, both the mock approach and direct construction work.
+
+---
+
+## Part 3 -- Upgrading MMLog call sites
+
+> **STOP. Do not begin this section until:**
+> 1. All other refactoring work (Parts 1 and 2) is complete across all affected plugins.
+> 2. The changes have been reviewed and **explicitly approved** by Byron.
+>
+> The deprecated aliases exist precisely so this can be deferred. Touching call sites before the structural work is reviewed creates unnecessary noise in diffs and risks merge conflicts. This section must not be started based on your own judgment — wait for a direct instruction to proceed.
+
+Once approved, work through each plugin's deprecation warnings. There are three categories:
+
+### Deprecated `MMLog` level methods
+
+| Old call | New call |
+|----------|----------|
+| `MMLog.fine(msg)` | `MMLog.debug(msg)` |
+| `MMLog.finer(msg)` | `MMLog.trace(msg)` |
+| `MMLog.finest(msg)` | `MMLog.trace(msg)` |
+
+Applies to both `String` and `Supplier<String>` variants.
+
+### `plugin.getLogger().<level>(msg)`
+
+Replace with the equivalent `MMLog` static method. Import `com.example.myplugin.utils.MMLog` (alphabetical order with other imports).
+
+| Old | New |
+|-----|-----|
+| `plugin.getLogger().severe(msg)` | `MMLog.severe(msg)` |
+| `plugin.getLogger().warning(msg)` | `MMLog.warning(msg)` |
+| `plugin.getLogger().info(msg)` | `MMLog.info(msg)` |
+| `plugin.getLogger().fine(msg)` | `MMLog.debug(msg)` |
+
+### Exception logging
+
+Pass the exception directly to `MMLog` instead of concatenating `getMessage()` and calling `printStackTrace()` separately.
+
+```java
+// Before
+MMLog.severe("Failed to do thing: " + ex.getMessage());
+ex.printStackTrace();
+
+// After
+MMLog.severe("Failed to do thing", ex);
+```
+
+If a bare `ex.printStackTrace()` exists with no preceding log call, convert it:
+
+```java
+// Before
+ex.printStackTrace();
+
+// After
+MMLog.severe("Unexpected error", ex);
+```
+
+If the preceding call is a raw `logger.severe()` (e.g. early-init code before MMLog is available), use the JUL overload:
+
+```java
+// Before
+e.printStackTrace();
+logger.severe("Server version " + version + " is not supported!");
+
+// After
+logger.log(Level.SEVERE, "Server version " + version + " is not supported!", e);
+// requires: import java.util.logging.Level;
+```
+
+Once all deprecation warnings are resolved, re-enable `-Werror` in the root `build.gradle.kts`.
