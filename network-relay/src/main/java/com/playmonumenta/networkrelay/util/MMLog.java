@@ -13,7 +13,7 @@ public class MMLog {
 	public static void init(JavaPlugin plugin) {
 		if (INSTANCE == null) {
 			INSTANCE = new com.playmonumenta.common.MMLog("MonumentaNetworkRelay");
-			INSTANCE.registerPaperCommand("monumenta", "networkRelay");
+			INSTANCE.registerPaperCommand("networkRelay");
 		}
 	}
 
@@ -23,7 +23,7 @@ public class MMLog {
 	public static void initVelocity(com.velocitypowered.api.proxy.ProxyServer server, Object plugin) {
 		if (INSTANCE == null) {
 			INSTANCE = new com.playmonumenta.common.MMLog("MonumentaNetworkRelay");
-			INSTANCE.registerVelocityCommand(server.getCommandManager(), plugin, "monumenta", "networkRelay");
+			INSTANCE.registerVelocityCommand(server.getCommandManager(), plugin, "networkRelay");
 		}
 	}
 
