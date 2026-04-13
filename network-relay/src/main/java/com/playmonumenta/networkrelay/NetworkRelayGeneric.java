@@ -36,7 +36,7 @@ public class NetworkRelayGeneric {
 							   String serverType,
 	                           BiConsumer<Integer, Consumer<Object>> registerEventMethod,
 	                           Consumer<Object> callEventMethod) {
-		MMLog.initFallback(parentLogger);
+		MMLog.init();
 		mCallEventMethod = callEventMethod;
 		GenericConfig config = new GenericConfig(parentLogger, configFile, defaultOwnerClass, resourcePath);
 

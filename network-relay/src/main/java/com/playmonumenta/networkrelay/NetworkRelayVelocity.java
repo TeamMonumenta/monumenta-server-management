@@ -61,7 +61,8 @@ public class NetworkRelayVelocity {
 		// init RabbitMQ single thread mimic - usb
 		NetworkRelayVelocityExecutor.getInstance();
 
-		MMLog.initVelocity(mServer, this);
+		MMLog.init();
+		com.playmonumenta.common.MMLogVelocity.registerCommand(MMLog.getLog(), mServer.getCommandManager(), this, "networkRelay");
 
 		INSTANCE = this;
 	}

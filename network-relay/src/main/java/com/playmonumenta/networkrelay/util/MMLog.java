@@ -1,40 +1,31 @@
 package com.playmonumenta.networkrelay.util;
 
 import java.util.function.Supplier;
-import java.util.logging.Logger;
 import org.apache.logging.log4j.Level;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.Nullable;
 
 public class MMLog {
+	static final String PLUGIN_ID = "MonumentaNetworkRelay";
 	private static @Nullable com.playmonumenta.common.MMLog INSTANCE = null;
 
-	/** Called from {@link com.playmonumenta.networkrelay.NetworkRelay#onLoad()} on Paper. */
-	public static void init(JavaPlugin plugin) {
+	/**
+	 * Creates the logger instance. Call once from the platform-specific plugin entry point before
+	 * any logging call. After calling this, register the changeLogLevel command via the appropriate
+	 * platform helper:
+	 * <ul>
+	 *   <li>Paper: {@code com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog(), "networkRelay")}
+	 *   <li>Velocity: {@code com.playmonumenta.common.MMLogVelocity.registerCommand(MMLog.getLog(), commandManager, plugin, "networkRelay")}
+	 * </ul>
+	 */
+	public static void init() {
 		if (INSTANCE == null) {
-			INSTANCE = new com.playmonumenta.common.MMLog("MonumentaNetworkRelay");
-			INSTANCE.registerPaperCommand("networkRelay");
+			INSTANCE = new com.playmonumenta.common.MMLog(PLUGIN_ID);
 		}
 	}
 
-	/**
-	 * Called on Velocity. Registers the changeLogLevel command via Brigadier.
-	 */
-	public static void initVelocity(com.velocitypowered.api.proxy.ProxyServer server, Object plugin) {
-		if (INSTANCE == null) {
-			INSTANCE = new com.playmonumenta.common.MMLog("MonumentaNetworkRelay");
-			INSTANCE.registerVelocityCommand(server.getCommandManager(), plugin, "networkRelay");
-		}
-	}
-
-	/**
-	 * Called in Generic (non-Paper, non-Velocity) mode. No changeLogLevel command is registered.
-	 * The {@code logger} parameter is unused; log output goes through log4j2 as on other platforms.
-	 */
-	public static void initFallback(Logger logger) {
-		if (INSTANCE == null) {
-			INSTANCE = new com.playmonumenta.common.MMLog("MonumentaNetworkRelay");
-		}
+	/** Returns the underlying {@link com.playmonumenta.common.MMLog} for command registration. */
+	public static com.playmonumenta.common.MMLog getLog() {
+		return get();
 	}
 
 	private static com.playmonumenta.common.MMLog get() {
