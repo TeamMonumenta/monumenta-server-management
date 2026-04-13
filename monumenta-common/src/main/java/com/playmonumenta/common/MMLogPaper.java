@@ -37,22 +37,27 @@ public final class MMLogPaper {
 				.withSubcommand(new CommandAPICommand("TRACE")
 					.executes((sender, args) -> {
 						log.setLevel(Level.TRACE);
+						sender.sendMessage("Log level for " + label + " set to TRACE");
 					}))
 				.withSubcommand(new CommandAPICommand("DEBUG")
 					.executes((sender, args) -> {
 						log.setLevel(Level.DEBUG);
+						sender.sendMessage("Log level for " + label + " set to DEBUG");
 					}))
 				.withSubcommand(new CommandAPICommand("INFO")
 					.executes((sender, args) -> {
 						log.setLevel(Level.INFO);
+						sender.sendMessage("Log level for " + label + " set to INFO");
 					}))
 				.withSubcommand(new CommandAPICommand("WARN")
 					.executes((sender, args) -> {
 						log.setLevel(Level.WARN);
+						sender.sendMessage("Log level for " + label + " set to WARN");
 					}))
 				.withSubcommand(new CommandAPICommand("ERROR")
 					.executes((sender, args) -> {
 						log.setLevel(Level.ERROR);
+						sender.sendMessage("Log level for " + label + " set to ERROR");
 					})))
 			.register();
 	}
