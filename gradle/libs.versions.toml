@@ -1,5 +1,5 @@
 [versions]
-monumenta-common = "6f48332-SNAPSHOT"
+monumenta-common = "a1f5bb3-SNAPSHOT"
 minimessage = "4.11.0"
 commons = "1.3"
 junit = "5.9.3"

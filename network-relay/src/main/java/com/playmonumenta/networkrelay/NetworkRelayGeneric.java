@@ -36,7 +36,7 @@ public class NetworkRelayGeneric {
 							   String serverType,
 	                           BiConsumer<Integer, Consumer<Object>> registerEventMethod,
 	                           Consumer<Object> callEventMethod) {
-		MMLog.init();
+		MMLog.init("MonumentaNetworkRelay");
 		mCallEventMethod = callEventMethod;
 		GenericConfig config = new GenericConfig(parentLogger, configFile, defaultOwnerClass, resourcePath);
 

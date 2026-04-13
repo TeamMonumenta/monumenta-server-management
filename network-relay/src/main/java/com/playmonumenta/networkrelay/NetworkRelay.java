@@ -22,8 +22,8 @@ public class NetworkRelay extends JavaPlugin {
 
 	@Override
 	public void onLoad() {
-		MMLog.init();
-		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog(), "networkRelay");
+		MMLog.init(getName());
+		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
 		mBroadcastCommand = new BroadcastCommand();
 		new SendCommand();
 		DebugHeartbeatCommand.registerCommands();

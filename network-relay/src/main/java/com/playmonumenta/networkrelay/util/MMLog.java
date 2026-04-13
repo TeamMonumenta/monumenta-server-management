@@ -5,21 +5,22 @@ import org.apache.logging.log4j.Level;
 import org.jetbrains.annotations.Nullable;
 
 public class MMLog {
-	static final String PLUGIN_ID = "MonumentaNetworkRelay";
 	private static @Nullable com.playmonumenta.common.MMLog INSTANCE = null;
 
 	/**
 	 * Creates the logger instance. Call once from the platform-specific plugin entry point before
-	 * any logging call. After calling this, register the changeLogLevel command via the appropriate
+	 * any logging call. After calling this, register the changeloglevel command via the appropriate
 	 * platform helper:
 	 * <ul>
-	 *   <li>Paper: {@code com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog(), "networkRelay")}
-	 *   <li>Velocity: {@code com.playmonumenta.common.MMLogVelocity.registerCommand(MMLog.getLog(), commandManager, plugin, "networkRelay")}
+	 *   <li>Paper: {@code com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog())}
+	 *   <li>Velocity: {@code com.playmonumenta.common.MMLogVelocity.registerCommand(MMLog.getLog(), commandManager, plugin)}
 	 * </ul>
+	 * @param pluginId the log4j2 logger name; on Paper pass {@code getName()}, on Velocity pass
+	 *                 the string from {@code @Plugin(name = ...)} in the same file
 	 */
-	public static void init() {
+	public static void init(String pluginId) {
 		if (INSTANCE == null) {
-			INSTANCE = new com.playmonumenta.common.MMLog(PLUGIN_ID);
+			INSTANCE = new com.playmonumenta.common.MMLog(pluginId);
 		}
 	}
 
