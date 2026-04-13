@@ -19,7 +19,7 @@ The new approach is a shared `com.playmonumenta.common.MMLog` class backed by **
 - Debug messages appear at `DEBUG` or `TRACE` level, not as fake `INFO`.
 - No manual level tracking, no re-leveling hack.
 
-`monumenta-common` ships as a single jar that loads as a plugin on both **Paper** and **Velocity**. Other plugins declare it as a hard dependency and construct their own `MMLog` instance. The `changeLogLevel` command is registered per-plugin; the platform-specific registration path (CommandAPI on Paper, BrigadierCommand on Velocity) is handled by `MMLogPaper` and `MMLogVelocity` respectively — separate helper classes that are only loaded on their respective platforms.
+`monumenta-common` ships as a single jar that loads as a plugin on both **Paper** and **Velocity**. Other plugins declare it as a hard dependency and construct their own `MMLog` instance. The `changeloglevel` command is registered per-plugin; the platform-specific registration path (CommandAPI on Paper, BrigadierCommand on Velocity) is handled by `MMLogPaper` and `MMLogVelocity` respectively — separate helper classes that are only loaded on their respective platforms.
 
 ### Level mapping (JUL -> log4j2)
 
@@ -34,13 +34,13 @@ The new approach is a shared `com.playmonumenta.common.MMLog` class backed by **
 
 `finest()`, `finer()`, and `fine()` are kept as `@Deprecated` aliases so existing call sites compile without immediate changes.
 
-### changeLogLevel command
+### changeloglevel command
 
-On Paper, each plugin registers `/changeLogLevel <label> TRACE|DEBUG|INFO|WARN|ERROR`.
-On Velocity, the command is `/changeLogLevelVelocity <label> TRACE|DEBUG|INFO|WARN|ERROR` to avoid conflicts.
+On Paper, each plugin registers `/changeloglevel <label> TRACE|DEBUG|INFO|WARN|ERROR`.
+On Velocity, the command is `/changeloglevelvelocity <label> TRACE|DEBUG|INFO|WARN|ERROR` to avoid conflicts.
 
-The label is a single lowerCamelCase identifier (e.g. `networkRelay`, `monumentaCommon`, `redisSync`).
-Permission is `<label>.changeloglevel` (all lowercase), e.g. `/changeLogLevel networkRelay INFO` requires `networkrelay.changeloglevel`.
+The label is derived automatically from the `MMLog` instance (`MMLog.getName()` returns the `pluginId` passed to its constructor), so `registerCommand` does not take a separate label argument. Use the plugin's display name as returned by `JavaPlugin.getName()` on Paper (e.g. `MonumentaNetworkRelay`, `MonumentaCommon`) — this keeps the command argument, permission node, and any `log4j2.xml` `<Logger name="...">` entries all consistent.
+Permission is `<label>.changeloglevel` (all lowercase), e.g. `/changeloglevel MonumentaNetworkRelay INFO` requires `monumentanetworkrelay.changeloglevel`.
 
 **Admin note:** old subcommand argument names have changed:
 
@@ -174,8 +174,6 @@ public Logger getLogger() { ... }
 Add to the class:
 ```java
 import com.example.myplugin.utils.MMLog;
-
-public static final String PLUGIN_ID = "MyPlugin"; // must match getName() / plugin.yml name
 ```
 
 Replace the `CustomLogger` construction and `ChangeLogLevel.register()` call in `onLoad()` with two lines:
@@ -183,19 +181,19 @@ Replace the `CustomLogger` construction and `ChangeLogLevel.register()` call in 
 ```java
 @Override
 public void onLoad() {
-    MMLog.init();
-    com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog(), "myPlugin");
-    // registers: /changeLogLevel myPlugin TRACE|DEBUG|INFO|WARN|ERROR
+    MMLog.init(getName()); // getName() == plugin.yml "name:" field — no string to keep in sync
+    com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
+    // registers: /changeloglevel MyPlugin TRACE|DEBUG|INFO|WARN|ERROR
     // permission: myplugin.changeloglevel
     // ... rest of onLoad
 }
 ```
 
-The `PLUGIN_ID` constant is the log4j2 logger name. It must match `JavaPlugin.getName()` (the plugin's display name in plugin.yml). The facade's `init()` uses it internally (see Step 5).
+The logger name is taken directly from `JavaPlugin.getName()`, so it automatically matches the plugin.yml `name:` field. The facade's `init(String)` stores it internally (see Step 5).
 
 #### Velocity (Velocity-only plugins)
 
-For a Velocity-only plugin with no Paper counterpart, hold a `mLog` field directly on the plugin class and initialize it in the constructor using `PLUGIN_ID` so log4j2 uses a consistent logger name:
+For a Velocity-only plugin with no Paper counterpart, hold a `mLog` field directly on the plugin class. Pass the plugin name as a string literal — it lives right next to the `@Plugin` annotation so it is easy to keep in sync:
 
 ```java
 import com.playmonumenta.common.MMLog;
@@ -203,11 +201,12 @@ import com.playmonumenta.common.MMLogVelocity;
 
 public MMLog mLog;
 
+// @Plugin(name = "MyPlugin", ...)
 @Subscribe
 public void onProxyInit(ProxyInitializeEvent event) {
-    mLog = new MMLog(MyPlugin.PLUGIN_ID);
-    MMLogVelocity.registerCommand(mLog, mServer.getCommandManager(), this, "myPlugin");
-    // registers: /changeLogLevelVelocity myPlugin TRACE|DEBUG|INFO|WARN|ERROR
+    mLog = new MMLog("MyPlugin");
+    MMLogVelocity.registerCommand(mLog, mServer.getCommandManager(), this);
+    // registers: /changeloglevelvelocity MyPlugin TRACE|DEBUG|INFO|WARN|ERROR
 }
 ```
 
@@ -235,10 +234,13 @@ import org.jetbrains.annotations.Nullable;
 public class MMLog {
     private static @Nullable com.playmonumenta.common.MMLog INSTANCE = null;
 
-    /** Call once from the platform-specific plugin entry point before any logging. */
-    public static void init() {
+    /**
+     * Call once from the platform-specific plugin entry point before any logging.
+     * On Paper pass {@code getName()}; on Velocity pass the string from the {@code @Plugin} annotation.
+     */
+    public static void init(String pluginId) {
         if (INSTANCE == null) {
-            INSTANCE = new com.playmonumenta.common.MMLog(com.example.myplugin.MyPlugin.PLUGIN_ID);
+            INSTANCE = new com.playmonumenta.common.MMLog(pluginId);
         }
     }
 
@@ -295,15 +297,16 @@ public class MMLog {
 Then in the **Paper plugin entry point** (`onLoad`):
 
 ```java
-MMLog.init();
-com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog(), "myPlugin");
+MMLog.init(getName()); // getName() == plugin.yml "name:" field
+com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
 ```
 
 And in the **Velocity plugin constructor**:
 
 ```java
-MMLog.init();
-com.playmonumenta.common.MMLogVelocity.registerCommand(MMLog.getLog(), mServer.getCommandManager(), this, "myPlugin");
+// @Plugin(name = "MyPlugin", ...)
+MMLog.init("MyPlugin"); // string matches @Plugin(name=...) in this file
+com.playmonumenta.common.MMLogVelocity.registerCommand(MMLog.getLog(), mServer.getCommandManager(), this);
 ```
 
 On the Velocity plugin class, add `@Dependency(id = "monumenta-common")` alongside any existing dependencies:
