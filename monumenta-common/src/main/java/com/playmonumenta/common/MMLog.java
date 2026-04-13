@@ -19,7 +19,10 @@ import org.apache.logging.log4j.core.config.Configurator;
  * <p>Each plugin creates one instance and holds it as a public field so a static facade can
  * delegate to it. Construct in {@code onLoad()} / {@code onEnable()} (Paper) or
  * {@code onProxyInit()} (Velocity), then call the appropriate {@code register*Command} method
- * to expose a {@code changeLogLevel} command in-game.
+ * to expose a level-change command in-game.
+ *
+ * <p>Paper registers {@code /changeLogLevel <label> TRACE|DEBUG|INFO|WARN|ERROR}.
+ * Velocity registers {@code /changeLogLevelVelocity <label> TRACE|DEBUG|INFO|WARN|ERROR}.
  *
  * <p>Paper example (plugin entry point):
  * <pre>{@code
@@ -68,98 +71,84 @@ public class MMLog {
 	}
 
 	/**
-	 * Registers a CommandAPI {@code changeLogLevel} subcommand under the given command path.
+	 * Registers {@code /changeLogLevel <label> TRACE|DEBUG|INFO|WARN|ERROR} via CommandAPI.
 	 *
-	 * <p>Call once from the Paper plugin's {@code onEnable()}. The path elements become nested
-	 * CommandAPI subcommands, with {@code changeLogLevel TRACE|DEBUG|INFO|WARN|ERROR} appended.
-	 * For example, {@code registerPaperCommand("monumenta", "myPlugin")} registers
-	 * {@code /monumenta myPlugin changeLogLevel INFO}.
+	 * <p>Call once from the Paper plugin's {@code onEnable()}. The required permission is
+	 * {@code <label>.changeloglevel} (e.g. {@code networkRelay.changeloglevel}).
 	 *
-	 * <p>The required permission is {@code <path.joined.with.dots>.changeloglevel}
-	 * (e.g. {@code monumenta.myPlugin.changeloglevel}).
-	 *
-	 * @param commandPath one or more command names forming the path above {@code changeLogLevel}
+	 * @param label identifier for this plugin shown as the first argument (e.g. "networkRelay")
 	 */
-	public void registerPaperCommand(String... commandPath) {
-		String permission = String.join(".", commandPath) + ".changeloglevel";
-		CommandAPICommand changeloglevel = new CommandAPICommand("changeLogLevel")
+	public void registerPaperCommand(String label) {
+		String permission = label + ".changeloglevel";
+		new CommandAPICommand("changeLogLevel")
 			.withPermission(CommandPermission.fromString(permission))
-			.withSubcommand(new CommandAPICommand("TRACE")
-				.executes((sender, args) -> {
-					setLevel(Level.TRACE);
-				}))
-			.withSubcommand(new CommandAPICommand("DEBUG")
-				.executes((sender, args) -> {
-					setLevel(Level.DEBUG);
-				}))
-			.withSubcommand(new CommandAPICommand("INFO")
-				.executes((sender, args) -> {
-					setLevel(Level.INFO);
-				}))
-			.withSubcommand(new CommandAPICommand("WARN")
-				.executes((sender, args) -> {
-					setLevel(Level.WARN);
-				}))
-			.withSubcommand(new CommandAPICommand("ERROR")
-				.executes((sender, args) -> {
-					setLevel(Level.ERROR);
-				}));
-
-		CommandAPICommand current = changeloglevel;
-		for (int i = commandPath.length - 1; i >= 1; i--) {
-			current = new CommandAPICommand(commandPath[i]).withSubcommand(current);
-		}
-		new CommandAPICommand(commandPath[0]).withSubcommand(current).register();
+			.withSubcommand(new CommandAPICommand(label)
+				.withSubcommand(new CommandAPICommand("TRACE")
+					.executes((sender, args) -> {
+						setLevel(Level.TRACE);
+					}))
+				.withSubcommand(new CommandAPICommand("DEBUG")
+					.executes((sender, args) -> {
+						setLevel(Level.DEBUG);
+					}))
+				.withSubcommand(new CommandAPICommand("INFO")
+					.executes((sender, args) -> {
+						setLevel(Level.INFO);
+					}))
+				.withSubcommand(new CommandAPICommand("WARN")
+					.executes((sender, args) -> {
+						setLevel(Level.WARN);
+					}))
+				.withSubcommand(new CommandAPICommand("ERROR")
+					.executes((sender, args) -> {
+						setLevel(Level.ERROR);
+					})))
+			.register();
 	}
 
 	/**
-	 * Registers a Brigadier {@code changeLogLevel} subcommand under the given command path.
+	 * Registers {@code /changeLogLevelVelocity <label> TRACE|DEBUG|INFO|WARN|ERROR} via Brigadier.
 	 *
-	 * <p>Call once from the Velocity plugin's {@code onProxyInit()}. Behaves identically to
-	 * {@link #registerPaperCommand} in structure and permission naming, but uses the Velocity
-	 * {@link CommandManager} and BrigadierCommand API. Pass {@code this} (the Velocity plugin
-	 * instance) as {@code plugin} so Velocity can attribute the command to the correct plugin.
+	 * <p>Call once from the Velocity plugin's {@code onProxyInit()}. Uses a distinct command name
+	 * ({@code changeLogLevelVelocity}) so it never conflicts with the Paper command. The required
+	 * permission is {@code <label>.changeloglevel}.
 	 *
 	 * @param commandManager the Velocity proxy's command manager
 	 * @param plugin         the Velocity plugin instance registering the command
-	 * @param commandPath    one or more command names forming the path above {@code changeLogLevel}
+	 * @param label          identifier for this plugin shown as the first argument
 	 */
-	public void registerVelocityCommand(CommandManager commandManager, Object plugin, String... commandPath) {
-		String permission = String.join(".", commandPath) + ".changeloglevel";
-		LiteralArgumentBuilder<CommandSource> changeloglevel = BrigadierCommand.literalArgumentBuilder("changeLogLevel")
+	public void registerVelocityCommand(CommandManager commandManager, Object plugin, String label) {
+		String permission = label + ".changeloglevel";
+		LiteralArgumentBuilder<CommandSource> root = BrigadierCommand.literalArgumentBuilder("changeLogLevelVelocity")
 			.requires(source -> source.hasPermission(permission))
-			.then(BrigadierCommand.literalArgumentBuilder("TRACE")
-				.executes(ctx -> {
-					setLevel(Level.TRACE);
-					return 1;
-				}))
-			.then(BrigadierCommand.literalArgumentBuilder("DEBUG")
-				.executes(ctx -> {
-					setLevel(Level.DEBUG);
-					return 1;
-				}))
-			.then(BrigadierCommand.literalArgumentBuilder("INFO")
-				.executes(ctx -> {
-					setLevel(Level.INFO);
-					return 1;
-				}))
-			.then(BrigadierCommand.literalArgumentBuilder("WARN")
-				.executes(ctx -> {
-					setLevel(Level.WARN);
-					return 1;
-				}))
-			.then(BrigadierCommand.literalArgumentBuilder("ERROR")
-				.executes(ctx -> {
-					setLevel(Level.ERROR);
-					return 1;
-				}));
+			.then(BrigadierCommand.literalArgumentBuilder(label)
+				.then(BrigadierCommand.literalArgumentBuilder("TRACE")
+					.executes(ctx -> {
+						setLevel(Level.TRACE);
+						return 1;
+					}))
+				.then(BrigadierCommand.literalArgumentBuilder("DEBUG")
+					.executes(ctx -> {
+						setLevel(Level.DEBUG);
+						return 1;
+					}))
+				.then(BrigadierCommand.literalArgumentBuilder("INFO")
+					.executes(ctx -> {
+						setLevel(Level.INFO);
+						return 1;
+					}))
+				.then(BrigadierCommand.literalArgumentBuilder("WARN")
+					.executes(ctx -> {
+						setLevel(Level.WARN);
+						return 1;
+					}))
+				.then(BrigadierCommand.literalArgumentBuilder("ERROR")
+					.executes(ctx -> {
+						setLevel(Level.ERROR);
+						return 1;
+					})));
 
-		LiteralArgumentBuilder<CommandSource> current = changeloglevel;
-		for (int i = commandPath.length - 1; i >= 1; i--) {
-			current = BrigadierCommand.literalArgumentBuilder(commandPath[i]).then(current);
-		}
-		LiteralCommandNode<CommandSource> rootNode =
-			BrigadierCommand.literalArgumentBuilder(commandPath[0]).then(current).build();
+		LiteralCommandNode<CommandSource> rootNode = root.build();
 		BrigadierCommand cmd = new BrigadierCommand(rootNode);
 		commandManager.register(commandManager.metaBuilder(cmd).plugin(plugin).build(), cmd);
 	}
