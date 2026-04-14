@@ -167,10 +167,6 @@ import java.util.logging.Logger;
 
 // field
 private @MonotonicNonNull CustomLogger mLogger;
-
-// getLogger() override
-@Override
-public Logger getLogger() { ... }
 ```
 
 Add to the class:
@@ -192,6 +188,17 @@ public void onLoad() {
 ```
 
 The logger name is taken directly from `JavaPlugin.getName()`, so it automatically matches the plugin.yml `name:` field. The facade's `init(String)` stores it internally (see Step 5).
+
+Keep (or add) the `getLogger()` override, marked deprecated, **permanently** — even after all internal call sites are removed in Part 3. Without it, `plugin.getLogger()` silently falls through to the `JavaPlugin` super implementation and returns a raw JUL logger with no warning to the caller:
+
+```java
+/** @deprecated Use {@link MMLog} static methods instead. */
+@Deprecated
+@Override
+public java.util.logging.Logger getLogger() {
+    return super.getLogger();
+}
+```
 
 #### Velocity (Velocity-only plugins)
 
