@@ -272,7 +272,7 @@ public class MonumentaWorldManagementAPI {
 				Bukkit.getScheduler().runTask(WorldManagementPlugin.getInstance(), () -> future.complete(null));
 			} catch (Exception ex) {
 				future.completeExceptionally(ex);
-				ex.printStackTrace();
+				MMLog.severe("Failed to copy world", ex);
 			}
 		});
 
@@ -335,7 +335,7 @@ public class MonumentaWorldManagementAPI {
 				Bukkit.getScheduler().runTask(WorldManagementPlugin.getInstance(), () -> future.complete(null));
 			} catch (Exception ex) {
 				future.completeExceptionally(ex);
-				ex.printStackTrace();
+				MMLog.severe("Failed to delete world", ex);
 			}
 		});
 

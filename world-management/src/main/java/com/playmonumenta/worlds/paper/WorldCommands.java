@@ -153,7 +153,7 @@ public class WorldCommands {
 						try {
 							MonumentaWorldManagementAPI.sortWorld(args.getByArgument(playerArg));
 						} catch (Exception ex) {
-							ex.printStackTrace();
+							MMLog.severe("Failed to sort world", ex);
 							throw CommandAPI.failWithString(ex.getMessage());
 						}
 					}))
@@ -309,7 +309,7 @@ public class WorldCommands {
 				try {
 					teleportToWorld(args.getByArgument(targetsArg), args.getByArgument(cachedWorldNameArg), args.getByArgument(locationArg), args.getByArgumentOrDefault(yawArg, 0f), args.getByArgumentOrDefault(pitchArg, 0f));
 				} catch (Exception e) {
-					e.printStackTrace();
+					MMLog.severe("Failed to teleport to world", e);
 				}
 			})
 			.register();
@@ -333,7 +333,7 @@ public class WorldCommands {
 				MonumentaRedisSyncAPI.getPlayerWorldData(player, newWorld).applyToPlayer(player);
 			} catch (Exception ex) {
 				sender.sendMessage(Component.text(ex.getMessage(), NamedTextColor.RED));
-				ex.printStackTrace();
+				MMLog.severe("Failed to force player to world", ex);
 			}
 		}, 1);
 
