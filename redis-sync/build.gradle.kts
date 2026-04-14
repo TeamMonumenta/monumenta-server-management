@@ -12,7 +12,7 @@ monumenta {
 	pluginProject("redissync")
 	paper(
 		"com.playmonumenta.redissync.MonumentaRedisSync", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20",
-		depends = listOf("CommandAPI", "MonumentaNetworkRelay"),
+		depends = listOf("CommandAPI", "MonumentaCommon", "MonumentaNetworkRelay"),
 	)
 
 	versionAdapterApi("adapter_api", paper = "1.18.2")

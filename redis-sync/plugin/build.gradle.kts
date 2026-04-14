@@ -1,5 +1,11 @@
+repositories {
+	mavenLocal()
+}
+
 dependencies {
 	implementation(libs.lettuce)
+	compileOnly(libs.log4j.core)
+	compileOnly(libs.monumenta.common)
 	compileOnly(project(":network-relay"))
 	compileOnly(libs.commandapi)
 
