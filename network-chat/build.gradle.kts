@@ -15,6 +15,8 @@ dependencies {
 	implementation(libs.minimessage)
 	implementation(libs.commons)
 	compileOnly(libs.commandapi)
+	compileOnly(libs.log4j.core)
+	compileOnly(libs.monumenta.common)
 	compileOnly(project(":network-relay"))
 	compileOnly(project(":redis-sync:redissync"))
 	compileOnly(libs.lettuce)
@@ -30,6 +32,7 @@ monumenta {
 		"com.playmonumenta.networkchat.NetworkChatPlugin", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.19",
 		depends = listOf(
 			"CommandAPI",
+			"MonumentaCommon",
 			"MonumentaNetworkRelay",
 			"MonumentaRedisSync",
 			"PlaceholderAPI",
