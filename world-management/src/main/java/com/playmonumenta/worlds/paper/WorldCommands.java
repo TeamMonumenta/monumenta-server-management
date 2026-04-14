@@ -19,7 +19,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
@@ -57,24 +56,6 @@ public class WorldCommands {
 
 		new CommandAPICommand("monumenta")
 			.withSubcommand(new CommandAPICommand("worldmanagement")
-				.withSubcommand(new CommandAPICommand("changeloglevel")
-					.withPermission(CommandPermission.fromString("monumenta.worldmanagement.changeloglevel"))
-					.withSubcommand(new CommandAPICommand("INFO")
-						.executes((sender, args) -> {
-							worldPlugin.setLogLevel(Level.INFO);
-						}))
-					.withSubcommand(new CommandAPICommand("FINE")
-						.executes((sender, args) -> {
-							worldPlugin.setLogLevel(Level.FINE);
-						}))
-					.withSubcommand(new CommandAPICommand("FINER")
-						.executes((sender, args) -> {
-							worldPlugin.setLogLevel(Level.FINER);
-						}))
-					.withSubcommand(new CommandAPICommand("FINEST")
-						.executes((sender, args) -> {
-							worldPlugin.setLogLevel(Level.FINEST);
-						})))
 				.withSubcommand(new CommandAPICommand("setviewdistance")
 					.withPermission(CommandPermission.fromString("monumenta.worldmanagement.setviewdistance"))
 					.withArguments(locationArg)

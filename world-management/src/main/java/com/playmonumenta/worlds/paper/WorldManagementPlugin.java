@@ -1,6 +1,5 @@
 package com.playmonumenta.worlds.paper;
 
-import com.playmonumenta.worlds.common.CustomLogger;
 import com.playmonumenta.worlds.common.MMLog;
 import java.io.File;
 import java.io.IOException;
@@ -11,20 +10,17 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class WorldManagementPlugin extends JavaPlugin {
 	private static @Nullable WorldManagementPlugin INSTANCE = null;
 
-	private static @Nullable CustomLogger mLogger = null;
 	private static boolean mSortWorldByScoreOnJoin = false;
 	private static boolean mSortWorldByScoreOnRespawn = false;
 	private static boolean mAllowInstanceAutocreation = false;
@@ -38,6 +34,8 @@ public class WorldManagementPlugin extends JavaPlugin {
 
 	@Override
 	public void onLoad() {
+		MMLog.init(getName());
+		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
 		WorldCommands.register(this);
 	}
 
@@ -219,17 +217,11 @@ public class WorldManagementPlugin extends JavaPlugin {
 		INSTANCE = null;
 	}
 
+	/** @deprecated Use {@link MMLog} static methods instead. */
+	@Deprecated
 	@Override
-	public @NotNull Logger getLogger() {
-		if (mLogger == null) {
-			mLogger = new CustomLogger(super.getLogger(), Level.INFO);
-		}
-		return mLogger;
-	}
-
-	protected void setLogLevel(Level level) {
-		super.getLogger().info("Changing log level to: " + level.toString());
-		getLogger().setLevel(level);
+	public java.util.logging.Logger getLogger() {
+		return super.getLogger();
 	}
 
 	/* If this ever returned null everything would explode anyway, no reason to add error handling around this */
