@@ -4,7 +4,7 @@ import com.fastasyncworldedit.core.util.collection.BlockSet;
 import com.fastasyncworldedit.core.util.collection.MemBlockSet;
 import com.playmonumenta.structures.StructuresAPI;
 import com.playmonumenta.structures.StructuresPlugin;
-import com.playmonumenta.structures.utils.MSLog;
+import com.playmonumenta.structures.utils.MMLog;
 import com.playmonumenta.structures.utils.MessagingUtils;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.regions.Region;
@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.logging.Level;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -56,7 +55,6 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 	// Minimum respawn timer value while players are inside a POI to prevent immediate respawns when leaving
 	private static final int MIN_TICKS_LEFT_WITH_PLAYERS_INSIDE = 20 * 10;
 
-	private final StructuresPlugin mPlugin;
 	private final World mWorld;
 	private final Random mRandom;
 
@@ -176,7 +174,7 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 				throw new Exception("No structures specified for '" + configLabel + "'");
 			}
 
-			RespawningStructure structure = new RespawningStructure(plugin, world, extraRadius,
+			RespawningStructure structure = new RespawningStructure(world, extraRadius,
 					configLabel, name, genericPaths,
 					loadPos, respawnTime, ticksLeft,
 					postRespawnCommand,
@@ -213,7 +211,7 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 						}
 					}
 				} else {
-					MSLog.warning("Cannot find minecraft:structure_void in registry");
+					MMLog.warning("Cannot find minecraft:structure_void in registry");
 				}
 				structure.mStructureVoidBlocks = structureVoidBlocks;
 
@@ -229,8 +227,7 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 		}
 	}
 
-	private RespawningStructure(StructuresPlugin plugin,
-	                            World world,
+	private RespawningStructure(World world,
 	                            int extraRadius,
 	                            String configLabel,
 	                            String name,
@@ -241,7 +238,6 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 	                            @Nullable String postRespawnCommand,
 	                            @Nullable String nextRespawnPath,
 	                            @Nullable SpawnerBreakTrigger spawnerBreakTrigger) {
-		mPlugin = plugin;
 		mWorld = world;
 		mRandom = new Random();
 		mConfigLabel = configLabel;
@@ -328,7 +324,7 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 
 		StructuresAPI.loadAndPasteStructure(respawnPath, new Location(mWorld, mLoadPos.getBlockX(), mLoadPos.getBlockY(), mLoadPos.getBlockZ()), true, false).whenComplete((unused, exception) -> {
 			if (exception != null) {
-				mPlugin.getLogger().log(Level.SEVERE, "Failed to respawn structure '" + mConfigLabel + "'", exception);
+				MMLog.severe("Failed to respawn structure '" + mConfigLabel + "'", exception);
 			} else if (mPostRespawnCommand != null) {
 				Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), mPostRespawnCommand);
 			}

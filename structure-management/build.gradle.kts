@@ -4,7 +4,13 @@ plugins {
 	alias(libs.plugins.gradle.config)
 }
 
+repositories {
+    mavenLocal()
+}
+
 dependencies {
+    compileOnly(libs.monumenta.common)
+    compileOnly(libs.log4j.core)
     compileOnly(libs.fawe.core)
     compileOnly(libs.fawe.bukkit) {
         isTransitive = false
@@ -22,7 +28,7 @@ monumenta {
 	name("MonumentaStructureManagement")
     paper(
         "com.playmonumenta.structures.StructuresPlugin", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20",
-        depends = listOf("CommandAPI", "FastAsyncWorldEdit", "ScriptedQuests")
+        depends = listOf("CommandAPI", "MonumentaCommon", "FastAsyncWorldEdit", "ScriptedQuests")
     )
 	gitPrefix("structure-management/")
 }

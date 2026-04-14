@@ -3,7 +3,7 @@ package com.playmonumenta.structures;
 import com.fastasyncworldedit.core.extent.clipboard.DiskOptimizedClipboard;
 import com.fastasyncworldedit.core.extent.processor.lighting.RelightMode;
 import com.playmonumenta.structures.utils.CommandUtils;
-import com.playmonumenta.structures.utils.MSLog;
+import com.playmonumenta.structures.utils.MMLog;
 import com.playmonumenta.structures.utils.MessagingUtils;
 import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.WorldEdit;
@@ -103,9 +103,9 @@ public class StructuresAPI {
 	public static CompletableFuture<BlockArrayClipboard> loadStructure(@NotNull String path) {
 		CompletableFuture<BlockArrayClipboard> future = new CompletableFuture<>();
 
-		MSLog.fine("loadStructure: Started loading structure '" + path + "'");
+		MMLog.debug("loadStructure: Started loading structure '" + path + "'");
 		Bukkit.getScheduler().runTaskAsynchronously(StructuresPlugin.getInstance(), () -> {
-			MSLog.fine("loadStructure: In async loading structure '" + path + "'");
+			MMLog.debug("loadStructure: In async loading structure '" + path + "'");
 			final BlockArrayClipboard clipboard;
 
 			try {
@@ -125,19 +125,19 @@ public class StructuresAPI {
 					future.completeExceptionally(new Exception("Loaded unknown clipboard type: " + newClip.getClass()));
 					return;
 				}
-				MSLog.fine("loadStructure: Async loaded structure '" + path + "'");
+				MMLog.debug("loadStructure: Async loaded structure '" + path + "'");
 
 				Bukkit.getScheduler().runTask(StructuresPlugin.getInstance(), () -> {
-					MSLog.fine("loadStructure: Completing future on main thread for '" + path + "'");
+					MMLog.debug("loadStructure: Completing future on main thread for '" + path + "'");
 					future.complete(clipboard);
-					MSLog.fine("loadStructure: Loading complete for '" + path + "'");
+					MMLog.debug("loadStructure: Loading complete for '" + path + "'");
 				});
 			} catch (Exception ex) {
-				MSLog.fine("loadStructure: Async caught exception loading '" + path + "': " + ex.getMessage());
+				MMLog.debug("loadStructure: Async caught exception loading '" + path + "': " + ex.getMessage());
 				Bukkit.getScheduler().runTask(StructuresPlugin.getInstance(), () -> {
-					MSLog.fine("loadStructure: Completing future with exception for '" + path + "': " + ex.getMessage());
+					MMLog.debug("loadStructure: Completing future with exception for '" + path + "': " + ex.getMessage());
 					future.completeExceptionally(ex);
-					MSLog.fine("loadStructure: Loading complete/failed for '" + path + "'");
+					MMLog.debug("loadStructure: Loading complete/failed for '" + path + "'");
 				});
 			}
 		});
@@ -161,7 +161,7 @@ public class StructuresAPI {
 	 * unused will always be null, ex will be a non-null exception if something went wrong
 	 */
 	public static CompletableFuture<Void> copyAreaAndSaveStructure(@NotNull String path, @NotNull Location loc1, @NotNull Location loc2) {
-		MSLog.fine("copyAreaAndSaveStructure: Started copying '" + path + "' at " +
+		MMLog.debug("copyAreaAndSaveStructure: Started copying '" + path + "' at " +
 				   loc1.getWorld().getName() + "(" + loc1.getBlockX() + " " + loc1.getBlockY() + " " + loc1.getBlockZ() + ")  " +
 				   loc2.getWorld().getName() + "(" + loc2.getBlockX() + " " + loc2.getBlockY() + " " + loc2.getBlockZ() + ")");
 
@@ -172,13 +172,13 @@ public class StructuresAPI {
 		Location copyLoc2 = loc2.clone();
 
 		if (!copyLoc1.getWorld().equals(copyLoc2.getWorld())) {
-			MSLog.fine("copyAreaAndSaveStructure: Completing with exception for '" + path + "' due to world mismatch");
+			MMLog.debug("copyAreaAndSaveStructure: Completing with exception for '" + path + "' due to world mismatch");
 			future.completeExceptionally(new Exception("Locations must have the same world"));
 			return future;
 		}
 
 		Bukkit.getScheduler().runTaskAsynchronously(StructuresPlugin.getInstance(), () -> {
-			MSLog.fine("copyAreaAndSaveStructure: In async copy for '" + path + "'");
+			MMLog.debug("copyAreaAndSaveStructure: In async copy for '" + path + "'");
 
 			// Create file to save under
 			try (Closer closer = Closer.create()) {
@@ -187,14 +187,14 @@ public class StructuresAPI {
 					//noinspection ResultOfMethodCallIgnored
 					file.getParentFile().mkdirs();
 					if (!file.createNewFile()) {
-						MSLog.warning("Failed to create " + path);
+						MMLog.warning("Failed to create " + path);
 					}
 				}
-				MSLog.fine("copyAreaAndSaveStructure: Created file for '" + path + "', starting copyArea");
+				MMLog.debug("copyAreaAndSaveStructure: Created file for '" + path + "', starting copyArea");
 
 				Clipboard clipboard = copyArea(copyLoc1, copyLoc2).get();
 
-				MSLog.fine("copyAreaAndSaveStructure: Area copied for '" + path + "'");
+				MMLog.debug("copyAreaAndSaveStructure: Area copied for '" + path + "'");
 
 				ClipboardFormat format = ClipboardFormats.findByAlias(FORMAT);
 				if (format == null) {
@@ -205,19 +205,19 @@ public class StructuresAPI {
 				ClipboardWriter writer = closer.register(format.getWriter(bos));
 				writer.write(clipboard);
 
-				MSLog.fine("copyAreaAndSaveStructure: Wrote output to file '" + path + "'");
+				MMLog.debug("copyAreaAndSaveStructure: Wrote output to file '" + path + "'");
 
 				Bukkit.getScheduler().runTask(StructuresPlugin.getInstance(), () -> {
-					MSLog.fine("copyAreaAndSaveStructure: Completing future on main thread for '" + path + "'");
+					MMLog.debug("copyAreaAndSaveStructure: Completing future on main thread for '" + path + "'");
 					future.complete(null);
-					MSLog.fine("copyAreaAndSaveStructure: Successfully completed '" + path + "'");
+					MMLog.debug("copyAreaAndSaveStructure: Successfully completed '" + path + "'");
 				});
 			} catch (Exception ex) {
-				MSLog.fine("copyAreaAndSaveStructure: Caught async exception for '" + path + "': " + ex.getMessage());
+				MMLog.debug("copyAreaAndSaveStructure: Caught async exception for '" + path + "': " + ex.getMessage());
 				Bukkit.getScheduler().runTask(StructuresPlugin.getInstance(), () -> {
-					MSLog.fine("copyAreaAndSaveStructure: Completing future with exception for '" + path + "': " + ex.getMessage());
+					MMLog.debug("copyAreaAndSaveStructure: Completing future with exception for '" + path + "': " + ex.getMessage());
 					future.completeExceptionally(ex);
-					MSLog.fine("copyAreaAndSaveStructure: Failed to complete '" + path + "': " + ex.getMessage());
+					MMLog.debug("copyAreaAndSaveStructure: Failed to complete '" + path + "': " + ex.getMessage());
 				});
 			}
 		});
@@ -410,7 +410,7 @@ public class StructuresAPI {
 				} else {
 					/* Actually load the structure asynchronously now that all the chunks have been processed for entities / blocks that shouldn't be replaced */
 					Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-						MSLog.finer(() -> "Initial processing took " + (System.currentTimeMillis() - initialTime) + " milliseconds (mostly async)"); // STOP -->
+						MMLog.trace(() -> "Initial processing took " + (System.currentTimeMillis() - initialTime) + " milliseconds (mostly async)"); // STOP -->
 
 						final long pasteTime = System.currentTimeMillis(); // <-- START
 
@@ -451,7 +451,7 @@ public class StructuresAPI {
 							copy.setCopyingEntities(includeEntities);
 							Operations.completeBlindly(copy);
 						}
-						MSLog.finer(() -> "Loading structure took " + (System.currentTimeMillis() - pasteTime) + " milliseconds (async)"); // STOP -->
+						MMLog.trace(() -> "Loading structure took " + (System.currentTimeMillis() - pasteTime) + " milliseconds (async)"); // STOP -->
 
 						/* Add a 5 tick delay until the next task for shifting */
 						Bukkit.getScheduler().runTaskLater(plugin, () -> signal.complete(null), 5);
@@ -509,7 +509,7 @@ public class StructuresAPI {
 			if (references == null || references == 0) {
 				references = 1;
 				if (!chunk.addPluginChunkTicket(plugin)) {
-					plugin.getLogger().warning("BUG: Plugin already has chunk ticket for " + chunk.getX() + "," + chunk.getZ());
+					MMLog.warning("BUG: Plugin already has chunk ticket for " + chunk.getX() + "," + chunk.getZ());
 				}
 			} else {
 				references += 1;
@@ -534,7 +534,7 @@ public class StructuresAPI {
 				mNumTicksWaited++;
 				if (mNumTicksWaited >= 30 * 20) {
 					String msg = "Timed out waiting for chunks to load";
-					plugin.getLogger().severe(msg);
+					MMLog.severe(msg);
 					this.cancel();
 					future.completeExceptionally(new Exception(msg));
 					return;
@@ -570,10 +570,10 @@ public class StructuresAPI {
 				WorldChunkKey key = new WorldChunkKey(world.getUID(), chunk.getChunkKey());
 				Integer references = CHUNK_TICKET_REFERENCE_COUNT.remove(key);
 				if (references == null || references <= 0) {
-					plugin.getLogger().warning("BUG: Chunk reference was cleared before it should have been: " + chunk.getX() + "," + chunk.getZ());
+					MMLog.warning("BUG: Chunk reference was cleared before it should have been: " + chunk.getX() + "," + chunk.getZ());
 				} else if (references == 1) {
 					if (!chunk.removePluginChunkTicket(plugin)) {
-						plugin.getLogger().warning("BUG: Chunk ticket was already removed: " + chunk.getX() + "," + chunk.getZ());
+						MMLog.warning("BUG: Chunk ticket was already removed: " + chunk.getX() + "," + chunk.getZ());
 					}
 				} else {
 					CHUNK_TICKET_REFERENCE_COUNT.put(key, references - 1);
@@ -696,14 +696,14 @@ public class StructuresAPI {
 							Bukkit.getScheduler().runTask(plugin, task.mStartTask);
 							task.mSignal.get(45, TimeUnit.SECONDS);
 						} catch (Exception ex) {
-							plugin.getLogger().severe("Structure task took longer than 45s to complete! Continuing to the next task. Exception: " + ex.getMessage());
+							MMLog.severe("Structure task took longer than 45s to complete! Continuing to the next task.", ex);
 						}
 					}
 
 					try {
 						Thread.sleep(50);
 					} catch (Exception ex) {
-						plugin.getLogger().info("Structure loading task sleep was interrupted");
+						MMLog.info("Structure loading task sleep was interrupted");
 						RUNNING_TASK = null;
 						break;
 					}

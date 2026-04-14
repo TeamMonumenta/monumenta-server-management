@@ -1,6 +1,5 @@
 package com.playmonumenta.structures.utils;
 
-import com.playmonumenta.structures.StructuresPlugin;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Objects;
@@ -40,7 +39,7 @@ public class MessagingUtils {
 		).hoverEvent(Component.text(sStackTrace, NamedTextColor.RED).asHoverEvent());
 
 		sender.sendMessage(formattedMessage);
-		StructuresPlugin.getInstance().getLogger().warning(errorMessage + "\n" + rawStackTrace);
+		MMLog.warning(Objects.requireNonNullElse(errorMessage, "Unknown error"), e);
 	}
 
 	public static String durationToString(int ticks) {

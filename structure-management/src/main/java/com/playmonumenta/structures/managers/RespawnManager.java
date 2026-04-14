@@ -3,6 +3,7 @@ package com.playmonumenta.structures.managers;
 import com.playmonumenta.structures.StructuresPlugin;
 import com.playmonumenta.structures.api.service.ZoneService;
 import com.playmonumenta.structures.api.service.ZoneServiceProvider;
+import com.playmonumenta.structures.utils.MMLog;
 import com.playmonumenta.structures.utils.MessagingUtils;
 import com.playmonumenta.structures.utils.Services;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
@@ -17,7 +18,6 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -113,7 +113,7 @@ public class RespawnManager {
 
 		// Load the frequency that the plugin should check for respawning structures
 		if (!config.isInt("check_respawn_period")) {
-			plugin.getLogger().warning("No check_respawn_period setting specified - using default 20");
+			MMLog.warning("No check_respawn_period setting specified - using default 20");
 			mTickPeriod = 20;
 		} else {
 			mTickPeriod = config.getInt("check_respawn_period");
@@ -121,7 +121,7 @@ public class RespawnManager {
 
 		// Load the respawning structures configuration section
 		if (!config.isConfigurationSection("respawning_structures")) {
-			plugin.getLogger().log(Level.INFO, "No respawning structures defined");
+			MMLog.info("No respawning structures defined");
 			mStructuresLoaded = true;
 			return;
 		}
@@ -143,7 +143,7 @@ public class RespawnManager {
 		// Iterate over all the respawning entries (shallow list at this level)
 		for (String key : keys) {
 			if (!respawnSection.isConfigurationSection(key)) {
-				mPlugin.getLogger().warning("respawning_structures entry '" + key + "' is not a configuration " +
+				MMLog.warning("respawning_structures entry '" + key + "' is not a configuration " +
 					"section!");
 				continue;
 			}
@@ -152,11 +152,11 @@ public class RespawnManager {
 				RespawningStructure.fromConfig(mPlugin, mWorld, key, respawnSection.getConfigurationSection(key))
 					.whenComplete((structure, ex) -> {
 						if (ex != null) {
-							mPlugin.getLogger().warning("Failed to load respawning structure entry '" + key + "': " + ex.getMessage());
+							MMLog.warning("Failed to load respawning structure entry '" + key + "'", ex);
 							MessagingUtils.sendStackTrace(Bukkit.getConsoleSender(), ex);
 						} else {
 							mRespawns.put(key, structure);
-							mPlugin.getLogger().info("Successfully loaded respawning structure '" + key + "': ");
+							MMLog.info("Successfully loaded respawning structure '" + key + "': ");
 						}
 					})
 			);
