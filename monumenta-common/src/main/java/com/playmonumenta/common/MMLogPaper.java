@@ -33,7 +33,7 @@ public final class MMLogPaper {
 	 */
 	public static void registerCommand(MMLog log) {
 		String label = log.getName();
-		String permission = label + ".changeloglevel";
+		String permission = label.toLowerCase(java.util.Locale.ROOT) + ".changeloglevel";
 		new CommandAPICommand("changeloglevel")
 			.withPermission(CommandPermission.fromString(permission))
 			.withSubcommand(new CommandAPICommand(label)

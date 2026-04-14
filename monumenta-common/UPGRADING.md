@@ -40,7 +40,9 @@ On Paper, each plugin registers `/changeloglevel <label> TRACE|DEBUG|INFO|WARN|E
 On Velocity, the command is `/changeloglevelvelocity <label> TRACE|DEBUG|INFO|WARN|ERROR` to avoid conflicts.
 
 The label is derived automatically from the `MMLog` instance (`MMLog.getName()` returns the `pluginName` passed to its constructor), so `registerCommand` does not take a separate label argument. Use the plugin's display name as returned by `JavaPlugin.getName()` on Paper (e.g. `MonumentaNetworkRelay`, `MonumentaCommon`) — this keeps the command argument, permission node, and any `log4j2.xml` `<Logger name="...">` entries all consistent.
-Permission is `<label>.changeloglevel` (all lowercase), e.g. `/changeloglevel MonumentaNetworkRelay INFO` requires `monumentanetworkrelay.changeloglevel`.
+Permission is `<label>.changeloglevel` (all lowercase), e.g. `/changeloglevelvelocity MonumentaNetworkRelay INFO` requires `monumentanetworkrelay.changeloglevel`.
+
+**Velocity shared root:** Velocity does not allow two plugins to own the same top-level command name. `MMLogVelocity.registerCommand` works around this by accumulating all registered `MMLog` instances in a static list. Each call unregisters the existing `/changeloglevelvelocity` root and re-registers a fresh tree containing every plugin's label as a child node. Permission checks are per-label, so each plugin's subcommand is independently gated. No change is needed at the call site — each plugin still calls `registerCommand` exactly once.
 
 **Admin note:** old subcommand argument names have changed:
 
