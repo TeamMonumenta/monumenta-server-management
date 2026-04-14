@@ -1,6 +1,7 @@
 package com.playmonumenta.worlds.paper;
 
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
+import com.playmonumenta.worlds.common.MMLog;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
@@ -19,7 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -355,10 +355,9 @@ public class WorldCommands {
 		List<String> worldNames = new ArrayList<>(worldNamesIn);
 
 		Bukkit.getScheduler().runTask(WorldManagementPlugin.getInstance(), () -> {
-			Logger log = WorldManagementPlugin.getInstance().getLogger();
 			int numUpgraded = worldNames.size();
-			log.info("Started upgrading " + numUpgraded + " worlds...");
-			log.info("NOTE: This will only do something useful if server was started with -Ddisable.watchdog=true -jar <jarname> --forceUpgrade --eraseCache");
+			MMLog.info("Started upgrading " + numUpgraded + " worlds...");
+			MMLog.info("NOTE: This will only do something useful if server was started with -Ddisable.watchdog=true -jar <jarname> --forceUpgrade --eraseCache");
 
 			new BukkitRunnable() {
 				@Nullable String mLastWorldName = null;
@@ -368,20 +367,20 @@ public class WorldCommands {
 				public void run() {
 					// If there was a last world, unload it
 					if (mLastWorldName != null) {
-						log.info("Finished upgrading world '" + mLastWorldName + "'");
-						log.fine(() -> "Upgrading took " + (System.currentTimeMillis() - mStartTime) + " milliseconds");
+						MMLog.info("Finished upgrading world '" + mLastWorldName + "'");
+						MMLog.debug(() -> "Upgrading took " + (System.currentTimeMillis() - mStartTime) + " milliseconds");
 						MonumentaWorldManagementAPI.unloadWorld(mLastWorldName).whenComplete((unused, ex) -> {
 							if (ex != null) {
-								log.severe("Failed to unload world '" + mLastWorldName + "': " + ex.getMessage());
+								MMLog.severe("Failed to unload world '" + mLastWorldName + "'", ex);
 							} else {
-								log.info("Unloaded world '" + mLastWorldName + "'");
+								MMLog.info("Unloaded world '" + mLastWorldName + "'");
 							}
 						});
 					}
 
 					if (worldNames.isEmpty()) {
 						// Done, exit
-						log.info("Completed upgrading " + numUpgraded + " worlds");
+						MMLog.info("Completed upgrading " + numUpgraded + " worlds");
 						this.cancel();
 						return;
 					}
@@ -389,14 +388,14 @@ public class WorldCommands {
 					// Not done, keep processing
 					mLastWorldName = worldNames.remove(0);
 					mStartTime = System.currentTimeMillis();
-					log.info("Started upgrading world '" + mLastWorldName + "'");
+					MMLog.info("Started upgrading world '" + mLastWorldName + "'");
 
 					// Load world
 					try {
 						MonumentaWorldManagementAPI.ensureWorldLoaded(mLastWorldName, null);
 					} catch (Exception ex) {
 						// Severe error, fail and stop loading new worlds so it doesn't get missed
-						log.severe("Failed to load world '" + mLastWorldName + "': " + ex.getMessage());
+						MMLog.severe("Failed to load world '" + mLastWorldName + "'", ex);
 						this.cancel();
 					}
 				}

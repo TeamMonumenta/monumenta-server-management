@@ -9,7 +9,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
+import org.apache.logging.log4j.Level;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -70,12 +70,12 @@ public class WorldManagementPlugin extends JavaPlugin {
 				// Copy the default config file
 				InputStream defaultConfig = getClass().getResourceAsStream("/default_config.yml");
 				if (defaultConfig == null) {
-					getLogger().log(Level.SEVERE, "Failed to locate default configuration file; was the plugin jar replaced?");
+					MMLog.severe("Failed to locate default configuration file; was the plugin jar replaced?");
 				} else {
 					Files.copy(defaultConfig, configFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
 				}
 			} catch (IOException ex) {
-				getLogger().log(Level.SEVERE, "Failed to create configuration file");
+				MMLog.severe("Failed to create configuration file", ex);
 			}
 		}
 
@@ -84,10 +84,10 @@ public class WorldManagementPlugin extends JavaPlugin {
 
 		String logLevel = config.getString("log-level", "INFO");
 		try {
-			getLogger().setLevel(Level.parse(logLevel));
+			MMLog.setLevel(Level.valueOf(logLevel));
 			printConfig("log-level", logLevel);
 		} catch (Exception ex) {
-			getLogger().warning("log-level=" + logLevel + " is invalid - defaulting to INFO");
+			MMLog.warning("log-level=" + logLevel + " is invalid - defaulting to INFO");
 		}
 
 		ConfigurationSection instancingConfig = config.getConfigurationSection("instancing");
@@ -138,11 +138,11 @@ public class WorldManagementPlugin extends JavaPlugin {
 	}
 
 	protected void printConfigHeader(String configKey) {
-		getLogger().info(configKey + ":");
+		MMLog.info(configKey + ":");
 	}
 
 	protected <T> void printConfig(String configKey, @Nullable T value) {
-		getLogger().info(configKey + "=" + (value == null ? "null" : value));
+		MMLog.info(configKey + "=" + (value == null ? "null" : value));
 	}
 
 	public static boolean isSortWorldByScoreOnJoin() {
@@ -166,7 +166,7 @@ public class WorldManagementPlugin extends JavaPlugin {
 			break;
 		}
 		if (info == null) {
-			MMLog.fine("No shard info found.");
+			MMLog.debug("No shard info found.");
 			return null;
 		}
 		return info;

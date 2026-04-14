@@ -5,11 +5,11 @@ import com.google.gson.JsonPrimitive;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
+import com.playmonumenta.worlds.common.MMLog;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Logger;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -34,11 +34,9 @@ public class WorldManagementListener implements Listener {
 
 	private @Nullable BukkitTask mUnloadTask = null;
 	private final Plugin mPlugin;
-	private final Logger mLogger;
 
 	protected WorldManagementListener(Plugin plugin) {
 		mPlugin = plugin;
-		mLogger = plugin.getLogger();
 		INSTANCE = this;
 		reloadConfig();
 	}
@@ -61,7 +59,7 @@ public class WorldManagementListener implements Listener {
 
 		ShardInfo info = WorldManagementPlugin.getShardInfo(player);
 		if (info == null) {
-			mLogger.severe("sort-world-by-score-on-respawn is True but no instancing shard info exists");
+			MMLog.severe("sort-world-by-score-on-respawn is True but no instancing shard info exists");
 			return;
 		}
 
@@ -84,7 +82,7 @@ public class WorldManagementListener implements Listener {
 					Bukkit.getScheduler().runTaskLater(mPlugin, () -> {
 						// Note that this will run after the player has been moved to the correct world, since it runs a tick later
 						if (Bukkit.getOnlinePlayers().contains(player)) {
-							mLogger.fine("Running respawn command on player=" + player.getName() + " thread=" + Thread.currentThread().getName());
+							MMLog.debug("Running respawn command on player=" + player.getName() + " thread=" + Thread.currentThread().getName());
 							Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "execute as " + player.getUniqueId() + " at @s run " + info.getRespawnInstanceCommand());
 						}
 					}, 1);
@@ -97,8 +95,7 @@ public class WorldManagementListener implements Listener {
 			} catch (Exception ex) {
 				String msg = "Failed to load your assigned world instance " + score + ": " + ex.getMessage();
 				player.sendMessage(msg);
-				mLogger.warning(msg);
-				ex.printStackTrace();
+				MMLog.warning(msg, ex);
 			}
 		}
 	}
@@ -109,7 +106,7 @@ public class WorldManagementListener implements Listener {
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
 	public void playerJoinSetWorldEvent(PlayerJoinSetWorldEvent event) {
 		Player player = event.getPlayer();
-		mLogger.fine("playerJoinSetWorldEvent: player=" + player.getName() + " thread=" + Thread.currentThread().getName());
+		MMLog.debug("playerJoinSetWorldEvent: player=" + player.getName() + " thread=" + Thread.currentThread().getName());
 
 		if (!WorldManagementPlugin.isSortWorldByScoreOnJoin()) {
 			String lastSavedWorldName = event.getLastSavedWorldName();
@@ -122,15 +119,14 @@ public class WorldManagementListener implements Listener {
 				} catch (Exception ex) {
 					String msg = "Failed to load the last world you were on (" + lastSavedWorldName + "): " + ex.getMessage();
 					player.sendMessage(msg);
-					mLogger.warning(msg);
-					ex.printStackTrace();
+					MMLog.warning(msg, ex);
 				}
 			}
 		} else {
 			try {
 				event.setWorld(getSortWorld(player));
 			} catch (Exception ex) {
-				mLogger.warning("Failed to set world for player " + player.getName() + ": " + ex.getMessage());
+				MMLog.warning("Failed to set world for player " + player.getName(), ex);
 			}
 		}
 
@@ -204,7 +200,7 @@ public class WorldManagementListener implements Listener {
 			command = info.getRejoinInstanceCommand();
 		}
 		if (command != null) {
-			mLogger.fine("Running (re)join command on player=" + player.getName() + " thread=" + Thread.currentThread().getName());
+			MMLog.debug("Running (re)join command on player=" + player.getName() + " thread=" + Thread.currentThread().getName());
 			Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "execute as " + player.getUniqueId() + " at @s run " + command);
 		}
 	}
@@ -276,13 +272,13 @@ public class WorldManagementListener implements Listener {
 					} else {
 						int idleTime = worldIdleTimes.getOrDefault(world.getUID(), 0) + 200;
 						if (idleTime > WorldManagementPlugin.getUnloadInactiveWorldAfterTicks()) {
-							mLogger.info("Unloading world '" + world.getName() + "' which has had no players for " + idleTime + " ticks");
+							MMLog.info("Unloading world '" + world.getName() + "' which has had no players for " + idleTime + " ticks");
 							MonumentaWorldManagementAPI.unloadWorld(world.getName()).whenComplete((unused, ex) -> {
 								if (ex != null) {
-									mLogger.warning("Failed to unload world '" + world.getName() + "': " + ex.getMessage());
+									MMLog.warning("Failed to unload world '" + world.getName() + "'", ex);
 								} else {
 									worldIdleTimes.remove(world.getUID());
-									mLogger.info("Unloaded world " + world.getName());
+									MMLog.info("Unloaded world " + world.getName());
 								}
 							});
 							// Even though it hasn't unloaded yet, reset its idle time so it won't attempt to unload constantly
