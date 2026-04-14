@@ -473,7 +473,7 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 	private void distributeMessageToPlayer(UUID playerId, UUID otherId, Message message) {
 		PlayerState state = PlayerStateManager.getPlayerState(playerId);
 		if (state == null) {
-			MMLog.finer("Receiver not on this shard.");
+			MMLog.trace("Receiver not on this shard.");
 			return;
 		}
 		Player player = state.getPlayer();
