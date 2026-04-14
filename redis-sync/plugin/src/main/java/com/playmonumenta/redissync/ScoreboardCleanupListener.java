@@ -3,10 +3,10 @@ package com.playmonumenta.redissync;
 import com.destroystokyo.paper.event.player.PlayerAdvancementDataLoadEvent;
 import com.destroystokyo.paper.event.player.PlayerDataLoadEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
+import com.playmonumenta.redissync.utils.MMLog;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -21,13 +21,11 @@ public class ScoreboardCleanupListener implements Listener {
 	private static final int CLEANUP_LOGOUT_DELAY = 20 * 60; // 1 minute
 
 	private final Plugin mPlugin;
-	private final Logger mLogger;
 	private final Map<UUID, BukkitTask> mCleanupTasks = new HashMap<>();
 	private final VersionAdapter mAdapter;
 
-	protected ScoreboardCleanupListener(Plugin plugin, Logger logger, VersionAdapter adapter) {
+	protected ScoreboardCleanupListener(Plugin plugin, VersionAdapter adapter) {
 		mPlugin = plugin;
-		mLogger = logger;
 		mAdapter = adapter;
 	}
 
@@ -60,7 +58,7 @@ public class ScoreboardCleanupListener implements Listener {
 		String playerName = event.getPlayer().getName();
 		mCleanupTasks.put(event.getPlayer().getUniqueId(), Bukkit.getScheduler().runTaskLater(mPlugin, () -> {
 			mAdapter.resetPlayerScores(playerName, Bukkit.getScoreboardManager().getMainScoreboard());
-			mLogger.info("Removed scores for player " + playerName + " from local scoreboard");
+			MMLog.info("Removed scores for player " + playerName + " from local scoreboard");
 		}, CLEANUP_LOGOUT_DELAY));
 	}
 

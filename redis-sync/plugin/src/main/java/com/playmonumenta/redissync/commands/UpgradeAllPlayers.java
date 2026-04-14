@@ -3,12 +3,12 @@ package com.playmonumenta.redissync.commands;
 import com.playmonumenta.redissync.MonumentaRedisSync;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI.RedisPlayerData;
+import com.playmonumenta.redissync.utils.MMLog;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.UUID;
-import java.util.logging.Level;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -62,7 +62,7 @@ public class UpgradeAllPlayers {
 				Bukkit.getServer().sendMessage(Component.text("Failed to save upgraded player: " + uuid).color(NamedTextColor.RED));
 			}
 		} catch (Exception ex) {
-			mrs.getLogger().log(Level.SEVERE, "Failed to upgrade player: " + uuid, ex);
+			MMLog.severe("Failed to upgrade player: " + uuid, ex);
 			Bukkit.getServer().sendMessage(Component.text("Failed to upgrade player: " + uuid + " : " + ex.getMessage()).color(NamedTextColor.RED));
 		}
 	}
@@ -98,7 +98,7 @@ public class UpgradeAllPlayers {
 				}
 			}.runTaskTimer(mrs, 0, 1);
 		} catch (Exception ex) {
-			mrs.getLogger().log(Level.SEVERE, "Upgrade failed", ex);
+			MMLog.severe("Upgrade failed", ex);
 			Bukkit.getServer().sendMessage(Component.text("Upgrade failed: " + ex.getMessage()).color(NamedTextColor.RED));
 		}
 	}

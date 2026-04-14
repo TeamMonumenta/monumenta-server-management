@@ -5,10 +5,9 @@ import com.playmonumenta.networkrelay.GatherHeartbeatDataEvent;
 import com.playmonumenta.networkrelay.NetworkRelayAPI;
 import com.playmonumenta.networkrelay.NetworkRelayMessageEvent;
 import com.playmonumenta.redissync.event.PlayerAccountTransferEvent;
+import com.playmonumenta.redissync.utils.MMLog;
 import java.util.Set;
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -22,12 +21,10 @@ public class NetworkRelayIntegration implements Listener {
 	private static final String LOGIN_EVENT_CHANNEL = "com.playmonumenta.redissync.loginEvent";
 	private static final String ACCOUNT_TRANSFER_EVENT_CHANNEL = "com.playmonumenta.redissync.AccountTransferEvent";
 	private static final String PLUGIN_IDENTIFIER = "com.playmonumenta.redissync";
-	private final Logger mLogger;
 	private final String mShardName;
 
-	protected NetworkRelayIntegration(Logger logger) throws Exception {
+	protected NetworkRelayIntegration() throws Exception {
 		INSTANCE = this;
-		mLogger = logger;
 		mShardName = NetworkRelayAPI.getShardName();
 	}
 
@@ -51,7 +48,7 @@ public class NetworkRelayIntegration implements Listener {
 				eventData.addProperty("playerUuid", uuidStr);
 				NetworkRelayAPI.sendBroadcastMessage(LOGIN_EVENT_CHANNEL, eventData);
 			} catch (Exception e) {
-				mLogger.warning("Failed to broadcast login event for " + nameStr);
+				MMLog.warning("Failed to broadcast login event for " + nameStr);
 			}
 		});
 	}
@@ -80,7 +77,7 @@ public class NetworkRelayIntegration implements Listener {
 
 				NetworkRelayAPI.sendBroadcastMessage(ACCOUNT_TRANSFER_EVENT_CHANNEL, eventData);
 			} catch (Exception e) {
-				instance.mLogger.warning("Failed to broadcast account transfer event for " + currentName);
+				MMLog.warning("Failed to broadcast account transfer event for " + currentName);
 			}
 		});
 	}
@@ -91,7 +88,7 @@ public class NetworkRelayIntegration implements Listener {
 			case LOGIN_EVENT_CHANNEL -> {
 				JsonObject data = event.getData();
 				if (data == null) {
-					mLogger.severe("Got " + LOGIN_EVENT_CHANNEL + " channel with null data");
+					MMLog.severe("Got " + LOGIN_EVENT_CHANNEL + " channel with null data");
 					return;
 				}
 				remoteLoginEvent(data);
@@ -104,7 +101,7 @@ public class NetworkRelayIntegration implements Listener {
 
 				JsonObject data = event.getData();
 				if (data == null) {
-					mLogger.severe("Got " + ACCOUNT_TRANSFER_EVENT_CHANNEL + " channel with null data");
+					MMLog.severe("Got " + ACCOUNT_TRANSFER_EVENT_CHANNEL + " channel with null data");
 					return;
 				}
 
@@ -117,7 +114,7 @@ public class NetworkRelayIntegration implements Listener {
 
 	@EventHandler(priority = EventPriority.LOW, ignoreCancelled = false)
 	public void gatherHeartbeatDataEvent(GatherHeartbeatDataEvent event) throws Exception {
-		mLogger.finest("Got relay request for heartbeat data");
+		MMLog.trace("Got relay request for heartbeat data");
 		/* Don't actually need to set any data - just being present is sufficient */
 		event.setPluginData(PLUGIN_IDENTIFIER, new JsonObject());
 	}
@@ -135,7 +132,7 @@ public class NetworkRelayIntegration implements Listener {
 
 				return shards.toArray(new String[0]);
 			} catch (Exception ex) {
-				instance.mLogger.log(Level.WARNING, "NetworkRelayAPI.getOnlineShardNames failed", ex);
+				MMLog.warning("NetworkRelayAPI.getOnlineShardNames failed", ex);
 			}
 		}
 		return new String[0];
@@ -155,11 +152,11 @@ public class NetworkRelayIntegration implements Listener {
 			playerName = data.get("playerName").getAsString();
 			playerUuid = UUID.fromString(data.get("playerUuid").getAsString());
 		} catch (Exception e) {
-			mLogger.severe("Got " + LOGIN_EVENT_CHANNEL + " channel with invalid data");
+			MMLog.severe("Got " + LOGIN_EVENT_CHANNEL + " channel with invalid data");
 			return;
 		}
 
-		mLogger.fine("Got relay remoteLoginEvent for " + playerName);
+		MMLog.debug("Got relay remoteLoginEvent for " + playerName);
 
 		if (mShardName.equals(remoteShardName)) {
 			return;
@@ -171,8 +168,7 @@ public class NetworkRelayIntegration implements Listener {
 
 	private void remoteAccountTransferEvent(JsonObject data) {
 		AccountTransferDetails transferDetails = new AccountTransferDetails(data);
-		MonumentaRedisSync.getInstance().getLogger()
-			.info("[AccountTransferManager] Detected remote account transfer for " + transferDetails.oldName() + " (" + transferDetails.oldId() + ") -> " + transferDetails.newName() + " (" + transferDetails.newId() + ")");
+		MMLog.info("[AccountTransferManager] Detected remote account transfer for " + transferDetails.oldName() + " (" + transferDetails.oldId() + ") -> " + transferDetails.newName() + " (" + transferDetails.newId() + ")");
 		AccountTransferManager.registerRemoteTransfer(transferDetails);
 
 		PlayerAccountTransferEvent event = new PlayerAccountTransferEvent(transferDetails);
@@ -185,7 +181,7 @@ public class NetworkRelayIntegration implements Listener {
 			try {
 				return NetworkRelayAPI.getShardName();
 			} catch (Exception ex) {
-				instance.mLogger.log(Level.WARNING, "NetworkRelayAPI.getShardName failed", ex);
+				MMLog.warning("NetworkRelayAPI.getShardName failed", ex);
 			}
 		}
 		return null;

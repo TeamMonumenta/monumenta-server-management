@@ -3,6 +3,7 @@ package com.playmonumenta.redissync.commands;
 import com.playmonumenta.redissync.AccountTransferAPI;
 import com.playmonumenta.redissync.AccountTransferDetails;
 import com.playmonumenta.redissync.MonumentaRedisSync;
+import com.playmonumenta.redissync.utils.MMLog;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.LiteralArgument;
@@ -13,7 +14,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
-import java.util.logging.Level;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -46,7 +46,7 @@ public class PlayerTransferHistory {
 							transferDetailsList = AccountTransferAPI.getEffectiveTransfersSince(since).join();
 						} catch (Throwable throwable) {
 							sender.sendMessage(Component.text("Unable to fetch transfer history: " + throwable, NamedTextColor.RED));
-							plugin.getLogger().log(Level.WARNING, "Unable to fetch transfer history: ", throwable);
+							MMLog.warning("Unable to fetch transfer history: ", throwable);
 							return;
 						}
 
@@ -66,7 +66,7 @@ public class PlayerTransferHistory {
 								sender.sendMessage(Component.text("Done!", NamedTextColor.GREEN));
 							} catch (Throwable throwable) {
 								sender.sendMessage(Component.text("Unable to display transfer history: " + throwable, NamedTextColor.RED));
-								plugin.getLogger().log(Level.WARNING, "Unable to display transfer history: ", throwable);
+								MMLog.warning("Unable to display transfer history: ", throwable);
 							}
 						});
 					});
@@ -90,7 +90,7 @@ public class PlayerTransferHistory {
 							transferDetailsList = AccountTransferAPI.getAllTransfersSince(since).join();
 						} catch (Throwable throwable) {
 							sender.sendMessage(Component.text("Unable to fetch transfer history: " + throwable, NamedTextColor.RED));
-							plugin.getLogger().log(Level.WARNING, "Unable to fetch transfer history: ", throwable);
+							MMLog.warning("Unable to fetch transfer history: ", throwable);
 							return;
 						}
 
@@ -110,7 +110,7 @@ public class PlayerTransferHistory {
 								sender.sendMessage(Component.text("Done!", NamedTextColor.GREEN));
 							} catch (Throwable throwable) {
 								sender.sendMessage(Component.text("Unable to display transfer history: " + throwable, NamedTextColor.RED));
-								plugin.getLogger().log(Level.WARNING, "Unable to display transfer history: ", throwable);
+								MMLog.warning("Unable to display transfer history: ", throwable);
 							}
 						});
 					});

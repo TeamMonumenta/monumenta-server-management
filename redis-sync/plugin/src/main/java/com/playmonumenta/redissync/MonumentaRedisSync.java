@@ -82,7 +82,7 @@ public class MonumentaRedisSync extends JavaPlugin {
 
 		if (getServer().getPluginManager().isPluginEnabled("MonumentaNetworkRelay")) {
 			try {
-				getServer().getPluginManager().registerEvents(new NetworkRelayIntegration(this.getLogger()), this);
+				getServer().getPluginManager().registerEvents(new NetworkRelayIntegration(), this);
 			} catch (Exception ex) {
 				MMLog.severe("Failed to enable MonumentaNetworkRelay integration", ex);
 			}
@@ -90,9 +90,8 @@ public class MonumentaRedisSync extends JavaPlugin {
 
 		loadConfig();
 		mRedisAPI = new RedisAPI(BukkitConfigAPI.getRedisHost(), BukkitConfigAPI.getRedisPort());
-		RedisAPI.setLogger(getLogger());
-		getServer().getPluginManager().registerEvents(new DataEventListener(this.getLogger(), mVersionAdapter), this);
-		getServer().getPluginManager().registerEvents(new ScoreboardCleanupListener(this, this.getLogger(), mVersionAdapter), this);
+		getServer().getPluginManager().registerEvents(new DataEventListener(mVersionAdapter), this);
+		getServer().getPluginManager().registerEvents(new ScoreboardCleanupListener(this, mVersionAdapter), this);
 		getServer().getPluginManager().registerEvents(AccountTransferManager.getInstance(), this);
 		if (BukkitConfigAPI.getTicksPerPlayerAutosave() > 0) {
 			getServer().getPluginManager().registerEvents(new AutoSaveListener(this, mVersionAdapter), this);

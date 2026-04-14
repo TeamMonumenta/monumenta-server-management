@@ -1,6 +1,7 @@
 package com.playmonumenta.redissync;
 
 import com.google.errorprone.annotations.MustBeClosed;
+import com.playmonumenta.redissync.utils.MMLog;
 import io.lettuce.core.AbstractRedisAsyncCommands;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
@@ -20,7 +21,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
 
 public class RedisAPI {
 	private static final class StringByteCodec implements RedisCodec<String, byte[]> {
@@ -61,12 +61,6 @@ public class RedisAPI {
 
 	public static final RedisCodec<String, String> STRING_STRING_CODEC = StringCodec.UTF8;
 	public static final RedisCodec<String, byte[]> STRING_BYTE_CODEC = StringByteCodec.INSTANCE;
-
-	private static Logger LOGGER = Logger.getLogger(RedisAPI.class.getName());
-
-	static void setLogger(Logger logger) {
-		LOGGER = logger;
-	}
 
 	private static String callerFrames() {
 		StackTraceElement[] stack = Thread.currentThread().getStackTrace();
@@ -120,9 +114,9 @@ public class RedisAPI {
 
 		@Override
 		public void close() {
-			LOGGER.fine("[BorrowedCommands] releasing lock");
+			MMLog.debug("[BorrowedCommands] releasing lock");
 			mLock.unlock();
-			LOGGER.fine("[BorrowedCommands] lock released");
+			MMLog.debug("[BorrowedCommands] lock released");
 		}
 	}
 
@@ -133,10 +127,10 @@ public class RedisAPI {
 	@MustBeClosed
 	public static BorrowedCommands<String, String> borrow() {
 		RedisAPI api = INSTANCE;
-		LOGGER.fine("[borrow] caller: " + callerFrames());
-		LOGGER.fine("[borrow] acquiring lock...");
+		MMLog.debug("[borrow] caller: " + callerFrames());
+		MMLog.debug("[borrow] acquiring lock...");
 		api.mLock.lock();
-		LOGGER.fine("[borrow] lock acquired");
+		MMLog.debug("[borrow] lock acquired");
 		return new BorrowedCommands<>(api.mConnection, STRING_STRING_CODEC, api.mLock);
 	}
 
@@ -147,10 +141,10 @@ public class RedisAPI {
 	@MustBeClosed
 	public static BorrowedCommands<String, byte[]> borrowStringBytes() {
 		RedisAPI api = INSTANCE;
-		LOGGER.fine("[borrowStringBytes] caller: " + callerFrames());
-		LOGGER.fine("[borrowStringBytes] acquiring lock...");
+		MMLog.debug("[borrowStringBytes] caller: " + callerFrames());
+		MMLog.debug("[borrowStringBytes] acquiring lock...");
 		api.mBytesLock.lock();
-		LOGGER.fine("[borrowStringBytes] lock acquired");
+		MMLog.debug("[borrowStringBytes] lock acquired");
 		return new BorrowedCommands<>(api.mStringByteConnection, STRING_BYTE_CODEC, api.mBytesLock);
 	}
 
@@ -170,10 +164,10 @@ public class RedisAPI {
 	 */
 	public static CompletableFuture<TransactionResult> multi(Consumer<BorrowedCommands<String, String>> block) {
 		RedisAPI api = INSTANCE;
-		LOGGER.fine("[multi] caller: " + callerFrames());
-		LOGGER.fine("[multi] acquiring lock...");
+		MMLog.debug("[multi] caller: " + callerFrames());
+		MMLog.debug("[multi] acquiring lock...");
 		api.mLock.lock();
-		LOGGER.fine("[multi] lock acquired");
+		MMLog.debug("[multi] lock acquired");
 		try {
 			BorrowedCommands<String, String> conn = new BorrowedCommands<>(api.mConnection, STRING_STRING_CODEC, api.mLock);
 			conn.multi();
@@ -183,9 +177,9 @@ public class RedisAPI {
 			api.mConnection.async().discard();
 			throw e;
 		} finally {
-			LOGGER.fine("[multi] releasing lock");
+			MMLog.debug("[multi] releasing lock");
 			api.mLock.unlock();
-			LOGGER.fine("[multi] lock released");
+			MMLog.debug("[multi] lock released");
 		}
 	}
 
@@ -198,10 +192,10 @@ public class RedisAPI {
 	 */
 	public static CompletableFuture<TransactionResult> multiStringBytes(Consumer<BorrowedCommands<String, byte[]>> block) {
 		RedisAPI api = INSTANCE;
-		LOGGER.fine("[multiStringBytes] caller: " + callerFrames());
-		LOGGER.fine("[multiStringBytes] acquiring lock...");
+		MMLog.debug("[multiStringBytes] caller: " + callerFrames());
+		MMLog.debug("[multiStringBytes] acquiring lock...");
 		api.mBytesLock.lock();
-		LOGGER.fine("[multiStringBytes] lock acquired");
+		MMLog.debug("[multiStringBytes] lock acquired");
 		try {
 			BorrowedCommands<String, byte[]> conn = new BorrowedCommands<>(api.mStringByteConnection, STRING_BYTE_CODEC, api.mBytesLock);
 			conn.multi();
@@ -211,9 +205,9 @@ public class RedisAPI {
 			api.mStringByteConnection.async().discard();
 			throw e;
 		} finally {
-			LOGGER.fine("[multiStringBytes] releasing lock");
+			MMLog.debug("[multiStringBytes] releasing lock");
 			api.mBytesLock.unlock();
-			LOGGER.fine("[multiStringBytes] lock released");
+			MMLog.debug("[multiStringBytes] lock released");
 		}
 	}
 
@@ -247,14 +241,14 @@ public class RedisAPI {
 	/** @deprecated Use {@link #borrow()} instead. */
 	@Deprecated
 	public RedisAsyncCommands<String, String> async() {
-		LOGGER.fine("[async] caller: " + callerFrames());
+		MMLog.debug("[async] caller: " + callerFrames());
 		return mConnection.async();
 	}
 
 	/** @deprecated Use {@link #borrowStringBytes()} instead. */
 	@Deprecated
 	public RedisAsyncCommands<String, byte[]> asyncStringBytes() {
-		LOGGER.fine("[asyncStringBytes] caller: " + callerFrames());
+		MMLog.debug("[asyncStringBytes] caller: " + callerFrames());
 		return mStringByteConnection.async();
 	}
 

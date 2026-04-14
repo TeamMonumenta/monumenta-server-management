@@ -3,14 +3,13 @@ package com.playmonumenta.redissync;
 import com.destroystokyo.paper.event.player.PlayerAdvancementDataLoadEvent;
 import com.destroystokyo.paper.event.player.PlayerDataLoadEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
+import com.playmonumenta.redissync.utils.MMLog;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -25,8 +24,6 @@ public class AutoSaveListener implements Listener {
 	private final Map<UUID, BukkitTask> mPendingSaves = new HashMap<>();
 
 	protected AutoSaveListener(Plugin plugin, VersionAdapter adapter) {
-		Logger logger = plugin.getLogger();
-
 		Bukkit.getScheduler().runTaskTimer(plugin, () -> {
 			// Create a local copy of the online players list
 			List<? extends Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
@@ -46,7 +43,7 @@ public class AutoSaveListener implements Listener {
 
 			// Remove all the previous iteration saves
 			for (Map.Entry<UUID, BukkitTask> entry : mPendingSaves.entrySet()) {
-				logger.severe("Player autosave for " + entry.getKey() + " did not complete before next autosave!");
+				MMLog.severe("Player autosave for " + entry.getKey() + " did not complete before next autosave!");
 				entry.getValue().cancel();
 			}
 			mPendingSaves.clear();
@@ -63,7 +60,7 @@ public class AutoSaveListener implements Listener {
 							adapter.savePlayer(player);
 						}
 					} catch (Exception ex) {
-						logger.log(Level.SEVERE, "Failed to autosave player " + player.getName(), ex);
+						MMLog.severe("Failed to autosave player " + player.getName(), ex);
 					}
 
 					mPendingSaves.remove(uuid);

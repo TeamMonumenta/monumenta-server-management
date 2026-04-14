@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.playmonumenta.redissync.event.PlayerAccountTransferEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
+import com.playmonumenta.redissync.utils.MMLog;
 import io.lettuce.core.Range;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -20,7 +21,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.logging.Level;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -95,7 +95,7 @@ public class AccountTransferManager implements Listener {
 		try {
 			lastAccountId = UUID.fromString(lastAccountUuidPrimitive.getAsString());
 		} catch (Throwable throwable) {
-			MonumentaRedisSync.getInstance().getLogger().log(Level.WARNING, "[AccountTransferManager] Unable to get previous player account ID for " + player.getName() + "!", throwable);
+			MMLog.warning("[AccountTransferManager] Unable to get previous player account ID for " + player.getName() + "!", throwable);
 			return;
 		}
 
@@ -120,8 +120,7 @@ public class AccountTransferManager implements Listener {
 			}
 		}
 
-		MonumentaRedisSync plugin = MonumentaRedisSync.getInstance();
-		plugin.getLogger().info("[AccountTransferManager] Detected account transfer for " + lastAccountName + " (" + lastAccountId + ") -> " + currentPlayerName + " (" + currentPlayerId + ")");
+		MMLog.info("[AccountTransferManager] Detected account transfer for " + lastAccountName + " (" + lastAccountId + ") -> " + currentPlayerName + " (" + currentPlayerId + ")");
 
 		LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
 		long timestampMillis = EPOCH.until(now, ChronoUnit.MILLIS);
@@ -272,7 +271,7 @@ public class AccountTransferManager implements Listener {
 				@Override
 				public void run() {
 					if (mTransferCacheRequestExpiry.isEmpty() && mTransferCacheLoadedExpiry.isEmpty()) {
-						plugin.getLogger().fine("[AccountTransferManager] Shutting down cache runnable due to lack of entries");
+						MMLog.debug("[AccountTransferManager] Shutting down cache runnable due to lack of entries");
 						mTransferCacheExpirationRunnable = null;
 						cancel();
 						return;
@@ -291,7 +290,7 @@ public class AccountTransferManager implements Listener {
 					while (transferIt.hasNext()) {
 						if (!mPendingTransfers.isEmpty()) {
 							// Entries are loading, pause removal for now!
-							plugin.getLogger().fine("[AccountTransferManager] Cache runnable pausing cleaning while transfers are in progress");
+							MMLog.debug("[AccountTransferManager] Cache runnable pausing cleaning while transfers are in progress");
 							return;
 						}
 
@@ -306,7 +305,7 @@ public class AccountTransferManager implements Listener {
 				}
 			};
 			mTransferCacheExpirationRunnable.runTaskTimer(plugin, CACHE_EXPIRY_TICKS, 60 * 20L);
-			plugin.getLogger().fine("[AccountTransferManager] Started cache runnable");
+			MMLog.debug("[AccountTransferManager] Started cache runnable");
 		});
 	}
 
@@ -383,7 +382,6 @@ public class AccountTransferManager implements Listener {
 	}
 
 	private static void logCacheStats(String label) {
-		MonumentaRedisSync.getInstance().getLogger()
-			.fine("[AccountTransferManager] Cache runnable stats (" + label + "): Cached=" + mTransferCache.size() + " Requested=" + mTransferCacheRequestExpiry.size() + ", Loaded=" + mTransferCacheLoadedExpiry.size() + ", PendingTransfers=" + mPendingTransfers.size());
+		MMLog.debug("[AccountTransferManager] Cache runnable stats (" + label + "): Cached=" + mTransferCache.size() + " Requested=" + mTransferCacheRequestExpiry.size() + ", Loaded=" + mTransferCacheLoadedExpiry.size() + ", PendingTransfers=" + mPendingTransfers.size());
 	}
 }
