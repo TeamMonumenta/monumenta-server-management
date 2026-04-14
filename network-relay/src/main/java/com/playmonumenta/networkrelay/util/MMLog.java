@@ -15,12 +15,12 @@ public class MMLog {
 	 *   <li>Paper: {@code com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog())}
 	 *   <li>Velocity: {@code com.playmonumenta.common.MMLogVelocity.registerCommand(MMLog.getLog(), commandManager, plugin)}
 	 * </ul>
-	 * @param pluginId the log4j2 logger name; on Paper pass {@code getName()}, on Velocity pass
-	 *                 the string from {@code @Plugin(name = ...)} in the same file
+	 * @param pluginName the log4j2 logger name; on Paper pass {@code getName()}, on Velocity pass
+	 *                   the string from {@code @Plugin(name = ...)} in the same file
 	 */
-	public static void init(String pluginId) {
+	public static void init(String pluginName) {
 		if (INSTANCE == null) {
-			INSTANCE = new com.playmonumenta.common.MMLog(pluginId);
+			INSTANCE = new com.playmonumenta.common.MMLog(pluginName);
 		}
 	}
 
