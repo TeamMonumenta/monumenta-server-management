@@ -16,14 +16,14 @@ public class RemotePlayerGeneric extends RemotePlayerAbstraction {
 		super(serverId, uuid, name, isOnline, isHidden);
 		mServerType = serverType;
 
-		MMLog.fine(() -> "Created RemotePlayerGeneric (" + mServerType + ") for " + mName + " from " + mServerId + ": " + (mIsOnline ? "online" : "offline"));
+		MMLog.debug(() -> "Created RemotePlayerGeneric (" + mServerType + ") for " + mName + " from " + mServerId + ": " + (mIsOnline ? "online" : "offline"));
 	}
 
 	protected RemotePlayerGeneric(JsonObject remoteData) {
 		super(remoteData);
 		mServerType = remoteData.get("serverType").getAsString();
 
-		MMLog.fine(() -> "Received RemotePlayerGeneric (" + mServerType + ") for " + mName + " from " + mServerId + ": " + (mIsOnline ? "online" : "offline"));
+		MMLog.debug(() -> "Received RemotePlayerGeneric (" + mServerType + ") for " + mName + " from " + mServerId + ": " + (mIsOnline ? "online" : "offline"));
 	}
 
 	@Override

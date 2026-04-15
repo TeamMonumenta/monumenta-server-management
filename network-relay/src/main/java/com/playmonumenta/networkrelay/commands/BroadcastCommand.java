@@ -10,7 +10,6 @@ import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.GreedyStringArgument;
 import java.util.Arrays;
 import java.util.List;
-import java.util.logging.Logger;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -20,7 +19,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.plugin.Plugin;
 
 public class BroadcastCommand implements Listener {
 	private static final List<NetworkRelayAPI.ServerType> ACCEPTED_SERVER_TYPES = Arrays.asList(
@@ -36,10 +34,7 @@ public class BroadcastCommand implements Listener {
 
 	private static boolean ENABLED = false;
 
-	private final Logger mLogger;
-
-	public BroadcastCommand(Plugin plugin) {
-		mLogger = plugin.getLogger();
+	public BroadcastCommand() {
 
 		GreedyStringArgument commandArg = new GreedyStringArgument("command");
 
@@ -47,7 +42,7 @@ public class BroadcastCommand implements Listener {
 			.withPermission(BROADCAST_PERMISSION)
 			.withArguments(commandArg)
 			.executes((sender, args) -> {
-				run(plugin, sender, args.getByArgument(commandArg), NetworkRelayAPI.ServerType.ALL);
+				run(sender, args.getByArgument(commandArg), NetworkRelayAPI.ServerType.ALL);
 			});
 
 		CommandAPICommand broadcastBungeeCommand = new CommandAPICommand("broadcastbungeecommand")
@@ -58,21 +53,21 @@ public class BroadcastCommand implements Listener {
 				String warning = "Warning: use broadcastproxycommand instead of broadcastbungeecommand";
 				sender.sendMessage(warning);
 				MMLog.warning(warning + ": " + command);
-				run(plugin, sender, command, NetworkRelayAPI.ServerType.PROXY);
+				run(sender, command, NetworkRelayAPI.ServerType.PROXY);
 			});
 
 		CommandAPICommand broadcastMinecraftCommand = new CommandAPICommand("broadcastminecraftcommand")
 			.withPermission(BROADCAST_MINECRAFT_PERMISSION)
 			.withArguments(commandArg)
 			.executes((sender, args) -> {
-				run(plugin, sender, args.getByArgument(commandArg), NetworkRelayAPI.ServerType.MINECRAFT);
+				run(sender, args.getByArgument(commandArg), NetworkRelayAPI.ServerType.MINECRAFT);
 			});
 
 		CommandAPICommand broadcastProxyCommand = new CommandAPICommand("broadcastproxycommand")
 			.withPermission(BROADCAST_PROXY_PERMISSION)
 			.withArguments(commandArg)
 			.executes((sender, args) -> {
-				run(plugin, sender, args.getByArgument(commandArg), NetworkRelayAPI.ServerType.PROXY);
+				run(sender, args.getByArgument(commandArg), NetworkRelayAPI.ServerType.PROXY);
 			});
 
 		// Register first under the monumenta -> networkRelay namespace
@@ -91,7 +86,7 @@ public class BroadcastCommand implements Listener {
 		broadcastProxyCommand.register();
 	}
 
-	private static void run(Plugin plugin, CommandSender sender, String command, NetworkRelayAPI.ServerType serverType) {
+	private static void run(CommandSender sender, String command, NetworkRelayAPI.ServerType serverType) {
 		if (!ENABLED) {
 			sender.sendMessage("This command is not enabled");
 			return;
@@ -119,7 +114,7 @@ public class BroadcastCommand implements Listener {
 		if (!(sender instanceof Player) || sender.isOp()) {
 			sender.sendMessage(Component.text("Broadcasting command '" + command + "' to " + typeStr + " servers", NamedTextColor.GRAY));
 		}
-		plugin.getLogger().fine("Broadcasting command '" + command + "' to " + typeStr + "servers");
+		MMLog.debug("Broadcasting command '" + command + "' to " + typeStr + "servers");
 
 		try {
 			NetworkRelayAPI.sendBroadcastCommand(command, serverType);
@@ -146,7 +141,7 @@ public class BroadcastCommand implements Listener {
 		if (!data.has("command") ||
 		    !data.get("command").isJsonPrimitive() ||
 		    !data.getAsJsonPrimitive("command").isString()) {
-			mLogger.warning("Got invalid command message with no actual command");
+			MMLog.warning("Got invalid command message with no actual command");
 			return;
 		}
 
@@ -163,7 +158,7 @@ public class BroadcastCommand implements Listener {
 		}
 
 		final String command = data.get("command").getAsString();
-		mLogger.fine("Executing command'" + command + "' from source '" + event.getSource() + "'");
+		MMLog.debug("Executing command'" + command + "' from source '" + event.getSource() + "'");
 
 		Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), command);
 	}

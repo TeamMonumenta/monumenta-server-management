@@ -57,8 +57,7 @@ public class RabbitMQManagerAbstractionVelocity implements RabbitMQManagerAbstra
 		try {
 			mServer.getEventManager().fire(event).get(1, TimeUnit.SECONDS);
 		} catch (Exception ex) {
-			MMLog.severe("Timeout for 1 seconds when gathering heartbeat data");
-			ex.printStackTrace();
+			MMLog.severe("Timeout for 1 seconds when gathering heartbeat data", ex);
 		}
 		return event.getPluginData();
 	}
@@ -81,8 +80,7 @@ public class RabbitMQManagerAbstractionVelocity implements RabbitMQManagerAbstra
 			try {
 				RabbitMQManager.getInstance().sendNetworkMessage(destination, channel, data, properties);
 			} catch (Exception ex) {
-				MMLog.severe("Error sending RabbitMQ message from API");
-				ex.printStackTrace();
+				MMLog.severe("Error sending RabbitMQ message from API", ex);
 			}
 		});
 	}

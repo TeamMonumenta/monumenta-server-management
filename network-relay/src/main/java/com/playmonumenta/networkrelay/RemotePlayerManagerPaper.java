@@ -28,7 +28,7 @@ public final class RemotePlayerManagerPaper extends RemotePlayerManagerAbstracti
 				if (shard.equals(lShard)) {
 					continue;
 				}
-				MMLog.fine(() -> "Registering shard " + shard);
+				MMLog.debug(() -> "Registering shard " + shard);
 				registerServer(shard);
 			}
 		} catch (Exception ex) {
@@ -134,7 +134,7 @@ public final class RemotePlayerManagerPaper extends RemotePlayerManagerAbstracti
 
 	// Run this on local players whenever their information is out of date
 	void refreshLocalPlayer(Player player, boolean forceBroadcast) {
-		MMLog.fine(() -> "Refreshing local player " + player.getName());
+		MMLog.debug(() -> "Refreshing local player " + player.getName());
 		RemotePlayerMinecraft localPlayer = fromLocal(player, true);
 
 		// update local player with data

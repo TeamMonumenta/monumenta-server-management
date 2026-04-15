@@ -1,70 +1,138 @@
 package com.playmonumenta.networkrelay.util;
 
-import com.playmonumenta.networkrelay.CustomLogger;
 import java.util.function.Supplier;
-import java.util.logging.Level;
+import org.apache.logging.log4j.Level;
+import org.jetbrains.annotations.Nullable;
 
 public class MMLog {
+	private static @Nullable com.playmonumenta.common.MMLog INSTANCE = null;
+
+	/**
+	 * Creates the logger instance. Call once from the platform-specific plugin entry point before
+	 * any logging call. After calling this, register the changeloglevel command via the appropriate
+	 * platform helper:
+	 * <ul>
+	 *   <li>Paper: {@code com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog())}
+	 *   <li>Velocity: {@code com.playmonumenta.common.MMLogVelocity.registerCommand(MMLog.getLog(), commandManager, plugin)}
+	 * </ul>
+	 * @param pluginName the log4j2 logger name; on Paper pass {@code getName()}, on Velocity pass
+	 *                   the string from {@code @Plugin(name = ...)} in the same file
+	 */
+	public static void init(String pluginName) {
+		if (INSTANCE == null) {
+			INSTANCE = new com.playmonumenta.common.MMLog(pluginName);
+		}
+	}
+
+	/** Returns the underlying {@link com.playmonumenta.common.MMLog} for command registration. */
+	public static com.playmonumenta.common.MMLog getLog() {
+		return get();
+	}
+
+	private static com.playmonumenta.common.MMLog get() {
+		if (INSTANCE == null) {
+			throw new RuntimeException("NetworkRelay logger invoked before being initialized!");
+		}
+		return INSTANCE;
+	}
+
 	public static void setLevel(Level level) {
-		CustomLogger.getInstance()
-			.ifPresent(value -> value.setLevel(level));
+		get().setLevel(level);
 	}
 
 	public static boolean isLevelEnabled(Level level) {
-		return CustomLogger.getInstance()
-			.map(customLogger -> level.intValue() >= customLogger.getLevel().intValue())
-			.orElse(true);
+		return get().isLevelEnabled(level);
 	}
 
+	/** @deprecated Use {@link #trace(Supplier)} instead. */
+	@Deprecated
 	public static void finest(Supplier<String> msg) {
-		CustomLogger.getInstance().ifPresent(customLogger -> customLogger.finest(msg));
+		get().trace(msg);
 	}
 
+	/** @deprecated Use {@link #trace(String)} instead. */
+	@Deprecated
 	public static void finest(String msg) {
-		CustomLogger.getInstance().ifPresent(customLogger -> customLogger.finest(msg));
+		get().trace(msg);
 	}
 
+	/** @deprecated Use {@link #trace(Supplier)} instead. */
+	@Deprecated
 	public static void finer(Supplier<String> msg) {
-		CustomLogger.getInstance().ifPresent(customLogger -> customLogger.finer(msg));
+		get().trace(msg);
 	}
 
+	/** @deprecated Use {@link #trace(String)} instead. */
+	@Deprecated
 	public static void finer(String msg) {
-		CustomLogger.getInstance().ifPresent(customLogger -> customLogger.finer(msg));
+		get().trace(msg);
 	}
 
+	/** @deprecated Use {@link #debug(Supplier)} instead. */
+	@Deprecated
 	public static void fine(Supplier<String> msg) {
-		CustomLogger.getInstance().ifPresent(customLogger -> customLogger.fine(msg));
+		get().debug(msg);
 	}
 
+	/** @deprecated Use {@link #debug(String)} instead. */
+	@Deprecated
 	public static void fine(String msg) {
-		CustomLogger.getInstance().ifPresent(customLogger -> customLogger.fine(msg));
+		get().debug(msg);
+	}
+
+	public static void trace(Supplier<String> msg) {
+		get().trace(msg);
+	}
+
+	public static void trace(String msg) {
+		get().trace(msg);
+	}
+
+	public static void trace(String msg, Throwable throwable) {
+		get().trace(msg, throwable);
+	}
+
+	public static void debug(Supplier<String> msg) {
+		get().debug(msg);
+	}
+
+	public static void debug(String msg) {
+		get().debug(msg);
+	}
+
+	public static void debug(String msg, Throwable throwable) {
+		get().debug(msg, throwable);
 	}
 
 	public static void info(String msg) {
-		CustomLogger.getInstance().ifPresent(customLogger -> customLogger.info(msg));
+		get().info(msg);
 	}
 
 	public static void info(Supplier<String> msg) {
-		CustomLogger.getInstance().ifPresent(customLogger -> customLogger.info(msg));
+		get().info(msg);
 	}
 
 	public static void warning(Supplier<String> msg) {
-		CustomLogger.getInstance().ifPresent(customLogger -> customLogger.warning(msg));
+		get().warning(msg);
 	}
 
 	public static void warning(String msg) {
-		CustomLogger.getInstance().ifPresent(customLogger -> customLogger.warning(msg));
+		get().warning(msg);
 	}
 
-	public static void warning(String msg, Throwable t) {
-		CustomLogger.getInstance().ifPresent(customLogger -> customLogger.log(Level.WARNING, msg, t));
+	public static void warning(String msg, Throwable throwable) {
+		get().warning(msg, throwable);
 	}
 
 	public static void severe(Supplier<String> msg) {
-		CustomLogger.getInstance().ifPresent(customLogger -> customLogger.severe(msg));
+		get().severe(msg);
 	}
 
 	public static void severe(String msg) {
-		CustomLogger.getInstance().ifPresent(customLogger -> customLogger.severe(msg));
+		get().severe(msg);
+	}
+
+	public static void severe(String msg, Throwable throwable) {
+		get().severe(msg, throwable);
 	}
 }

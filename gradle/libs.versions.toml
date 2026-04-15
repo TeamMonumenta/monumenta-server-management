@@ -1,4 +1,5 @@
 [versions]
+monumenta-common = "1.0.0"
 minimessage = "4.11.0"
 commons = "1.3"
 junit = "5.9.3"
@@ -38,6 +39,7 @@ fawe-core = { module = "com.fastasyncworldedit:FastAsyncWorldEdit-Core", version
 fawe-bukkit = { module = "com.fastasyncworldedit:FastAsyncWorldEdit-Bukkit", version.ref = "fawe" }
 protocollib = { module = "com.comphenix.protocol:ProtocolLib", version.ref = "protocollib" }
 sq = { module = "com.playmonumenta:scripted-quests", version.ref = "sq" }
+monumenta-common = { module = "com.playmonumenta:monumenta-common", version.ref = "monumenta-common" }
 
 [plugins]
 gradle-config = { id = "com.playmonumenta.gradle-config", version.ref = "gradle-config" }

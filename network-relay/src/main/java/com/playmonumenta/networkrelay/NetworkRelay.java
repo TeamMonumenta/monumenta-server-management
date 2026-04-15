@@ -1,7 +1,6 @@
 package com.playmonumenta.networkrelay;
 
 import com.playmonumenta.networkrelay.commands.BroadcastCommand;
-import com.playmonumenta.networkrelay.commands.ChangeLogLevelCommand;
 import com.playmonumenta.networkrelay.commands.DebugHeartbeatCommand;
 import com.playmonumenta.networkrelay.commands.ListShardsCommand;
 import com.playmonumenta.networkrelay.commands.RemotePlayerAPICommand;
@@ -9,10 +8,9 @@ import com.playmonumenta.networkrelay.commands.SendCommand;
 import com.playmonumenta.networkrelay.commands.WhereIsCommand;
 import com.playmonumenta.networkrelay.config.BukkitConfig;
 import com.playmonumenta.networkrelay.shardhealth.ShardHealthManager;
+import com.playmonumenta.networkrelay.util.MMLog;
 import java.io.File;
 import java.util.Objects;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.Nullable;
@@ -21,13 +19,13 @@ public class NetworkRelay extends JavaPlugin {
 	private static @Nullable NetworkRelay INSTANCE = null;
 	private @Nullable RabbitMQManager mRabbitMQManager = null;
 	private @Nullable BroadcastCommand mBroadcastCommand = null;
-	private @Nullable CustomLogger mLogger = null;
 
 	@Override
 	public void onLoad() {
-		mBroadcastCommand = new BroadcastCommand(this);
-		new SendCommand(this);
-		ChangeLogLevelCommand.register(this);
+		MMLog.init(getName());
+		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
+		mBroadcastCommand = new BroadcastCommand();
+		new SendCommand();
 		DebugHeartbeatCommand.registerCommands();
 		ListShardsCommand.register();
 		RemotePlayerAPICommand.register();
@@ -41,7 +39,7 @@ public class NetworkRelay extends JavaPlugin {
 
 		File configFile = new File(getDataFolder(), "config.yml");
 
-		BukkitConfig config = new BukkitConfig(getLogger(), configFile, getClass(), "/default_config.yml");
+		BukkitConfig config = new BukkitConfig(super.getLogger(), configFile, getClass(), "/default_config.yml");
 
 		boolean broadcastCommandSendingEnabled = config.mBroadcastCommandSendingEnabled;
 		boolean broadcastCommandReceivingEnabled = config.mBroadcastCommandReceivingEnabled;
@@ -61,10 +59,9 @@ public class NetworkRelay extends JavaPlugin {
 		}
 
 		try {
-			mRabbitMQManager = new RabbitMQManager(new RabbitMQManagerAbstractionBukkit(this), getLogger(), shardName, rabbitURI, heartbeatInterval, destinationTimeout, defaultTTL);
+			mRabbitMQManager = new RabbitMQManager(new RabbitMQManagerAbstractionBukkit(this), shardName, rabbitURI, heartbeatInterval, destinationTimeout, defaultTTL);
 		} catch (Exception e) {
-			getLogger().severe("RabbitMQ manager failed to initialize. This plugin will not function");
-			e.printStackTrace();
+			MMLog.severe("RabbitMQ manager failed to initialize. This plugin will not function", e);
 		}
 
 		// Provide placeholder API replacements if it is present
@@ -104,16 +101,10 @@ public class NetworkRelay extends JavaPlugin {
 		return INSTANCE;
 	}
 
+	/** @deprecated Use {@link MMLog} static methods instead. */
+	@Deprecated
 	@Override
-	public Logger getLogger() {
-		if (mLogger == null) {
-			mLogger = new CustomLogger(super.getLogger(), Level.INFO);
-		}
-		return mLogger;
-	}
-
-	public void setLogLevel(Level level) {
-		super.getLogger().info("Changing log level to: " + level.toString());
-		getLogger().setLevel(level);
+	public java.util.logging.Logger getLogger() {
+		return super.getLogger();
 	}
 }

@@ -3,6 +3,7 @@ package com.playmonumenta.networkrelay.shardhealth;
 import com.playmonumenta.networkrelay.NetworkRelay;
 import com.playmonumenta.networkrelay.NetworkRelayAPI;
 import com.playmonumenta.networkrelay.shardhealth.g1.G1Listener;
+import com.playmonumenta.networkrelay.util.MMLog;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import dev.jorel.commandapi.arguments.TextArgument;
@@ -35,7 +36,7 @@ public class ShardHealthManager {
 
 	public static void init() {
 		if (!G1_LISTENER.beginListen()) {
-			NetworkRelay.getInstance().getLogger().severe("failed to initialize G1 garbage collector shard health gatherer... did we switch go ZGC?");
+			MMLog.severe("failed to initialize G1 garbage collector shard health gatherer... did we switch go ZGC?");
 		}
 
 		CommandAPICommand instantSubcommand = new CommandAPICommand("instant")

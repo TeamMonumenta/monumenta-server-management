@@ -18,14 +18,14 @@ public class RemotePlayerProxy extends RemotePlayerAbstraction {
 		super(serverId, uuid, name, isOnline, isHidden);
 		mTargetShard = targetShard;
 
-		MMLog.fine(() -> "Created RemotePlayerProxy for " + mName + " from " + mServerId + ": " + (mIsOnline ? "online" : "offline"));
+		MMLog.debug(() -> "Created RemotePlayerProxy for " + mName + " from " + mServerId + ": " + (mIsOnline ? "online" : "offline"));
 	}
 
 	protected RemotePlayerProxy(JsonObject remoteData) {
 		super(remoteData);
 		mTargetShard = remoteData.get("targetShard").getAsString();
 
-		MMLog.fine(() -> "Received RemotePlayerProxy for " + mName + " from " + mServerId + ": " + (mIsOnline ? "online" : "offline"));
+		MMLog.debug(() -> "Received RemotePlayerProxy for " + mName + " from " + mServerId + ": " + (mIsOnline ? "online" : "offline"));
 	}
 
 	@Override
