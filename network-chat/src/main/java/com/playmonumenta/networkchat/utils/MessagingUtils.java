@@ -272,7 +272,7 @@ public class MessagingUtils {
 			String substring = text.substring(start);
 			String mentionedPlayer = MonumentaRedisSyncAPI.getClosestPlayerName(substring);
 			if (!mentionedPlayer.isBlank()) {
-				MMLog.finer(() -> "Detected mention for @" + mentionedPlayer);
+				MMLog.trace(() -> "Detected mention for @" + mentionedPlayer);
 				hasMention = true;
 				break;
 			}

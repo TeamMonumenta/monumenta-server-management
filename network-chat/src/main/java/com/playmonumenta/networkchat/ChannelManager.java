@@ -536,7 +536,7 @@ public class ChannelManager implements Listener {
 		}
 
 		// Mark the channel as loading
-		MMLog.finer("Attempting to load channel " + channelId.toString() + ".");
+		MMLog.trace("Attempting to load channel " + channelId.toString() + ".");
 		ChannelLoading loadingChannel = new ChannelLoading(channelId);
 		mChannels.put(channelId, loadingChannel);
 
@@ -614,7 +614,7 @@ public class ChannelManager implements Listener {
 		Channel channel;
 		try {
 			channel = Channel.fromJson(channelJson);
-			MMLog.finer("Channel " + channelId.toString() + " loaded, registering...");
+			MMLog.trace("Channel " + channelId.toString() + " loaded, registering...");
 			registerLoadedChannel(channel);
 		} catch (Exception e) {
 			MMLog.severe("Caught exception trying to load channel " + channelId.toString(), e);
@@ -652,7 +652,7 @@ public class ChannelManager implements Listener {
 		JsonObject channelJson = channel.toJson();
 		String channelJsonStr = channelJson.toString();
 
-		MMLog.finer("Saving channel " + channelIdStr + ".");
+		MMLog.trace("Saving channel " + channelIdStr + ".");
 		RedisAPI.multi(conn -> {
 			conn.hset(REDIS_CHANNEL_NAME_TO_UUID_PATH, channelName, channelIdStr);
 			conn.hset(REDIS_CHANNELS_PATH, channelIdStr, channelJsonStr);
@@ -670,7 +670,7 @@ public class ChannelManager implements Listener {
 			NetworkRelayAPI.sendExpiringBroadcastMessage(NETWORK_CHAT_CHANNEL_UPDATE,
 			                                             wrappedChannelJson,
 			                                             NetworkChatPlugin.getMessageTtl());
-			MMLog.finer("Broadcast channel " + channelIdStr + " changes.");
+			MMLog.trace("Broadcast channel " + channelIdStr + " changes.");
 		} catch (Exception e) {
 			MMLog.severe("Failed to broadcast " + NETWORK_CHAT_CHANNEL_UPDATE, e);
 		}
@@ -751,7 +751,7 @@ public class ChannelManager implements Listener {
 		if (channelData == null) {
 			MMLog.info("Got deletion notice for channel " + logIdName);
 		} else {
-			MMLog.finer("Got update for channel " + logIdName);
+			MMLog.trace("Got update for channel " + logIdName);
 		}
 		Channel oldChannel = mChannels.get(channelId);
 		if (oldChannel != null) {

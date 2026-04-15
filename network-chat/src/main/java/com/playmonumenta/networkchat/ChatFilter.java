@@ -217,7 +217,7 @@ public class ChatFilter {
 					}
 					String content = textBuilder.content();
 					String finalContent = content;
-					MMLog.finer(() -> "    <- " + finalContent);
+					MMLog.trace(() -> "    <- " + finalContent);
 					try {
 						content = mPattern.matcher(content).replaceAll(replacer);
 					} catch (IllegalArgumentException ex) {
@@ -229,17 +229,17 @@ public class ChatFilter {
 						throw new RuntimeException("Exception occurred with a replacement; aborting", ex);
 					}
 					String finalContent1 = content;
-					MMLog.finer(() -> "    -- " + finalContent1);
+					MMLog.trace(() -> "    -- " + finalContent1);
 					Component replacementResult = MessagingUtils.getSenderFmtMinimessage().deserialize(content);
-					MMLog.finer(() -> "    -> " + MessagingUtils.getSenderFmtMinimessage().serialize(replacementResult));
+					MMLog.trace(() -> "    -> " + MessagingUtils.getSenderFmtMinimessage().serialize(replacementResult));
 					return replacementResult;
 				})
 				.build(); // deprecation warning is an upstream issue, ignore until fixed upstream
 
 			try {
-				MMLog.finer(() -> "  ..." + MessagingUtils.getSenderFmtMinimessage().serialize(localResult.component()));
+				MMLog.trace(() -> "  ..." + MessagingUtils.getSenderFmtMinimessage().serialize(localResult.component()));
 				localResult.component(localResult.component().replaceText(replacementConfig));
-				MMLog.finer(() -> "  ..." + MessagingUtils.getSenderFmtMinimessage().serialize(localResult.component()));
+				MMLog.trace(() -> "  ..." + MessagingUtils.getSenderFmtMinimessage().serialize(localResult.component()));
 
 				String plainText = MessagingUtils.plainText(localResult.component());
 				String plainReplacement = mPattern.matcher(plainText).replaceAll(replacer);
@@ -321,8 +321,8 @@ public class ChatFilter {
 			}
 			filterResult.copyResults(localResult);
 
-			MMLog.finer(() -> "- " + mId + ":");
-			MMLog.finer(() -> MessagingUtils.getSenderFmtMinimessage().serialize(filterResult.component()));
+			MMLog.trace(() -> "- " + mId + ":");
+			MMLog.trace(() -> MessagingUtils.getSenderFmtMinimessage().serialize(filterResult.component()));
 		}
 	}
 
@@ -521,8 +521,8 @@ public class ChatFilter {
 	}
 
 	public void run(CommandSender sender, ChatFilterResult filterResult) {
-		MMLog.finer("Start:");
-		MMLog.finer(() -> MessagingUtils.getSenderFmtMinimessage().serialize(filterResult.component()));
+		MMLog.trace("Start:");
+		MMLog.trace(() -> MessagingUtils.getSenderFmtMinimessage().serialize(filterResult.component()));
 		for (ChatFilterPattern filterPattern : mFilters.values()) {
 			filterPattern.run(sender, filterResult);
 		}

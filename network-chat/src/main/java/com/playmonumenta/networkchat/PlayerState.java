@@ -84,7 +84,7 @@ public class PlayerState {
 
 			if (lastLoginMillis != null) {
 				long millisOffline = nowMillis - lastLoginMillis;
-				MMLog.finer(player.getName() + " was offline for " + millisOffline / 1000.0 + " seconds.");
+				MMLog.trace(player.getName() + " was offline for " + millisOffline / 1000.0 + " seconds.");
 			}
 		}
 

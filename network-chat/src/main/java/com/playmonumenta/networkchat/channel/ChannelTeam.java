@@ -295,7 +295,7 @@ public class ChannelTeam extends Channel {
 		}
 		Team team = Bukkit.getScoreboardManager().getMainScoreboard().getTeam(teamName);
 		if (team == null) {
-			MMLog.finer("No such team " + teamName + " on this shard, ignoring.");
+			MMLog.trace("No such team " + teamName + " on this shard, ignoring.");
 			return;
 		}
 

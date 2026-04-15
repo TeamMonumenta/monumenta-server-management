@@ -1,6 +1,7 @@
 package com.playmonumenta.worlds.paper;
 
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
+import com.playmonumenta.worlds.common.MMLog;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -11,7 +12,6 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
-import java.util.logging.Logger;
 import java.util.stream.Stream;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -125,24 +125,23 @@ public class MonumentaWorldManagementAPI {
 		if (plugin == null) {
 			throw new Exception("MonumentaWorldManagement plugin is not loaded");
 		}
-		Logger logger = plugin.getLogger();
-		logger.fine("ensureWorldLoaded enter: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
+		MMLog.debug("ensureWorldLoaded enter: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
 
 		/* Try to get existing world first */
 		World newWorld = Bukkit.getWorld(worldName);
 		if (newWorld != null) {
-			logger.fine("ensureWorldLoaded found existing unlocked: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
+			MMLog.debug("ensureWorldLoaded found existing unlocked: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
 			return newWorld;
 		}
 
-		logger.fine("ensureWorldLoaded world not loaded: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
+		MMLog.debug("ensureWorldLoaded world not loaded: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
 
 		//TODO Check redis to make sure world isn't loaded or created elsewhere
 
 		/* Copy world if it doesn't exist */
 		File worldFolder = new File(worldName);
 		if (worldFolder.isDirectory()) {
-			logger.fine("ensureWorldLoaded folder exists: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
+			MMLog.debug("ensureWorldLoaded folder exists: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
 		} else {
 			/* Not allowed to create so return null */
 			if (templateName == null) {
@@ -155,13 +154,13 @@ public class MonumentaWorldManagementAPI {
 			AVAILABLE_WORLDS_CACHE = Arrays.copyOf(AVAILABLE_WORLDS_CACHE, AVAILABLE_WORLDS_CACHE.length + 1);
 			AVAILABLE_WORLDS_CACHE[AVAILABLE_WORLDS_CACHE.length - 1] = worldName;
 
-			logger.fine("ensureWorldLoaded created new: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
+			MMLog.debug("ensureWorldLoaded created new: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
 		}
 
-		logger.fine("ensureWorldLoaded sync loadworld: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
+		MMLog.debug("ensureWorldLoaded sync loadworld: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
 		newWorld = new WorldCreator(worldName).type(WorldType.NORMAL).generateStructures(false).environment(Environment.NORMAL).createWorld();
 
-		logger.fine("ensureWorldLoaded loaded world: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
+		MMLog.debug("ensureWorldLoaded loaded world: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
 
 		if (newWorld == null) {
 			throw new Exception("Failed to create world '" + worldName + "' - world is somehow null after creating which should never happen");
@@ -273,7 +272,7 @@ public class MonumentaWorldManagementAPI {
 				Bukkit.getScheduler().runTask(WorldManagementPlugin.getInstance(), () -> future.complete(null));
 			} catch (Exception ex) {
 				future.completeExceptionally(ex);
-				ex.printStackTrace();
+				MMLog.severe("Failed to copy world", ex);
 			}
 		});
 
@@ -336,7 +335,7 @@ public class MonumentaWorldManagementAPI {
 				Bukkit.getScheduler().runTask(WorldManagementPlugin.getInstance(), () -> future.complete(null));
 			} catch (Exception ex) {
 				future.completeExceptionally(ex);
-				ex.printStackTrace();
+				MMLog.severe("Failed to delete world", ex);
 			}
 		});
 

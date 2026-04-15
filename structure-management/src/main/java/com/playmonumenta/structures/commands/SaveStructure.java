@@ -3,6 +3,7 @@ package com.playmonumenta.structures.commands;
 import com.playmonumenta.structures.StructuresAPI;
 import com.playmonumenta.structures.StructuresPlugin;
 import com.playmonumenta.structures.utils.CommandUtils;
+import com.playmonumenta.structures.utils.MMLog;
 import com.playmonumenta.structures.utils.MessagingUtils;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
@@ -40,7 +41,7 @@ public class SaveStructure {
 					CommandUtils.reloadStructurePathSuggestions();
 				} else {
 					sender.sendMessage(Component.text("Failed to save structure" + e.getMessage()));
-					StructuresPlugin.getInstance().getLogger().severe("Caught exception saving structure: " + e.getMessage());
+					MMLog.severe("Caught exception saving structure", e);
 					MessagingUtils.sendStackTrace(sender, e);
 				}
 

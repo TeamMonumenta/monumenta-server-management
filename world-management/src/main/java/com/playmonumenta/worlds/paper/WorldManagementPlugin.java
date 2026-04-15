@@ -1,6 +1,5 @@
 package com.playmonumenta.worlds.paper;
 
-import com.playmonumenta.worlds.common.CustomLogger;
 import com.playmonumenta.worlds.common.MMLog;
 import java.io.File;
 import java.io.IOException;
@@ -10,21 +9,18 @@ import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.apache.logging.log4j.Level;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class WorldManagementPlugin extends JavaPlugin {
 	private static @Nullable WorldManagementPlugin INSTANCE = null;
 
-	private static @Nullable CustomLogger mLogger = null;
 	private static boolean mSortWorldByScoreOnJoin = false;
 	private static boolean mSortWorldByScoreOnRespawn = false;
 	private static boolean mAllowInstanceAutocreation = false;
@@ -38,6 +34,8 @@ public class WorldManagementPlugin extends JavaPlugin {
 
 	@Override
 	public void onLoad() {
+		MMLog.init(getName());
+		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
 		WorldCommands.register(this);
 	}
 
@@ -72,12 +70,12 @@ public class WorldManagementPlugin extends JavaPlugin {
 				// Copy the default config file
 				InputStream defaultConfig = getClass().getResourceAsStream("/default_config.yml");
 				if (defaultConfig == null) {
-					getLogger().log(Level.SEVERE, "Failed to locate default configuration file; was the plugin jar replaced?");
+					MMLog.severe("Failed to locate default configuration file; was the plugin jar replaced?");
 				} else {
 					Files.copy(defaultConfig, configFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
 				}
 			} catch (IOException ex) {
-				getLogger().log(Level.SEVERE, "Failed to create configuration file");
+				MMLog.severe("Failed to create configuration file", ex);
 			}
 		}
 
@@ -86,10 +84,10 @@ public class WorldManagementPlugin extends JavaPlugin {
 
 		String logLevel = config.getString("log-level", "INFO");
 		try {
-			getLogger().setLevel(Level.parse(logLevel));
+			MMLog.setLevel(Level.valueOf(logLevel));
 			printConfig("log-level", logLevel);
 		} catch (Exception ex) {
-			getLogger().warning("log-level=" + logLevel + " is invalid - defaulting to INFO");
+			MMLog.warning("log-level=" + logLevel + " is invalid - defaulting to INFO");
 		}
 
 		ConfigurationSection instancingConfig = config.getConfigurationSection("instancing");
@@ -140,11 +138,11 @@ public class WorldManagementPlugin extends JavaPlugin {
 	}
 
 	protected void printConfigHeader(String configKey) {
-		getLogger().info(configKey + ":");
+		MMLog.info(configKey + ":");
 	}
 
 	protected <T> void printConfig(String configKey, @Nullable T value) {
-		getLogger().info(configKey + "=" + (value == null ? "null" : value));
+		MMLog.info(configKey + "=" + (value == null ? "null" : value));
 	}
 
 	public static boolean isSortWorldByScoreOnJoin() {
@@ -168,7 +166,7 @@ public class WorldManagementPlugin extends JavaPlugin {
 			break;
 		}
 		if (info == null) {
-			MMLog.fine("No shard info found.");
+			MMLog.debug("No shard info found.");
 			return null;
 		}
 		return info;
@@ -219,17 +217,11 @@ public class WorldManagementPlugin extends JavaPlugin {
 		INSTANCE = null;
 	}
 
+	/** @deprecated Use {@link MMLog} static methods instead. */
+	@Deprecated
 	@Override
-	public @NotNull Logger getLogger() {
-		if (mLogger == null) {
-			mLogger = new CustomLogger(super.getLogger(), Level.INFO);
-		}
-		return mLogger;
-	}
-
-	protected void setLogLevel(Level level) {
-		super.getLogger().info("Changing log level to: " + level.toString());
-		getLogger().setLevel(level);
+	public java.util.logging.Logger getLogger() {
+		return super.getLogger();
 	}
 
 	/* If this ever returned null everything would explode anyway, no reason to add error handling around this */

@@ -24,7 +24,7 @@ public class ReplacementsManager {
 				MMLog.info("Replacement found for " + replacement.mName + "in " + input);
 				return replacement.replace(sender, input);
 			} else {
-				MMLog.fine("No replacement found for " + replacement.mName + "in " + input);
+				MMLog.debug("No replacement found for " + replacement.mName + "in " + input);
 			}
 		}
 		return input;

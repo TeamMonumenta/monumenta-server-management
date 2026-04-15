@@ -173,11 +173,11 @@ public class RemotePlayerListener implements Listener {
 	public void gatherRemotePlayerDataEvent(GatherRemotePlayerDataEvent event) {
 		UUID playerId = event.mRemotePlayer.getUuid();
 		String playerName = event.mRemotePlayer.getName();
-		MMLog.fine("[RPM Listener] Refreshing " + playerName);
+		MMLog.debug("[RPM Listener] Refreshing " + playerName);
 
 		Player player = Bukkit.getPlayer(playerId);
 		if (player == null) {
-			MMLog.fine("[RPM Listener] Player not found, not entering NetworkChat data: " + playerName);
+			MMLog.debug("[RPM Listener] Player not found, not entering NetworkChat data: " + playerName);
 			return;
 		}
 

@@ -2,7 +2,6 @@ package com.playmonumenta.structures;
 
 import com.playmonumenta.structures.commands.ActivateSpecialStructure;
 import com.playmonumenta.structures.commands.AddRespawningStructure;
-import com.playmonumenta.structures.commands.ChangeLogLevel;
 import com.playmonumenta.structures.commands.CompassRespawn;
 import com.playmonumenta.structures.commands.ForceConquerRespawn;
 import com.playmonumenta.structures.commands.ForceloadLazy;
@@ -18,11 +17,10 @@ import com.playmonumenta.structures.commands.SetSpawnerBreakTrigger;
 import com.playmonumenta.structures.managers.EventListener;
 import com.playmonumenta.structures.managers.RespawnManager;
 import com.playmonumenta.structures.utils.CommandUtils;
+import com.playmonumenta.structures.utils.MMLog;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.Executor;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.PluginManager;
@@ -37,15 +35,12 @@ public class StructuresPlugin extends JavaPlugin implements Executor {
 	private static @Nullable StructuresPlugin INSTANCE = null;
 
 	private @Nullable YamlConfiguration mConfig = null;
-	private @Nullable CustomLogger mLogger = null;
 
 	@Override
 	public void onLoad() {
-		if (mLogger == null) {
-			mLogger = new CustomLogger(super.getLogger(), Level.INFO);
-		}
+		MMLog.init(getName());
+		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
 
-		ChangeLogLevel.register();
 		ActivateSpecialStructure.register(this);
 		AddRespawningStructure.register(this);
 		CompassRespawn.register();
@@ -96,7 +91,7 @@ public class StructuresPlugin extends JavaPlugin implements Executor {
 			for (StackTraceElement traceElement : thread.getStackTrace()) {
 				builder.append("\n\tat ").append(traceElement);
 			}
-			getLogger().severe(builder.toString());
+			MMLog.severe(builder.toString());
 		}
 		// Cancel any remaining tasks
 		getServer().getScheduler().cancelTasks(this);
@@ -119,7 +114,7 @@ public class StructuresPlugin extends JavaPlugin implements Executor {
 					throw new IOException();
 				}
 			} catch (IOException ex) {
-				getLogger().log(Level.SEVERE, "Failed to create non-existent configuration file");
+				MMLog.severe("Failed to create non-existent configuration file");
 			}
 
 			// TODO: Put sample config file in here also
@@ -154,17 +149,16 @@ public class StructuresPlugin extends JavaPlugin implements Executor {
 				mConfig = mRespawnManager.getConfig();
 				mConfig.save(configFile);
 			} catch (Exception ex) {
-				getLogger().log(Level.SEVERE, "Could not save config to " + configFile, ex);
+				MMLog.severe("Could not save config to " + configFile, ex);
 			}
 		}
 	}
 
+	/** @deprecated Use {@link MMLog} static methods instead. */
+	@Deprecated
 	@Override
-	public Logger getLogger() {
-		if (mLogger == null) {
-			mLogger = new CustomLogger(super.getLogger(), Level.INFO);
-		}
-		return mLogger;
+	public java.util.logging.Logger getLogger() {
+		return super.getLogger();
 	}
 
 	public static StructuresPlugin getInstance() {

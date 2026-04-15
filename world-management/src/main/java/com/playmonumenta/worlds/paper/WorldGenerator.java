@@ -192,9 +192,9 @@ public class WorldGenerator {
 	}
 
 	public void getWorldInstance(String worldName, String templateName) throws Exception {
-		MMLog.fine("Preparing world " + worldName);
+		MMLog.debug("Preparing world " + worldName);
 		if (worldExists(worldName)) {
-			MMLog.fine("World already exists: " + worldName);
+			MMLog.debug("World already exists: " + worldName);
 			return;
 		}
 

@@ -1,4 +1,4 @@
-package com.playmonumenta.worlds.common;
+package com.playmonumenta.structures.utils;
 
 import java.util.function.Supplier;
 import org.apache.logging.log4j.Level;
@@ -8,13 +8,10 @@ public class MMLog {
 	private static @Nullable com.playmonumenta.common.MMLog INSTANCE = null;
 
 	/**
-	 * Creates the logger instance. Call once from the platform-specific plugin entry point before
-	 * any logging call. After calling this, register the changeloglevel command via the appropriate
-	 * platform helper:
-	 * <ul>
-	 *   <li>Paper: {@code com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog())}
-	 * </ul>
-	 * @param pluginName the log4j2 logger name; on Paper pass {@code getName()}
+	 * Call once from the plugin entry point before any logging.
+	 * After calling this, register the changeloglevel command:
+	 * {@code com.playmonumenta.common.MMLogPaper.registerCommand(MSLog.getLog())}
+	 * @param pluginName on Paper pass {@code getName()}
 	 */
 	public static void init(String pluginName) {
 		if (INSTANCE == null) {
@@ -29,7 +26,7 @@ public class MMLog {
 
 	private static com.playmonumenta.common.MMLog get() {
 		if (INSTANCE == null) {
-			throw new RuntimeException("WorldManagement logger invoked before being initialized!");
+			throw new RuntimeException("StructureManagement logger invoked before being initialized!");
 		}
 		return INSTANCE;
 	}

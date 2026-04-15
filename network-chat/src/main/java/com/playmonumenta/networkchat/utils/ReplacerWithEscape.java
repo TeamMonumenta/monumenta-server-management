@@ -26,7 +26,7 @@ public class ReplacerWithEscape implements Function<MatchResult, String> {
 
 	private static void debugMessage(String prefix, String msg) {
 		String escaped = StringEscapeUtils.escapeJava(msg);
-		MMLog.finer(prefix + "\"" + escaped + "\"");
+		MMLog.trace(prefix + "\"" + escaped + "\"");
 	}
 
 	@Override

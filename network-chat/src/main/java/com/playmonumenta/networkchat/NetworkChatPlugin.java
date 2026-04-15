@@ -10,7 +10,6 @@ import com.playmonumenta.networkchat.channel.ChannelParty;
 import com.playmonumenta.networkchat.channel.ChannelTeam;
 import com.playmonumenta.networkchat.channel.ChannelWhisper;
 import com.playmonumenta.networkchat.channel.ChannelWorld;
-import com.playmonumenta.networkchat.commands.ChangeLogLevel;
 import com.playmonumenta.networkchat.commands.ChatCommand;
 import com.playmonumenta.networkchat.inlinereplacements.ReplacementsManager;
 import com.playmonumenta.networkchat.utils.MMLog;
@@ -21,8 +20,6 @@ import com.playmonumenta.redissync.RedisAPI;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.zip.ZipFile;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
@@ -44,7 +41,6 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 	private static final String REDIS_CHAT_MOD_LOG_KEY = "chat_mod_log_command";
 
 	private static @Nullable NetworkChatPlugin INSTANCE = null;
-	private @Nullable CustomLogger mLogger = null;
 
 	private static final Map<String, TextColor> mDefaultMessageColors = new ConcurrentSkipListMap<>();
 	private static final Map<String, String> mDefaultMessageFormats = new ConcurrentSkipListMap<>();
@@ -73,9 +69,8 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 
 	@Override
 	public void onLoad() {
-		if (mLogger == null) {
-			mLogger = new CustomLogger(super.getLogger(), Level.INFO);
-		}
+		MMLog.init(getName());
+		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
 
 		NetworkChatProperties.load(this, null);
 
@@ -110,7 +105,6 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 		mMessageColors.putAll(mDefaultMessageColors);
 		mMessageFormats.putAll(mDefaultMessageFormats);
 
-		ChangeLogLevel.register();
 		@Nullable ZipFile zip = null;
 		try {
 			zip = new ZipFile(getFile());
@@ -217,12 +211,11 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 		return INSTANCE;
 	}
 
+	/** @deprecated Use {@link MMLog} static methods instead. */
+	@Deprecated
 	@Override
-	public Logger getLogger() {
-		if (mLogger == null) {
-			mLogger = new CustomLogger(super.getLogger(), Level.INFO);
-		}
-		return mLogger;
+	public java.util.logging.Logger getLogger() {
+		return super.getLogger();
 	}
 
 	public static void reload(CommandSender sender) {
