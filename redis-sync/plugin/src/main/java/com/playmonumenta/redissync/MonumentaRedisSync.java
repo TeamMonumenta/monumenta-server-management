@@ -1,7 +1,6 @@
 package com.playmonumenta.redissync;
 
 import com.playmonumenta.redissync.adapters.VersionAdapter;
-import com.playmonumenta.redissync.commands.ChangeLogLevel;
 import com.playmonumenta.redissync.commands.PlayerHistory;
 import com.playmonumenta.redissync.commands.PlayerLoadFromPlayer;
 import com.playmonumenta.redissync.commands.PlayerRollback;
@@ -11,9 +10,8 @@ import com.playmonumenta.redissync.commands.RemoteDataCommand;
 import com.playmonumenta.redissync.commands.Stash;
 import com.playmonumenta.redissync.commands.TransferServer;
 import com.playmonumenta.redissync.commands.UpgradeAllPlayers;
+import com.playmonumenta.redissync.utils.MMLog;
 import java.io.File;
-import java.util.Locale;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -26,7 +24,6 @@ public class MonumentaRedisSync extends JavaPlugin {
 	private static @Nullable MonumentaRedisSync INSTANCE = null;
 	private @Nullable RedisAPI mRedisAPI = null;
 	private @Nullable VersionAdapter mVersionAdapter = null;
-	private @Nullable CustomLogger mLogger = null;
 
 	private void loadVersionAdapter() {
 		/* From https://github.com/mbax/AbstractionExamplePlugin */
@@ -38,17 +35,20 @@ public class MonumentaRedisSync extends JavaPlugin {
 			final Class<?> clazz = Class.forName("com.playmonumenta.redissync.adapters.VersionAdapter_" + version);
 			// Check if we have a valid adapter class at that location.
 			if (VersionAdapter.class.isAssignableFrom(clazz)) {
-				mVersionAdapter = (VersionAdapter) clazz.getConstructor(Logger.class).newInstance(this.getLogger());
+				mVersionAdapter = (VersionAdapter) clazz.getConstructor(org.apache.logging.log4j.Logger.class).newInstance(MMLog.getLog().asLogger());
 			}
 		} catch (final Exception e) {
-			getLogger().log(Level.SEVERE, "Server version " + version + " is not supported!", e);
+			MMLog.severe("Server version " + version + " is not supported!", e);
 			return;
 		}
-		getLogger().info("Loading support for " + version);
+		MMLog.info("Loading support for " + version);
 	}
 
 	@Override
 	public void onLoad() {
+		MMLog.init(getName());
+		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
+
 		loadVersionAdapter();
 
 		/*
@@ -63,7 +63,6 @@ public class MonumentaRedisSync extends JavaPlugin {
 		PlayerLoadFromPlayer.register();
 		PlayerTransferHistory.register(this);
 		UpgradeAllPlayers.register(this);
-		ChangeLogLevel.register(this);
 		RboardCommand.register(this);
 		RemoteDataCommand.register(this);
 	}
@@ -83,19 +82,16 @@ public class MonumentaRedisSync extends JavaPlugin {
 
 		if (getServer().getPluginManager().isPluginEnabled("MonumentaNetworkRelay")) {
 			try {
-				getServer().getPluginManager().registerEvents(new NetworkRelayIntegration(this.getLogger()), this);
+				getServer().getPluginManager().registerEvents(new NetworkRelayIntegration(), this);
 			} catch (Exception ex) {
-				getLogger().severe("Failed to enable MonumentaNetworkRelay integration: " + ex.getMessage());
+				MMLog.severe("Failed to enable MonumentaNetworkRelay integration", ex);
 			}
 		}
 
 		loadConfig();
-		// TODO: Set the default log level back to INFO, this is only for temporary debugging of the new redis borrow() system
-		setLogLevel(Level.FINE);
 		mRedisAPI = new RedisAPI(BukkitConfigAPI.getRedisHost(), BukkitConfigAPI.getRedisPort());
-		RedisAPI.setLogger(getLogger());
-		getServer().getPluginManager().registerEvents(new DataEventListener(this.getLogger(), mVersionAdapter), this);
-		getServer().getPluginManager().registerEvents(new ScoreboardCleanupListener(this, this.getLogger(), mVersionAdapter), this);
+		getServer().getPluginManager().registerEvents(new DataEventListener(mVersionAdapter), this);
+		getServer().getPluginManager().registerEvents(new ScoreboardCleanupListener(this, mVersionAdapter), this);
 		getServer().getPluginManager().registerEvents(AccountTransferManager.getInstance(), this);
 		if (BukkitConfigAPI.getTicksPerPlayerAutosave() > 0) {
 			getServer().getPluginManager().registerEvents(new AutoSaveListener(this, mVersionAdapter), this);
@@ -131,7 +127,7 @@ public class MonumentaRedisSync extends JavaPlugin {
 		return versionAdapter;
 	}
 
-	private BukkitConfigAPI loadConfig() {
+	private void loadConfig() {
 		File configFile = new File(this.getDataFolder(), "config.yml");
 		/* TODO: Default file if not exist */
 		FileConfiguration config = YamlConfiguration.loadConfiguration(configFile);
@@ -151,34 +147,13 @@ public class MonumentaRedisSync extends JavaPlugin {
 		boolean savingDisabled = config.getBoolean("saving_disabled", false);
 		boolean scoreboardCleanupEnabled = config.getBoolean("scoreboard_cleanup_enabled", true);
 
-		String level = config.getString("log_level", "INFO").toLowerCase(Locale.ENGLISH);
-		switch (level) {
-			case "finest":
-				setLogLevel(Level.FINEST);
-				break;
-			case "finer":
-				setLogLevel(Level.FINER);
-				break;
-			case "fine":
-				setLogLevel(Level.FINE);
-				break;
-			default:
-				setLogLevel(Level.INFO);
-		}
-
-		 return new BukkitConfigAPI(getLogger(), redisHost, redisPort, serverDomain, shardName, historyAmount, ticksPerPlayerAutosave, savingDisabled, scoreboardCleanupEnabled);
+		new BukkitConfigAPI(getLogger(), redisHost, redisPort, serverDomain, shardName, historyAmount, ticksPerPlayerAutosave, savingDisabled, scoreboardCleanupEnabled);
 	}
 
-	public void setLogLevel(Level level) {
-		super.getLogger().info("Changing log level to: " + level.toString());
-		getLogger().setLevel(level);
-	}
-
+	/** @deprecated Use {@link MMLog} static methods instead. */
+	@Deprecated
 	@Override
 	public @NotNull Logger getLogger() {
-		if (mLogger == null) {
-			mLogger = new CustomLogger(super.getLogger(), Level.INFO);
-		}
-		return mLogger;
+		return super.getLogger();
 	}
 }

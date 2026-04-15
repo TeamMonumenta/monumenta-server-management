@@ -14,6 +14,7 @@ import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
 import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
 import com.playmonumenta.redissync.event.PlayerTransferFailEvent;
+import com.playmonumenta.redissync.utils.MMLog;
 import com.playmonumenta.redissync.utils.ScoreboardUtils;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.output.KeyValueStreamingChannel;
@@ -40,8 +41,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -122,7 +121,6 @@ public class DataEventListener implements Listener {
 	private static DataEventListener INSTANCE = null;
 
 	private final Gson mGson = new Gson();
-	private final Logger mLogger;
 	private final VersionAdapter mAdapter;
 	private final Set<UUID> mTransferringPlayers = new HashSet<>();
 	private final Map<UUID, ReturnParams> mReturnParams = new HashMap<>();
@@ -140,8 +138,7 @@ public class DataEventListener implements Listener {
 	 */
 	private final Map<UUID, Map<String, String>> mShardData = new HashMap<>();
 
-	protected DataEventListener(Logger logger, VersionAdapter adapter) {
-		mLogger = logger;
+	protected DataEventListener(VersionAdapter adapter) {
 		mAdapter = adapter;
 		INSTANCE = this;
 
@@ -230,7 +227,7 @@ public class DataEventListener implements Listener {
 		Plugin plugin = MonumentaRedisSync.getInstance();
 
 		if (!mPendingSaves.containsKey(player.getUniqueId()) && !BukkitConfigAPI.getSavingDisabled()) {
-			mLogger.warning("Got request to wait for save commit but no pending save operations found. This might be a bug with the plugin that uses MonumentaRedisSync");
+			MMLog.warning("Got request to wait for save commit but no pending save operations found. This might be a bug with the plugin that uses MonumentaRedisSync");
 		}
 
 		long startTime = System.currentTimeMillis();
@@ -238,7 +235,7 @@ public class DataEventListener implements Listener {
 		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
 			blockingWaitForPlayerToSave(player);
 
-			mLogger.fine(() -> "Committing save took " + (System.currentTimeMillis() - startTime) + " milliseconds");
+			MMLog.debug(() -> "Committing save took " + (System.currentTimeMillis() - startTime) + " milliseconds");
 
 			/* Run the callback after about 150ms have passed to make sure the redis changes commit */
 			if (sync) {
@@ -258,19 +255,19 @@ public class DataEventListener implements Listener {
 			return;
 		}
 
-		mLogger.fine("Blocking wait for pending save for player=" + player.getName());
+		MMLog.debug("Blocking wait for pending save for player=" + player.getName());
 
 		try {
 			@SuppressWarnings("unchecked")
 			CompletableFuture<?>[] futureArr = futures.toArray(new CompletableFuture[0]);
 			CompletableFuture.allOf(futureArr).get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
 		} catch (TimeoutException ex) {
-			mLogger.log(Level.SEVERE, "Got timeout waiting to commit transactions for player '" + player.getName() + "'. This is very bad!", ex);
+			MMLog.severe("Got timeout waiting to commit transactions for player '" + player.getName() + "'. This is very bad!", ex);
 		} catch (InterruptedException | ExecutionException ex) {
-			mLogger.log(Level.SEVERE, "Failed waiting to commit transactions for player '" + player.getName() + "'", ex);
+			MMLog.severe("Failed waiting to commit transactions for player '" + player.getName() + "'", ex);
 		}
 
-		mLogger.fine("Pending save completed for player=" + player.getName());
+		MMLog.debug("Pending save completed for player=" + player.getName());
 	}
 
 	/* ******************* Data Save/Load Event Handlers ******************* */
@@ -280,13 +277,13 @@ public class DataEventListener implements Listener {
 	 */
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	public void serverResourcesReloadedEvent(ServerResourcesReloadedEvent event) {
-		mLogger.fine("ServerResourcesReloadedEvent caused by " + event.getCause() + ", triggering save for all players...");
+		MMLog.debug("ServerResourcesReloadedEvent caused by " + event.getCause() + ", triggering save for all players...");
 		for (Player player : Bukkit.getOnlinePlayers()) {
-			mLogger.finer("Saving player " + player.getName() + " due to datapack reload");
+			MMLog.trace("Saving player " + player.getName() + " due to datapack reload");
 			try {
 				MonumentaRedisSyncAPI.savePlayer(player);
 			} catch (Exception ex) {
-				mLogger.log(Level.SEVERE, "Failed to save player '" + player.getName() + "'", ex);
+				MMLog.severe("Failed to save player '" + player.getName() + "'", ex);
 			}
 		}
 	}
@@ -301,7 +298,7 @@ public class DataEventListener implements Listener {
 		}
 
 		long startTime = System.currentTimeMillis();
-		mLogger.fine("Started loading advancements data for player=" + player.getName());
+		MMLog.debug("Started loading advancements data for player=" + player.getName());
 
 		/* Wait until player has finished saving if they just logged out and back in */
 		blockingWaitForPlayerToSave(player);
@@ -314,17 +311,17 @@ public class DataEventListener implements Listener {
 		try {
 			/* Advancements */
 			final String advanceData = advanceFuture.get();
-			mLogger.finer(() -> "Advancements data loaded for player=" + player.getName());
-			mLogger.finest(() -> "Advancements data:" + advanceData);
+			MMLog.trace(() -> "Advancements data loaded for player=" + player.getName());
+			MMLog.trace(() -> "Advancements data:" + advanceData);
 			if (advanceData != null) {
 				event.setJsonData(advanceData);
 			} else {
-				mLogger.warning("No advancements data for player '" + player.getName() + "' - if they are not new, this is a serious error!");
+				MMLog.warning("No advancements data for player '" + player.getName() + "' - if they are not new, this is a serious error!");
 			}
 
-			mLogger.fine(() -> "Processing PlayerAdvancementDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
+			MMLog.debug(() -> "Processing PlayerAdvancementDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
 		} catch (InterruptedException | ExecutionException ex) {
-			mLogger.log(Level.SEVERE, "Failed to get advancements data for player '" + player.getName() + "'. This is very bad!", ex);
+			MMLog.severe("Failed to get advancements data for player '" + player.getName() + "'. This is very bad!", ex);
 		}
 	}
 
@@ -340,7 +337,7 @@ public class DataEventListener implements Listener {
 
 		Player player = event.getPlayer();
 		if (isPlayerTransferring(player)) {
-			mLogger.fine("Ignoring PlayerAdvancementDataSaveEvent for player:" + player.getName());
+			MMLog.debug("Ignoring PlayerAdvancementDataSaveEvent for player:" + player.getName());
 			return;
 		}
 
@@ -353,15 +350,15 @@ public class DataEventListener implements Listener {
 
 		/* Execute the advancements as a multi() batch */
 		/* Advancements */
-		mLogger.fine("Saving advancements data for player=" + player.getName());
-		mLogger.finest(() -> "Data:" + event.getJsonData());
+		MMLog.debug("Saving advancements data for player=" + player.getName());
+		MMLog.trace(() -> "Data:" + event.getJsonData());
 		String advPath = MonumentaRedisSyncAPI.getRedisAdvancementsPath(player);
 		String advJsonData = event.getJsonData();
 		futures.add(RedisAPI.multi(commands -> {
 			commands.lpush(advPath, advJsonData);
 			commands.ltrim(advPath, 0, BukkitConfigAPI.getHistoryAmount());
 		}).exceptionally(ex -> {
-			mLogger.log(Level.SEVERE, "Advancements saving for player=" + player.getName() + " failed", ex);
+			MMLog.severe("Advancements saving for player=" + player.getName() + " failed", ex);
 			return null;
 		}));
 
@@ -384,11 +381,11 @@ public class DataEventListener implements Listener {
 		try {
 			callable.run(path.resolve(name));
 		} catch (Throwable e) {
-			mLogger.log(Level.SEVERE, "failed to save data to file", e);
+			MMLog.severe("failed to save data to file", e);
 			try {
 				Files.writeString(path.resolve(name + ".save_error.txt"), exceptionToString(e));
 			} catch (Throwable e2) {
-				mLogger.log(Level.SEVERE, "I give up!", e2);
+				MMLog.severe("I give up!", e2);
 			}
 		}
 	}
@@ -403,7 +400,7 @@ public class DataEventListener implements Listener {
 		}
 
 		long startTime = System.currentTimeMillis();
-		mLogger.fine("Started loading data for player=" + player.getName());
+		MMLog.debug("Started loading data for player=" + player.getName());
 
 		/* Wait until player has finished saving if they just logged out and back in */
 		blockingWaitForPlayerToSave(player);
@@ -426,37 +423,37 @@ public class DataEventListener implements Listener {
 			/* Load the primary shared NBT data */
 			byte[] data = dataFuture.get();
 			if (data == null) {
-				mLogger.warning("No data for player '" + player.getName() + "' - if they are not new, this is a serious error!");
+				MMLog.warning("No data for player '" + player.getName() + "' - if they are not new, this is a serious error!");
 				return;
 			}
-			mLogger.finer("Player data loaded for player=" + player.getName());
-			mLogger.finest(() -> "Player data: " + b64encode(data));
+			MMLog.trace("Player data loaded for player=" + player.getName());
+			MMLog.trace(() -> "Player data: " + b64encode(data));
 
 			/* Load plugin data */
 			String pluginData = pluginDataFuture.get();
 			if (pluginData == null) {
-				mLogger.fine("Player '" + player.getName() + "' has no plugin data");
+				MMLog.debug("Player '" + player.getName() + "' has no plugin data");
 			} else {
 				mLoadingPlayers.add(player.getUniqueId());
 				mPluginData.put(player.getUniqueId(), mGson.fromJson(pluginData, JsonObject.class));
-				mLogger.finer("Plugin data loaded for player=" + player.getName());
-				mLogger.finest(() -> "Plugin data: " + pluginData);
+				MMLog.trace("Plugin data loaded for player=" + player.getName());
+				MMLog.trace(() -> "Plugin data: " + pluginData);
 			}
 
 			/* Load scoreboards */
 			final String scoreData = scoreFuture.get();
-			mLogger.fine("Scoreboard data loaded for player=" + player.getName());
+			MMLog.debug("Scoreboard data loaded for player=" + player.getName());
 			mAdapter.resetPlayerScores(player.getName(), Bukkit.getScoreboardManager().getMainScoreboard());
-			mLogger.finest(() -> "Score data:" + scoreData);
+			MMLog.trace(() -> "Score data:" + scoreData);
 			if (scoreData != null) {
 				JsonObject obj = mGson.fromJson(scoreData, JsonObject.class);
 				if (obj != null) {
 					ScoreboardUtils.loadFromJsonObject(player, obj);
 				} else {
-					mLogger.severe("Failed to parse player '" + player.getName() + "' scoreboard data as JSON. This results in data loss!");
+					MMLog.severe("Failed to parse player '" + player.getName() + "' scoreboard data as JSON. This results in data loss!");
 				}
 			} else {
-				mLogger.warning("No scoreboard data for player '" + player.getName() + "' - if they are not new, this is a serious error!");
+				MMLog.warning("No scoreboard data for player '" + player.getName() + "' - if they are not new, this is a serious error!");
 			}
 
 			/* Get all the shard data for all shards and worlds */
@@ -470,13 +467,13 @@ public class DataEventListener implements Listener {
 				mShardData.put(player.getUniqueId(), new HashMap<>());
 
 				/* This is not an error - this will happen whenever a player first joins the game */
-				mLogger.fine("Player '" + player.getName() + "' has never been to any shard before");
+				MMLog.debug("Player '" + player.getName() + "' has never been to any shard before");
 			} else {
 				/* Maintain a local cache of shard data while the player is logged in here */
 				mShardData.put(player.getUniqueId(), shardData);
 
-				mLogger.finer("Shard data loaded for player=" + player.getName());
-				mLogger.finest(() -> "Shard data: " + mGson.toJson(shardData));
+				MMLog.trace("Shard data loaded for player=" + player.getName());
+				MMLog.trace(() -> "Shard data: " + mGson.toJson(shardData));
 
 				/* Figure out what world the player's sharddata indicates they should join
 				 * If shard data does not contain this shard name, no info on what world to use - use the default one
@@ -485,7 +482,7 @@ public class DataEventListener implements Listener {
 				String overallShardData = shardData.get(BukkitConfigAPI.getShardName());
 				if (overallShardData == null) {
 					/* This is not an error - this will happen whenever a player first visits a new shard */
-					mLogger.fine("Player '" + player.getName() + "' has never been to this shard before");
+					MMLog.debug("Player '" + player.getName() + "' has never been to this shard before");
 				} else {
 					JsonObject shardDataJson = mGson.fromJson(overallShardData, JsonObject.class);
 
@@ -497,7 +494,7 @@ public class DataEventListener implements Listener {
 								playerWorld = world;
 							}
 						} catch (Exception ex) {
-							mLogger.log(Level.SEVERE, "Got sharddata WorldUUID='" + shardDataJson.get("WorldUUID").getAsString() + "' which is invalid", ex);
+							MMLog.severe("Got sharddata WorldUUID='" + shardDataJson.get("WorldUUID").getAsString() + "' which is invalid", ex);
 						}
 					}
 
@@ -521,25 +518,25 @@ public class DataEventListener implements Listener {
 			/* After this point playerWorld is always non-null and a valid loaded world */
 
 			// Throw an event that lets other plugins modify the join world.
-			mLogger.finer("Calling PlayerJoinSetWorldEvent for player '" + player.getName() + "' with world={" + playerWorld.getUID() + ": " + playerWorld.getName() + "}, lastSavedWorld={" + lastSavedWorldUUID + ": " + lastSavedWorldName + "}");
+			MMLog.trace("Calling PlayerJoinSetWorldEvent for player '" + player.getName() + "' with world={" + playerWorld.getUID() + ": " + playerWorld.getName() + "}, lastSavedWorld={" + lastSavedWorldUUID + ": " + lastSavedWorldName + "}");
 			PlayerJoinSetWorldEvent worldEvent = new PlayerJoinSetWorldEvent(player, playerWorld, lastSavedWorldUUID, lastSavedWorldName);
 			Bukkit.getPluginManager().callEvent(worldEvent);
 
 			playerWorld = worldEvent.getWorld();
-			mLogger.finer("After PlayerJoinSetWorldEvent for player '" + player.getName() + "' got world={" + playerWorld.getUID() + ": " + playerWorld.getName() + "}");
+			MMLog.trace("After PlayerJoinSetWorldEvent for player '" + player.getName() + "' got world={" + playerWorld.getUID() + ": " + playerWorld.getName() + "}");
 
 			final JsonObject shardDataJson;
 			if (shardData == null || shardData.isEmpty()) {
-				mLogger.finer("No shard data for player '" + player.getName() + "'");
+				MMLog.trace("No shard data for player '" + player.getName() + "'");
 				shardDataJson = new JsonObject();
 			} else {
 				/* Look up in the shard data first the "world" part - data from this world about where the player should be */
 				String worldShardData = shardData.get(MonumentaRedisSyncAPI.getRedisPerShardDataWorldKey(playerWorld));
 				if (worldShardData == null || worldShardData.isEmpty()) {
-					mLogger.finer("No world shard data for player '" + player.getName() + "', using default");
+					MMLog.trace("No world shard data for player '" + player.getName() + "', using default");
 					shardDataJson = new JsonObject();
 				} else {
-					mLogger.finer("Found world shard data for player '" + player.getName() + "': '" + worldShardData + "'");
+					MMLog.trace("Found world shard data for player '" + player.getName() + "': '" + worldShardData + "'");
 					shardDataJson = mGson.fromJson(worldShardData, JsonObject.class);
 				}
 			}
@@ -571,10 +568,10 @@ public class DataEventListener implements Listener {
 			Object nbtTagCompound = mAdapter.retrieveSaveData(data, shardDataJson);
 			event.setData(nbtTagCompound);
 
-			mLogger.fine(() -> "Processing PlayerDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
+			MMLog.debug(() -> "Processing PlayerDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
 		} catch (Throwable ex) {
 			mLoadFailedPlayers.add(event.getPlayer().getUniqueId());
-			mLogger.log(Level.SEVERE, "!!! Failed to load player data !!!", ex);
+			MMLog.severe("!!! Failed to load player data !!!", ex);
 
 			final var rootPath = MonumentaRedisSync.getInstance().getDataFolder().toPath()
 				.resolve("data-fail-report-%s-%s-%s".formatted(
@@ -583,7 +580,7 @@ public class DataEventListener implements Listener {
 					player.getUniqueId()
 				));
 
-			mLogger.severe("Writing data files to for analysis..." + rootPath);
+			MMLog.severe("Writing data files to for analysis..." + rootPath);
 
 			try {
 				Files.createDirectories(rootPath);
@@ -599,10 +596,10 @@ public class DataEventListener implements Listener {
 				});
 			} catch (IOException e) {
 				// there's nothing we can do here if we can't create the directory...
-				mLogger.log(Level.SEVERE, "Failed to create directory for saving player info", e);
+				MMLog.severe("Failed to create directory for saving player info", e);
 			}
 
-			mLogger.severe("Bail: kicking player early in order to prevent data loss!");
+			MMLog.severe("Bail: kicking player early in order to prevent data loss!");
 			Bukkit.getScheduler().runTask(MonumentaRedisSync.getInstance(), () -> event.getPlayer().kick(LOAD_ERROR_MSG));
 		}
 	}
@@ -618,17 +615,17 @@ public class DataEventListener implements Listener {
 
 		if (mLoadFailedPlayers.contains(event.getPlayer().getUniqueId())) {
 			mLoadFailedPlayers.remove(event.getPlayer().getUniqueId());
-			mLogger.warning("Skipping playerdata save for " + event.getPlayer().getUniqueId() + " because their playerdata failed to load");
+			MMLog.warning("Skipping playerdata save for " + event.getPlayer().getUniqueId() + " because their playerdata failed to load");
 			return;
 		}
 
 		Player player = event.getPlayer();
 		if (isPlayerTransferring(player)) {
-			mLogger.fine("Ignoring PlayerDataSaveEvent for player:" + player.getName());
+			MMLog.debug("Ignoring PlayerDataSaveEvent for player:" + player.getName());
 			return;
 		}
 
-		mLogger.fine("Saving data for player=" + player.getName());
+		MMLog.debug("Saving data for player=" + player.getName());
 
 		List<CompletableFuture<?>> futures = mPendingSaves.remove(player.getUniqueId());
 		if (futures == null) {
@@ -652,9 +649,9 @@ public class DataEventListener implements Listener {
 			for (Map.Entry<String, JsonObject> ent : eventData.entrySet()) {
 				pluginData.add(ent.getKey(), ent.getValue());
 			}
-			mLogger.fine(() -> "Getting plugindata from other plugins took " + (System.currentTimeMillis() - startTime) + " milliseconds");
+			MMLog.debug(() -> "Getting plugindata from other plugins took " + (System.currentTimeMillis() - startTime) + " milliseconds");
 		} else {
-			mLogger.fine(() -> "Skipped fetching plugindata from other plugins, as the player hasn't finished joining yet");
+			MMLog.debug(() -> "Skipped fetching plugindata from other plugins, as the player hasn't finished joining yet");
 		}
 
 		try {
@@ -662,13 +659,13 @@ public class DataEventListener implements Listener {
 			ReturnParams returnParams = mReturnParams.get(player.getUniqueId());
 			SaveData data = mAdapter.extractSaveData(event.getData(), returnParams);
 
-			mLogger.finest(() -> "data: " + b64encode(data.getData()));
+			MMLog.trace(() -> "data: " + b64encode(data.getData()));
 			String dataPath = MonumentaRedisSyncAPI.getRedisDataPath(player);
 			futures.add(RedisAPI.multiStringBytes(byteConn -> {
 				byteConn.lpush(dataPath, data.getData());
 				byteConn.ltrim(dataPath, 0, BukkitConfigAPI.getHistoryAmount());
 			}).exceptionally(ex -> {
-				mLogger.log(Level.SEVERE, "Failed to save player nbt data for player=" + player.getName(), ex);
+				MMLog.severe("Failed to save player nbt data for player=" + player.getName(), ex);
 				return null;
 			}));
 
@@ -683,11 +680,11 @@ public class DataEventListener implements Listener {
 			// Also update the local sharddata cache
 			Map<String, String> shardDataMap = mShardData.get(player.getUniqueId());
 			if (shardDataMap == null) {
-				mLogger.warning("BUG! There was no player entry in the mShardData map for uuid=" + player.getUniqueId() + " name=" + player.getName() + ". This is not a fatal error, but player locations are likely wrong in some corner cases...");
+				MMLog.warning("BUG! There was no player entry in the mShardData map for uuid=" + player.getUniqueId() + " name=" + player.getName() + ". This is not a fatal error, but player locations are likely wrong in some corner cases...");
 			} else {
 				shardDataMap.put(worldKey, data.getShardData());
 			}
-			mLogger.finest("sharddata (world): " + worldKey + "=" + data.getShardData());
+			MMLog.trace("sharddata (world): " + worldKey + "=" + data.getShardData());
 
 			// Save the data for this shard indicating which world the player is currently on
 			JsonObject overallShardData = new JsonObject();
@@ -697,25 +694,25 @@ public class DataEventListener implements Listener {
 			if (shardDataMap != null) {
 				shardDataMap.put(BukkitConfigAPI.getShardName(), overallShardDataStr);
 			}
-			mLogger.finest("sharddata (overall): " + BukkitConfigAPI.getShardName() + "=" + overallShardDataStr);
+			MMLog.trace("sharddata (overall): " + BukkitConfigAPI.getShardName() + "=" + overallShardDataStr);
 
 			/* history */
 			String histPath = MonumentaRedisSyncAPI.getRedisHistoryPath(player);
 			String history = BukkitConfigAPI.getShardName() + "|" + System.currentTimeMillis() + "|" + player.getName();
-			mLogger.finest(() -> "history: " + history);
+			MMLog.trace(() -> "history: " + history);
 
 			/* plugindata */
 			String pluginDataPath = MonumentaRedisSyncAPI.getRedisPluginDataPath(player);
 			mPluginData.put(player.getUniqueId(), pluginData); // Update cache
 			String pluginDataStr = mGson.toJson(pluginData);
-			mLogger.finest(() -> "plugindata: " + pluginDataStr);
+			MMLog.trace(() -> "plugindata: " + pluginDataStr);
 
 			/* Scoreboards */
-			mLogger.fine("Saving scoreboard data for player=" + player.getName());
+			MMLog.debug("Saving scoreboard data for player=" + player.getName());
 			long scoreStartTime = System.currentTimeMillis();
 			String scoreboardData = mGson.toJson(mAdapter.getPlayerScoresAsJson(player.getName(), Bukkit.getScoreboardManager().getMainScoreboard()));
-			mLogger.fine(() -> "Scoreboard saving took " + (System.currentTimeMillis() - scoreStartTime) + " " + "milliseconds on main thread");
-			mLogger.finest(() -> "Data:" + scoreboardData);
+			MMLog.debug(() -> "Scoreboard saving took " + (System.currentTimeMillis() - scoreStartTime) + " " + "milliseconds on main thread");
+			MMLog.trace(() -> "Data:" + scoreboardData);
 			String scorePath = MonumentaRedisSyncAPI.getRedisScoresPath(player);
 
 			futures.add(RedisAPI.multi(commands -> {
@@ -728,11 +725,11 @@ public class DataEventListener implements Listener {
 				commands.lpush(scorePath, scoreboardData);
 				commands.ltrim(scorePath, 0, BukkitConfigAPI.getHistoryAmount());
 			}).exceptionally(ex -> {
-				mLogger.log(Level.SEVERE, "Failed to save player data for player=" + player.getName(), ex);
+				MMLog.severe("Failed to save player data for player=" + player.getName(), ex);
 				return null;
 			}));
 		} catch (IOException ex) {
-			mLogger.log(Level.SEVERE, "Failed to save player data for player=" + player.getName(), ex);
+			MMLog.severe("Failed to save player data for player=" + player.getName(), ex);
 		}
 
 		/* Don't block - store the pending futures for completion later */
@@ -907,7 +904,7 @@ public class DataEventListener implements Listener {
 	@EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
 	public void entitySpawnEvent(EntitySpawnEvent event) {
 		if (mTransferringPlayerShoulderEntities.containsKey(event.getEntity().getUniqueId())) {
-			mLogger.fine(() -> "Refused to spawn shoulder entity id: " + event.getEntity().getType() + " uuid: " + event.getEntity().getUniqueId());
+			MMLog.debug(() -> "Refused to spawn shoulder entity id: " + event.getEntity().getType() + " uuid: " + event.getEntity().getUniqueId());
 			event.setCancelled(true);
 		}
 	}
@@ -938,14 +935,14 @@ public class DataEventListener implements Listener {
 		PlayerProfile profile = event.getPlayerProfile();
 		UUID uuid = profile.getId();
 		if (uuid == null) {
-			mLogger.warning(() -> "A player uuid=null" + " name=" + profile.getName() + " tried to login without a UUID! Preventing duplicate uuid stupidity");
+			MMLog.warning(() -> "A player uuid=null" + " name=" + profile.getName() + " tried to login without a UUID! Preventing duplicate uuid stupidity");
 			// Probably the most accurate kick message? Can't verify a username without a UUID, however we got into this state.
 			event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, Component.translatable("multiplayer.disconnect.unverified_username"));
 			return;
 		}
 		// if player is loaded, but they are also trying to connect, disconnect the one trying to connect to prevent duplicate uuid stupidity
 		if (Bukkit.getPlayer(uuid) != null || mLoadingPlayers.contains(uuid) || mShardData.containsKey(uuid)) {
-			mLogger.warning(() -> "A player uuid=" + uuid + " name=" + profile.getName() + " tried to login while loading/online! Preventing duplicate uuid stupidity");
+			MMLog.warning(() -> "A player uuid=" + uuid + " name=" + profile.getName() + " tried to login while loading/online! Preventing duplicate uuid stupidity");
 			event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, Component.translatable("multiplayer.disconnect.duplicate_login"));
 		}
 	}

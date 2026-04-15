@@ -2,7 +2,6 @@ package com.playmonumenta.redissync.utils;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.playmonumenta.redissync.MonumentaRedisSync;
 import java.util.Map;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -28,7 +27,7 @@ public class ScoreboardUtils {
 			if (!objective.isModifiable()) {
 				final Criteria criteriaName = objective.getTrackedCriteria();
 				// TODO: remove debug logging :3
-				MonumentaRedisSync.getInstance().getLogger().warning(() -> "Objective " + name + " is not modifiable. Criteria: " + criteriaName.getName());
+				MMLog.warning(() -> "Objective " + name + " is not modifiable. Criteria: " + criteriaName.getName());
 				continue;
 			}
 

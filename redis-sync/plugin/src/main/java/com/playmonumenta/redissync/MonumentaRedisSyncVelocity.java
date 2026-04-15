@@ -1,9 +1,11 @@
 package com.playmonumenta.redissync;
 
 import com.google.inject.Inject;
+import com.playmonumenta.redissync.utils.MMLog;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
+import com.velocitypowered.api.plugin.Dependency;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.ProxyServer;
@@ -19,7 +21,17 @@ import org.spongepowered.configurate.objectmapping.meta.Setting;
 import org.spongepowered.configurate.yaml.NodeStyle;
 import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
-@Plugin(id = "monumenta-redisapi", name = "Monumenta-RedisAPI", version = "", url = "", description = "", authors = {""})
+@Plugin(
+	id = "monumenta-redisapi",
+	name = "Monumenta-RedisAPI",
+	version = "",
+	url = "",
+	description = "",
+	authors = {""},
+	dependencies = {
+		@Dependency(id = "monumenta-common")
+	}
+)
 public class MonumentaRedisSyncVelocity {
 	private @Nullable RedisAPI mRedisAPI = null;
 	public final ProxyServer mServer;
@@ -31,6 +43,7 @@ public class MonumentaRedisSyncVelocity {
 
 	@Inject
 	public MonumentaRedisSyncVelocity(ProxyServer server, Logger logger, @DataDirectory Path dataDirectory) {
+		MMLog.init("Monumenta-RedisAPI");
 		mServer = server;
 		mLogger = logger;
 
@@ -48,6 +61,7 @@ public class MonumentaRedisSyncVelocity {
 
 	@Subscribe
 	public void onEnable(ProxyInitializeEvent event) {
+		com.playmonumenta.common.MMLogVelocity.registerCommand(MMLog.getLog(), mServer.getCommandManager(), this);
 		mServer.getEventManager().register(this, new VelocityListener(this));
 	}
 
