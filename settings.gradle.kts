@@ -7,6 +7,7 @@ pluginManagement {
 	}
 }
 
+include("monumenta-common")
 include("network-chat")
 include("network-relay")
 include("redis-sync")
