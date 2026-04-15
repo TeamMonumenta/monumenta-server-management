@@ -54,6 +54,7 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean, pm
         options.compilerArgs.add("-Xmaxwarns")
         options.compilerArgs.add("10000")
         options.compilerArgs.add("-Xlint:deprecation")
+        options.compilerArgs.add("-Xlint:unchecked")
 
         options.errorproneWrap {
             option("NullAway:AnnotatedPackages", "com.playmonumenta")

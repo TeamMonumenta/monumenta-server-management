@@ -4,6 +4,10 @@ plugins {
 	alias(libs.plugins.gradle.config)
 }
 
+tasks.withType<JavaCompile> {
+	options.compilerArgs.add("-Werror")
+}
+
 dependencies {
 	compileOnly(libs.annotations)
 	compileOnly(libs.commandapi)

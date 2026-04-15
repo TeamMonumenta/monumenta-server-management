@@ -4,6 +4,10 @@ plugins {
 	alias(libs.plugins.gradle.config)
 }
 
+tasks.withType<JavaCompile> {
+	options.compilerArgs.add("-Werror")
+}
+
 repositories {
 	mavenLocal()
 }
