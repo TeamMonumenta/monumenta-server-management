@@ -27,7 +27,7 @@ public class StructureConquerEvent extends Event {
 		return mTimestamp;
 	}
 
-	// The location is the last spawner broken
+	// The location is the last spawner broken.
 
 	public Location getLocation() {
 		return mLocation.clone();

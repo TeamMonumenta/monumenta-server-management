@@ -601,6 +601,14 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 		return mWorld;
 	}
 
+	public StructureBounds getInnerBounds() {
+		return mInnerBounds;
+	}
+
+	public StructureBounds getOuterBounds() {
+		return mOuterBounds;
+	}
+
 	public int getSpawnerCount() {
 		return mSpawnerBreakTrigger != null ? mSpawnerBreakTrigger.mSpawnerCount : -1;
 	}
