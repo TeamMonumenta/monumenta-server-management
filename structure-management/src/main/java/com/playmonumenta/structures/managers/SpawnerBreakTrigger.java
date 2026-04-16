@@ -4,7 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.playmonumenta.scriptedquests.quests.QuestContext;
 import com.playmonumenta.scriptedquests.quests.components.QuestComponent;
-import com.playmonumenta.structures.StructureConquerEvent;
+import com.playmonumenta.structures.events.StructureConquerEvent;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.bukkit.Bukkit;

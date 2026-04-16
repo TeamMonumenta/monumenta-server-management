@@ -1,4 +1,4 @@
-package com.playmonumenta.structures;
+package com.playmonumenta.structures.events;
 
 import com.playmonumenta.structures.managers.RespawningStructure;
 import java.time.Instant;
