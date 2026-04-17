@@ -1,10 +1,9 @@
 package com.playmonumenta.structures.events;
 
 import com.playmonumenta.structures.managers.RespawningStructure;
+import java.time.Instant;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
-
-import java.time.Instant;
 
 /** Fires when a structure respawns successfully without throwing an exception. Not cancellable. */
 public class StructureRespawnEvent extends Event {
