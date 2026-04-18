@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chat-logger-config
+  namespace: play
+data:
+  network_relay.yml: |
+    log-level: INFO
+
+    broadcast-command-sending-enabled: true
+    broadcast-command-receiving-enabled: true
+
+    # Shard name is set via the NETWORK_RELAY_NAME env var in the Deployment.
+    # Uncomment to override:
+    #shard-name: "chat-logger"
+
+    rabbitmq-uri: "amqp://guest:guest@rabbitmq:5672"
+
+    heartbeat-interval: 3
+    destination-timeout: 10
+    default-time-to-live: 604800
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat-logger
+  namespace: play
+  labels:
+    app: chat-logger
+spec:
+  strategy:
+    type: Recreate
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chat-logger
+  template:
+    metadata:
+      labels:
+        app: chat-logger
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - monumenta-18
+      volumes:
+        - name: chat-logger-config
+          configMap:
+            name: chat-logger-config
+        - name: chat-logger-logs
+          hostPath:
+            type: Directory
+            path: /nfs/chat-logger/play/logs
+      containers:
+      - name: chat-logger
+        image: ghcr.io/teammonumenta/monumenta-automation/monumenta-chat-logger:latest
+        tty: false
+        stdin: false
+        volumeMounts:
+        - name: chat-logger-config
+          mountPath: /config
+          readOnly: true
+        - name: chat-logger-logs
+          mountPath: /logs/chat
+        env:
+        # Unique name this logger appears as on the RabbitMQ network.
+        # Should not conflict with any shard name.
+        - name: NETWORK_RELAY_NAME
+          value: chat-logger
+        # Path to the network_relay.yml config file (rabbitmq-uri, shard-name, etc.)
+        - name: CHAT_LOGGER_CONFIG
+          value: /config/network_relay.yml
+        # Directory where rolling chat log files are written.
+        - name: CHAT_LOG_DIR
+          value: /logs/chat
+        # JVM heap size. Chat logger is lightweight; 128m is sufficient.
+        - name: JAVA_MEM
+          value: 128m
+        resources:
+          limits:
+            cpu: 250m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi

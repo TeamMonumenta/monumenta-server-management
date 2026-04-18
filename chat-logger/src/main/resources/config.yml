@@ -1,0 +1,16 @@
+# NetworkRelay config for the standalone chat logger.
+# Override shard-name and rabbitmq-uri via environment variables:
+#   NETWORK_RELAY_NAME    - shard name (e.g. "chat-logger")
+#   CHAT_LOGGER_RABBIT_URI is NOT supported here; edit this file or mount a custom config.
+
+log-level: INFO
+
+# Unique name for this logger instance on the network
+# Set via NETWORK_RELAY_NAME env var or override below
+shard-name: "chat-logger"
+
+rabbitmq-uri: "amqp://guest:guest@127.0.0.1:5672"
+
+heartbeat-interval: 1
+destination-timeout: 5
+default-time-to-live: 604800

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="ChatConsole" target="SYSTEM_OUT">
+            <PatternLayout pattern="[%d{HH:mm:ss} CHAT]: %msg%n"/>
+        </Console>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="[%d{HH:mm:ss} %level]: [%logger] %msg%n"/>
+        </Console>
+        <RollingRandomAccessFile name="ChatFile"
+                     fileName="${env:CHAT_LOG_DIR:-logs/chat}/latest.log"
+                     filePattern="${env:CHAT_LOG_DIR:-logs/chat}/%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="[%d{yyyy-MM-dd HH:mm:ss}]: %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="50 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="1000"/>
+        </RollingRandomAccessFile>
+    </Appenders>
+    <Loggers>
+        <Logger name="NetworkChatLog" level="INFO" additivity="false">
+            <AppenderRef ref="ChatFile"/>
+            <AppenderRef ref="ChatConsole"/>
+        </Logger>
+        <Root level="INFO">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>

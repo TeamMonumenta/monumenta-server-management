@@ -7,6 +7,7 @@ pluginManagement {
 	}
 }
 
+include("chat-logger")
 include("monumenta-common")
 include("network-chat")
 include("network-relay")
