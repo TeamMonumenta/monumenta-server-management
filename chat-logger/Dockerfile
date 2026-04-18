@@ -1,4 +1,12 @@
-FROM eclipse-temurin:21
+FROM rust:1-bookworm AS builder
+WORKDIR /build
+COPY . .
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libssl3 ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
 ARG USERNAME
 ARG UID
@@ -7,23 +15,17 @@ RUN : "${USERNAME:?'USERNAME' argument needs to be set and non-empty.}"
 RUN : "${UID:?'UID' argument needs to be set and non-empty.}"
 RUN : "${GID:?'GID' argument needs to be set and non-empty.}"
 
-ENV USERHOME=/home/$USERNAME
+RUN groupadd --non-unique -g $GID $USERNAME \
+ && useradd --non-unique -lmNs /bin/bash -u $UID -g $GID $USERNAME
 
-RUN groupadd --non-unique -g $GID $USERNAME && \
-        useradd --non-unique -lmNs /bin/bash -u $UID -g $GID $USERNAME
-
-COPY chat-logger/build/libs/chat-logger.jar /app/chat-logger.jar
-COPY chat-logger/docker/start.sh /start.sh
-RUN chmod +x /start.sh
+COPY --from=builder /build/target/release/chat-logger /app/chat-logger
 
 # Mount points:
-#   /config/network_relay.yml  - NetworkRelay config (rabbitmq URI, shard name)
-#   /logs/chat                 - chat log output directory
+#   /logs        - chat log output directory
 # Environment variables:
-#   CHAT_LOGGER_CONFIG  - override config file path (default: /config/network_relay.yml)
-#   CHAT_LOG_DIR        - override log directory (default: /logs/chat)
-#   JAVA_MEM            - JVM heap size (default: 256m)
+#   AMQP_URI     - RabbitMQ connection string (default: amqp://guest:guest@127.0.0.1:5672)
+#   SHARD_NAME   - queue name / identity on the network (default: chat-logger)
 
 USER $USERNAME
-WORKDIR $USERHOME
-CMD ["/start.sh"]
+WORKDIR /home/$USERNAME
+CMD ["/app/chat-logger"]
