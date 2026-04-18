@@ -2,6 +2,7 @@ package com.playmonumenta.networkchat;
 
 import com.google.gson.JsonObject;
 import com.playmonumenta.networkchat.channel.Channel;
+import com.playmonumenta.networkchat.channel.ChannelLoading;
 import com.playmonumenta.networkchat.utils.ChatLogger;
 import com.playmonumenta.networkchat.utils.CommandUtils;
 import com.playmonumenta.networkchat.utils.MMLog;
@@ -167,7 +168,7 @@ public class MessageManager implements Listener {
 		}
 
 		Channel channel = message.getChannel();
-		if (channel == null) {
+		if (channel == null || channel instanceof ChannelLoading) {
 			UUID channelId = message.getChannelUniqueId();
 			if (channelId != null) {
 				// Channel not loaded yet; defer logging+distribution until after channel loads
