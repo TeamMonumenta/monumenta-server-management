@@ -304,7 +304,7 @@ public class ChannelParty extends Channel implements ChannelInviteOnly {
 
 	@Override
 	public void distributeMessage(Message message) {
-		showMessage(Bukkit.getConsoleSender(), message);
+		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
 		for (Map.Entry<UUID, PlayerState> playerStateEntry : PlayerStateManager.getPlayerStates().entrySet()) {
 			PlayerState state = playerStateEntry.getValue();
 			Player player = state.getPlayer();

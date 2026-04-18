@@ -240,7 +240,7 @@ public class ChannelLocal extends Channel implements ChannelAutoJoin, ChannelPer
 			// TODO Chat spy here
 			return;
 		}
-		showMessage(Bukkit.getConsoleSender(), message);
+		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
 		for (Map.Entry<UUID, PlayerState> playerStateEntry : PlayerStateManager.getPlayerStates().entrySet()) {
 			PlayerState state = playerStateEntry.getValue();
 			Player player = state.getPlayer();

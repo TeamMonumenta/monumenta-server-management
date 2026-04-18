@@ -71,6 +71,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 	public void onLoad() {
 		MMLog.init(getName());
 		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
+		com.playmonumenta.networkchat.utils.ChatLogger.init();
 
 		NetworkChatProperties.load(this, null);
 

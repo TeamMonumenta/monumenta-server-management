@@ -2,6 +2,7 @@ package com.playmonumenta.networkchat;
 
 import com.google.gson.JsonObject;
 import com.playmonumenta.networkchat.channel.Channel;
+import com.playmonumenta.networkchat.utils.ChatLogger;
 import com.playmonumenta.networkchat.utils.CommandUtils;
 import com.playmonumenta.networkchat.utils.MMLog;
 import com.playmonumenta.networkchat.utils.MessagingUtils;
@@ -163,6 +164,13 @@ public class MessageManager implements Listener {
 		} catch (Exception e) {
 			MMLog.severe("Could not read Message from json", e);
 			return;
+		}
+
+		// Log every received chat message once, to the dedicated chat log file
+		try {
+			ChatLogger.log(MessagingUtils.plainText(message.shownMessage(Bukkit.getConsoleSender())));
+		} catch (Exception e) {
+			MMLog.warning("Failed to write chat log entry: " + e.getMessage());
 		}
 
 		Channel channel = message.getChannel();

@@ -273,7 +273,7 @@ public class ChannelWorld extends Channel implements ChannelAutoJoin, ChannelPer
 		}
 		fromWorld = fromWorldJsonPrimitive.getAsString();
 
-		showMessage(Bukkit.getConsoleSender(), message);
+		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
 		for (Map.Entry<UUID, PlayerState> playerStateEntry : PlayerStateManager.getPlayerStates().entrySet()) {
 			PlayerState state = playerStateEntry.getValue();
 			Player player = state.getPlayer();
