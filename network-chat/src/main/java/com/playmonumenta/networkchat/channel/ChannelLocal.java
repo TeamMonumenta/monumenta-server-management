@@ -219,6 +219,19 @@ public class ChannelLocal extends Channel implements ChannelAutoJoin, ChannelPer
 	}
 
 	@Override
+	public @Nullable String getOriginShard(Message message) {
+		JsonObject extraData = message.getExtraData();
+		if (extraData == null) {
+			return null;
+		}
+		JsonElement el = extraData.get("fromShard");
+		if (el == null || !el.isJsonPrimitive()) {
+			return null;
+		}
+		return el.getAsString();
+	}
+
+	@Override
 	public void distributeMessage(Message message) {
 		JsonObject extraData = message.getExtraData();
 		if (extraData == null) {

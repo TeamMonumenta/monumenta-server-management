@@ -166,15 +166,23 @@ public class MessageManager implements Listener {
 			return;
 		}
 
-		ChatLogger.log(MessagingUtils.plainText(message.shownMessage(Bukkit.getConsoleSender())));
-
 		Channel channel = message.getChannel();
 		if (channel == null) {
+			ChatLogger.log(MessagingUtils.plainText(message.shownMessage(Bukkit.getConsoleSender())));
 			UUID channelId = message.getChannelUniqueId();
 			if (channelId != null) {
 				ChannelManager.loadChannel(channelId, message);
 			}
 		} else {
+			String originShard = channel.getOriginShard(message);
+			boolean isRemote = originShard != null && !originShard.equals(NetworkChatPlugin.getShardName());
+			if (!isRemote || NetworkChatProperties.getChatLogAllServers()) {
+				String logLine = MessagingUtils.plainText(message.shownMessage(Bukkit.getConsoleSender()));
+				if (originShard != null) {
+					logLine = "[" + originShard + "] " + logLine;
+				}
+				ChatLogger.log(logLine);
+			}
 			channel.distributeMessage(message);
 		}
 	}

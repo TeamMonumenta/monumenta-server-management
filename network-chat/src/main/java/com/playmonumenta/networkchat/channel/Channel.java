@@ -281,6 +281,11 @@ public abstract class Channel {
 	// Note that sending to player chat state allows chat to be paused.
 	public abstract void distributeMessage(Message message);
 
+	// Returns the shard that originated this message, or null for network-wide channels.
+	public @Nullable String getOriginShard(Message message) {
+		return null;
+	}
+
 	// Get how the message appears to a given recipient.
 	public abstract Component shownMessage(CommandSender recipient, Message message);
 
