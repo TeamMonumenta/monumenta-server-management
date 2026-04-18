@@ -166,12 +166,7 @@ public class MessageManager implements Listener {
 			return;
 		}
 
-		// Log every received chat message once, to the dedicated chat log file
-		try {
-			ChatLogger.log(MessagingUtils.plainText(message.shownMessage(Bukkit.getConsoleSender())));
-		} catch (Exception e) {
-			MMLog.warning("Failed to write chat log entry: " + e.getMessage());
-		}
+		ChatLogger.log(MessagingUtils.plainText(message.shownMessage(Bukkit.getConsoleSender())));
 
 		Channel channel = message.getChannel();
 		if (channel == null) {
