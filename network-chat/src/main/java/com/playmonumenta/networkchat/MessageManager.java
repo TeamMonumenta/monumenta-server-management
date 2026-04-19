@@ -3,6 +3,7 @@ package com.playmonumenta.networkchat;
 import com.google.gson.JsonObject;
 import com.playmonumenta.networkchat.channel.Channel;
 import com.playmonumenta.networkchat.channel.ChannelLoading;
+import com.playmonumenta.networkchat.utils.ChatLogger;
 import com.playmonumenta.networkchat.utils.CommandUtils;
 import com.playmonumenta.networkchat.utils.MMLog;
 import com.playmonumenta.networkchat.utils.MessagingUtils;
@@ -170,11 +171,26 @@ public class MessageManager implements Listener {
 		if (channel == null || channel instanceof ChannelLoading) {
 			UUID channelId = message.getChannelUniqueId();
 			if (channelId != null) {
+				// Channel not loaded yet; defer logging+distribution until after channel loads
 				ChannelManager.loadChannel(channelId, message);
+			} else {
+				ChatLogger.log(MessagingUtils.plainText(message.shownMessage(Bukkit.getConsoleSender())));
 			}
 		} else {
-			channel.distributeMessage(message);
+			processMessage(channel, message);
 		}
+	}
+
+	public static void processMessage(Channel channel, Message message) {
+		if (channel.shouldLog(message)) {
+			String originShard = channel.getOriginShard(message);
+			String logLine = MessagingUtils.plainText(message.shownMessage(Bukkit.getConsoleSender()));
+			if (originShard != null) {
+				logLine = "[" + originShard + "] " + logLine;
+			}
+			ChatLogger.log(logLine);
+		}
+		channel.distributeMessage(message);
 	}
 
 	public void deleteMessageHandler(JsonObject object) {
