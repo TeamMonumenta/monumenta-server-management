@@ -4,8 +4,10 @@ use lapin::{
     types::{AMQPValue, FieldTable},
     Connection, ConnectionProperties,
 };
+use redis::AsyncCommands;
 use serde_json::Value;
 use std::{
+    collections::HashMap,
     env,
     fs::{File, OpenOptions},
     io::{BufWriter, Write},
@@ -14,6 +16,7 @@ use std::{
 use tokio_stream::StreamExt;
 
 const CHAT_CHANNEL: &str = "com.playmonumenta.networkchat.Message";
+const UUID2NAME_KEY: &str = "uuid2name";
 const MAX_FILE_BYTES: u64 = 50 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
@@ -79,12 +82,78 @@ impl RollingLog {
 }
 
 // ---------------------------------------------------------------------------
+// UUID → player name cache backed by Redis
+// ---------------------------------------------------------------------------
+
+struct UuidCache {
+    map: HashMap<String, String>,
+    conn: Option<redis::aio::MultiplexedConnection>,
+}
+
+impl UuidCache {
+    async fn new(uri: Option<&str>) -> Self {
+        let Some(uri) = uri else {
+            return Self {
+                map: HashMap::new(),
+                conn: None,
+            };
+        };
+
+        let client = match redis::Client::open(uri) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Redis: invalid URI: {e}. UUID lookups will fall back to raw UUIDs.");
+                return Self {
+                    map: HashMap::new(),
+                    conn: None,
+                };
+            }
+        };
+
+        let mut conn = match client.get_multiplexed_async_connection().await {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Redis: connection failed: {e}. UUID lookups will fall back to raw UUIDs.");
+                return Self {
+                    map: HashMap::new(),
+                    conn: None,
+                };
+            }
+        };
+
+        let map: HashMap<String, String> = conn
+            .hgetall(UUID2NAME_KEY)
+            .await
+            .unwrap_or_default();
+        eprintln!("Redis: loaded {} UUID→name mappings from {UUID2NAME_KEY}", map.len());
+
+        Self {
+            map,
+            conn: Some(conn),
+        }
+    }
+
+    async fn lookup(&mut self, uuid: &str) -> String {
+        if let Some(name) = self.map.get(uuid) {
+            return name.clone();
+        }
+        if let Some(conn) = &mut self.conn {
+            let result: redis::RedisResult<Option<String>> = conn.hget(UUID2NAME_KEY, uuid).await;
+            if let Ok(Some(name)) = result {
+                self.map.insert(uuid.to_string(), name.clone());
+                return name;
+            }
+        }
+        uuid.to_string()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Adventure Component → plain text
 // ---------------------------------------------------------------------------
 
 fn plain_text(v: &Value) -> String {
     match v {
-        // Gson shorthand: a bare JSON string is a text component
         Value::String(s) => s.clone(),
         Value::Object(obj) => {
             let mut out = String::new();
@@ -103,19 +172,52 @@ fn plain_text(v: &Value) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// Message parsing
+// Message parsing and formatting
 // ---------------------------------------------------------------------------
 
-fn format_message(body: &[u8]) -> Option<String> {
+async fn format_message(body: &[u8], cache: &mut UuidCache, debug: bool) -> Option<String> {
     let root: Value = serde_json::from_slice(body).ok()?;
     if root.get("channel")?.as_str()? != CHAT_CHANNEL {
         return None;
     }
-    let source = root.get("source").and_then(Value::as_str).unwrap_or("?");
+
+    if debug {
+        eprintln!(
+            "DEBUG: {}",
+            serde_json::to_string_pretty(&root).unwrap_or_default()
+        );
+    }
+
     let data = root.get("data")?;
     let sender = data.get("senderName").and_then(Value::as_str).unwrap_or("?");
     let message = data.get("message").map(plain_text).unwrap_or_default();
-    Some(format!("[{source}] {sender}: {message}"))
+
+    let line = match data.get("extra") {
+        Some(Value::Object(extra)) => {
+            if let Some(receiver_uuid) = extra.get("receiver").and_then(Value::as_str) {
+                // Whisper / DM
+                let receiver = cache.lookup(receiver_uuid).await;
+                format!("<whisper> {sender} → {receiver} » {message}")
+            } else if extra.contains_key("fromWorld") {
+                // World channel — includes shard and world name
+                let shard = extra.get("fromShard").and_then(Value::as_str).unwrap_or("?");
+                format!("[{shard}] <wc> {sender} » {message}")
+            } else if let Some(shard) = extra.get("fromShard").and_then(Value::as_str) {
+                // Local channel
+                format!("[{shard}] <l> {sender} » {message}")
+            } else if let Some(team) = extra.get("team").and_then(Value::as_str) {
+                // Team channel
+                format!("<team:{team}> {sender} » {message}")
+            } else {
+                // Unknown extra structure; treat as global
+                format!("<g> {sender} » {message}")
+            }
+        }
+        // No extra: global, party, or announcement — indistinguishable from message data alone
+        _ => format!("<g> {sender} » {message}"),
+    };
+
+    Some(line)
 }
 
 // ---------------------------------------------------------------------------
@@ -126,6 +228,8 @@ fn format_message(body: &[u8]) -> Option<String> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let uri = env::var("AMQP_URI").unwrap_or_else(|_| "amqp://guest:guest@127.0.0.1:5672".into());
     let queue = env::var("SHARD_NAME").unwrap_or_else(|_| "chat-logger".into());
+    let redis_uri = env::var("REDIS_URI").ok();
+    let debug = env::var("CHAT_LOGGER_DEBUG").is_ok();
 
     let mut log = match RollingLog::open(Path::new("/logs")) {
         Ok(l) => l,
@@ -134,6 +238,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
+
+    let mut cache = UuidCache::new(redis_uri.as_deref()).await;
 
     let conn = Connection::connect(
         &uri,
@@ -188,7 +294,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         match consumer.next().await {
             Some(Ok(delivery)) => {
-                if let Some(line) = format_message(&delivery.data) {
+                if let Some(line) = format_message(&delivery.data, &mut cache, debug).await {
                     let now = Local::now();
                     let ts = now.format("%Y-%m-%d %H:%M:%S");
                     println!("[{ts}]: {line}");

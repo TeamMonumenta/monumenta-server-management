@@ -2,12 +2,17 @@
 
 Standalone service that connects to RabbitMQ and logs all Monumenta network chat messages to a rolling log file and stdout.
 
-Each log line is prefixed with the originating shard name and a timestamp:
+Each log line is prefixed with a timestamp and channel indicator:
 
 ```
-[2026-04-18 14:23:01]: [valley] Playername: hello everyone
-[2026-04-18 14:23:05]: [build] OtherPlayer: working on the new dungeon
+[2026-04-18 14:23:01]: [valley] <l> Playername » hello (local chat)
+[2026-04-18 14:23:02]: <g> OtherPlayer » global announcement
+[2026-04-18 14:23:03]: [valley] <wc> Playername » world chat message
+[2026-04-18 14:23:04]: <whisper> Sender → Receiver » private message
+[2026-04-18 14:23:05]: <team:TeamName> Playername » team chat
 ```
+
+Channel prefixes: `<l>` local, `<wc>` world, `<whisper>` DM, `<team:X>` team, `<g>` global/party/announcement.
 
 The service reconnects automatically to RabbitMQ on connection loss, using lapin's built-in auto-recovery. Non-recoverable errors exit the process (rely on Kubernetes to restart the pod).
 
@@ -17,6 +22,8 @@ The service reconnects automatically to RabbitMQ on connection loss, using lapin
 |----------|---------|-------------|
 | `AMQP_URI` | `amqp://guest:guest@127.0.0.1:5672` | RabbitMQ connection string |
 | `SHARD_NAME` | `chat-logger` | Queue name. Must be unique across the network. |
+| `REDIS_URI` | _(none)_ | Redis connection string (e.g. `redis://127.0.0.1:6379`). Used to resolve player UUIDs to names via the `uuid2name` hash. If unset or unreachable, UUIDs are logged as-is. |
+| `CHAT_LOGGER_DEBUG` | _(unset)_ | If set to any value, prints the full raw JSON of each chat message to stderr before formatting. |
 
 ## Log output
 
