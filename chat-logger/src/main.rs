@@ -13,6 +13,7 @@ use std::{
     io::{BufWriter, Write},
     path::{Path, PathBuf},
 };
+use tokio::signal::unix::{signal, SignalKind};
 use tokio_stream::StreamExt;
 
 const CHAT_CHANNEL: &str = "com.playmonumenta.networkchat.Message";
@@ -450,25 +451,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     eprintln!("Connected to RabbitMQ, listening on queue '{queue}'");
 
+    let mut sigterm = signal(SignalKind::terminate())?;
+
     loop {
-        match consumer.next().await {
-            Some(Ok(delivery)) => {
-                if let Some(msg) = format_message(&delivery.data, &mut redis, debug).await {
-                    let now = Local::now();
-                    let ts = now.format("%Y-%m-%d %H:%M:%S");
-                    println!("[{ts}]: {}", msg.colored);
-                    if let Err(e) = log.write_line(&msg.plain) {
-                        eprintln!("Failed to write log line: {e}");
+        tokio::select! {
+            biased;
+            _ = sigterm.recv() => {
+                eprintln!("Received SIGTERM, shutting down.");
+                break;
+            }
+            _ = tokio::signal::ctrl_c() => {
+                eprintln!("Received SIGINT, shutting down.");
+                break;
+            }
+            delivery = consumer.next() => {
+                match delivery {
+                    Some(Ok(delivery)) => {
+                        if let Some(msg) = format_message(&delivery.data, &mut redis, debug).await {
+                            let now = Local::now();
+                            let ts = now.format("%Y-%m-%d %H:%M:%S");
+                            println!("[{ts}]: {}", msg.colored);
+                            if let Err(e) = log.write_line(&msg.plain) {
+                                eprintln!("Failed to write log line: {e}");
+                            }
+                        }
+                        delivery.ack(BasicAckOptions::default()).await?;
                     }
+                    Some(Err(err)) => {
+                        eprintln!("Connection error: {err}. Waiting for recovery...");
+                        ch.wait_for_recovery(err).await?;
+                        eprintln!("Recovered, resuming.");
+                    }
+                    None => return Err("Consumer stream ended unexpectedly".into()),
                 }
-                delivery.ack(BasicAckOptions::default()).await?;
             }
-            Some(Err(err)) => {
-                eprintln!("Connection error: {err}. Waiting for recovery...");
-                ch.wait_for_recovery(err).await?;
-                eprintln!("Recovered, resuming.");
-            }
-            None => return Err("Consumer stream ended unexpectedly".into()),
         }
     }
+
+    Ok(())
 }
