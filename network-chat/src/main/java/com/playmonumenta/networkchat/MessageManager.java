@@ -174,9 +174,8 @@ public class MessageManager implements Listener {
 				ChannelManager.loadChannel(channelId, message);
 			}
 		} else {
-			String originShard = channel.getOriginShard(message);
-			boolean isRemote = originShard != null && !originShard.equals(NetworkChatPlugin.getShardName());
-			if (!isRemote || NetworkChatProperties.getChatLogAllServers()) {
+			if (channel.shouldLog(message)) {
+				String originShard = channel.getOriginShard(message);
 				String logLine = MessagingUtils.plainText(message.shownMessage(Bukkit.getConsoleSender()));
 				if (originShard != null) {
 					logLine = "[" + originShard + "] " + logLine;

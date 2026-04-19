@@ -5,6 +5,7 @@ import com.playmonumenta.networkchat.ChannelManager;
 import com.playmonumenta.networkchat.Message;
 import com.playmonumenta.networkchat.MessageManager;
 import com.playmonumenta.networkchat.NetworkChatPlugin;
+import com.playmonumenta.networkchat.NetworkChatProperties;
 import com.playmonumenta.networkchat.PlayerState;
 import com.playmonumenta.networkchat.PlayerStateManager;
 import com.playmonumenta.networkchat.RemotePlayerListener;
@@ -222,6 +223,25 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 	@Override
 	public String getClassId() {
 		return CHANNEL_CLASS_ID;
+	}
+
+	@Override
+	public boolean shouldLog(Message message) {
+		if (NetworkChatProperties.getChatLogAllServers()) {
+			return true;
+		}
+		JsonObject extra = message.getExtraData();
+		if (extra == null) {
+			return false;
+		}
+		try {
+			UUID receiverUuid = UUID.fromString(extra.getAsJsonPrimitive("receiver").getAsString());
+			UUID senderUuid = message.getSenderId();
+			return (senderUuid != null && PlayerStateManager.getPlayerState(senderUuid) != null)
+				|| PlayerStateManager.getPlayerState(receiverUuid) != null;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 
 	@Override

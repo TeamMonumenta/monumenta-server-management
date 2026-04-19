@@ -4,6 +4,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.playmonumenta.networkchat.Message;
+import com.playmonumenta.networkchat.NetworkChatPlugin;
+import com.playmonumenta.networkchat.NetworkChatProperties;
 import com.playmonumenta.networkchat.PlayerState;
 import com.playmonumenta.networkchat.PlayerStateManager;
 import com.playmonumenta.networkchat.channel.property.ChannelAccess;
@@ -284,6 +286,13 @@ public abstract class Channel {
 	// Returns the shard that originated this message, or null for network-wide channels.
 	public @Nullable String getOriginShard(Message message) {
 		return null;
+	}
+
+	// Whether this shard should log this message. Default: log if originating shard or ChatLogAllServers.
+	public boolean shouldLog(Message message) {
+		String originShard = getOriginShard(message);
+		boolean isRemote = originShard != null && !originShard.equals(NetworkChatPlugin.getShardName());
+		return !isRemote || NetworkChatProperties.getChatLogAllServers();
 	}
 
 	// Get how the message appears to a given recipient.
