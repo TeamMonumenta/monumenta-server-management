@@ -11,5 +11,5 @@ path = "src/main.rs"
 chrono = { version = "0.4", features = ["clock"] }
 lapin = "4"
 serde_json = "1"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
 tokio-stream = "0.1"

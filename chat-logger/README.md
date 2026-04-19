@@ -9,7 +9,7 @@ Each log line is prefixed with the originating shard name and a timestamp:
 [2026-04-18 14:23:05]: [build] OtherPlayer: working on the new dungeon
 ```
 
-The service reconnects automatically to rabbitmq on connection loss (5-second retry interval).
+The service reconnects automatically to RabbitMQ on connection loss, using lapin's built-in auto-recovery. Non-recoverable errors exit the process (rely on Kubernetes to restart the pod).
 
 ## Configuration
 

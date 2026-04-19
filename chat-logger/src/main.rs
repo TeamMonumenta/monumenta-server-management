@@ -1,5 +1,4 @@
 use chrono::Local;
-use tokio_stream::StreamExt;
 use lapin::{
     options::*,
     types::{AMQPValue, FieldTable},
@@ -11,8 +10,8 @@ use std::{
     fs::{File, OpenOptions},
     io::{BufWriter, Write},
     path::{Path, PathBuf},
-    time::Duration,
 };
+use tokio_stream::StreamExt;
 
 const CHAT_CHANNEL: &str = "com.playmonumenta.networkchat.Message";
 const MAX_FILE_BYTES: u64 = 50 * 1024 * 1024;
@@ -120,15 +119,27 @@ fn format_message(body: &[u8]) -> Option<String> {
 }
 
 // ---------------------------------------------------------------------------
-// AMQP consumer (one attempt; reconnect loop is in main)
+// Entry point
 // ---------------------------------------------------------------------------
 
-async fn run_consumer(
-    uri: &str,
-    queue: &str,
-    log: &mut RollingLog,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let conn = Connection::connect(uri, ConnectionProperties::default()).await?;
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let uri = env::var("AMQP_URI").unwrap_or_else(|_| "amqp://guest:guest@127.0.0.1:5672".into());
+    let queue = env::var("SHARD_NAME").unwrap_or_else(|_| "chat-logger".into());
+
+    let mut log = match RollingLog::open(Path::new("/logs")) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("Failed to open log dir '/logs': {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let conn = Connection::connect(
+        &uri,
+        ConnectionProperties::default().enable_auto_recover(),
+    )
+    .await?;
     let ch = conn.create_channel().await?;
 
     ch.exchange_declare(
@@ -143,10 +154,9 @@ async fn run_consumer(
     .await?;
 
     let mut args = FieldTable::default();
-    // Queue auto-deletes after 20 min of inactivity, matching the Java relay behavior.
     args.insert("x-expires".into(), AMQPValue::LongInt(1_200_000));
     ch.queue_declare(
-        queue.into(),
+        queue.as_str().into(),
         QueueDeclareOptions {
             durable: false,
             ..Default::default()
@@ -156,7 +166,7 @@ async fn run_consumer(
     .await?;
 
     ch.queue_bind(
-        queue.into(),
+        queue.as_str().into(),
         "broadcast".into(),
         "".into(),
         QueueBindOptions::default(),
@@ -166,7 +176,7 @@ async fn run_consumer(
 
     let mut consumer = ch
         .basic_consume(
-            queue.into(),
+            queue.as_str().into(),
             "chat-logger".into(),
             BasicConsumeOptions::default(),
             FieldTable::default(),
@@ -175,43 +185,25 @@ async fn run_consumer(
 
     eprintln!("Connected to RabbitMQ, listening on queue '{queue}'");
 
-    while let Some(delivery) = consumer.next().await {
-        let delivery = delivery?;
-        if let Some(line) = format_message(&delivery.data) {
-            let now = Local::now();
-            let ts = now.format("%Y-%m-%d %H:%M:%S");
-            println!("[{ts}]: {line}");
-            if let Err(e) = log.write_line(&line) {
-                eprintln!("Failed to write log line: {e}");
-            }
-        }
-        delivery.ack(BasicAckOptions::default()).await?;
-    }
-
-    Err("Consumer stream ended unexpectedly".into())
-}
-
-// ---------------------------------------------------------------------------
-// Entry point
-// ---------------------------------------------------------------------------
-
-#[tokio::main]
-async fn main() {
-    let uri = env::var("AMQP_URI").unwrap_or_else(|_| "amqp://guest:guest@127.0.0.1:5672".into());
-    let queue = env::var("SHARD_NAME").unwrap_or_else(|_| "chat-logger".into());
-
-    let mut log = match RollingLog::open(Path::new("/logs")) {
-        Ok(l) => l,
-        Err(e) => {
-            eprintln!("Failed to open log dir '/logs': {e}");
-            std::process::exit(1);
-        }
-    };
-
     loop {
-        if let Err(e) = run_consumer(&uri, &queue, &mut log).await {
-            eprintln!("Connection error: {e}. Reconnecting in 5s...");
-            tokio::time::sleep(Duration::from_secs(5)).await;
+        match consumer.next().await {
+            Some(Ok(delivery)) => {
+                if let Some(line) = format_message(&delivery.data) {
+                    let now = Local::now();
+                    let ts = now.format("%Y-%m-%d %H:%M:%S");
+                    println!("[{ts}]: {line}");
+                    if let Err(e) = log.write_line(&line) {
+                        eprintln!("Failed to write log line: {e}");
+                    }
+                }
+                delivery.ack(BasicAckOptions::default()).await?;
+            }
+            Some(Err(err)) => {
+                eprintln!("Connection error: {err}. Waiting for recovery...");
+                ch.wait_for_recovery(err).await?;
+                eprintln!("Recovered, resuming.");
+            }
+            None => return Err("Consumer stream ended unexpectedly".into()),
         }
     }
 }
