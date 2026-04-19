@@ -279,7 +279,7 @@ public class ChannelTeam extends Channel {
 
 	@Override
 	public void distributeMessage(Message message) {
-		showMessage(Bukkit.getConsoleSender(), message);
+		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
 
 		JsonObject extraData = message.getExtraData();
 		if (extraData == null) {
