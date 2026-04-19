@@ -17,6 +17,7 @@ use tokio_stream::StreamExt;
 
 const CHAT_CHANNEL: &str = "com.playmonumenta.networkchat.Message";
 const UUID2NAME_KEY: &str = "uuid2name";
+const REDIS_CHANNELS_PATH: &str = "networkchat:channels";
 const MAX_FILE_BYTES: u64 = 50 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
@@ -82,19 +83,97 @@ impl RollingLog {
 }
 
 // ---------------------------------------------------------------------------
-// UUID → player name cache backed by Redis
+// Channel info and color helpers
 // ---------------------------------------------------------------------------
 
-struct UuidCache {
-    map: HashMap<String, String>,
+type Rgb = (u8, u8, u8);
+
+struct ChannelInfo {
+    name: String,
+    channel_type: String,
+    color: Option<Rgb>,
+}
+
+// Parses "#rrggbb" or a Minecraft NamedTextColor name as used by Adventure/network-chat.
+fn parse_color(s: &str) -> Option<Rgb> {
+    let s = s.trim();
+    if let Some(hex) = s.strip_prefix('#') {
+        if hex.len() == 6 {
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            return Some((r, g, b));
+        }
+    }
+    // NamedTextColor RGB values from the Adventure library (Minecraft standard)
+    match s {
+        "black"        => Some((0, 0, 0)),
+        "dark_blue"    => Some((0, 0, 170)),
+        "dark_green"   => Some((0, 170, 0)),
+        "dark_aqua"    => Some((0, 170, 170)),
+        "dark_red"     => Some((170, 0, 0)),
+        "dark_purple"  => Some((170, 0, 170)),
+        "gold"         => Some((255, 170, 0)),
+        "gray"         => Some((170, 170, 170)),
+        "dark_gray"    => Some((85, 85, 85)),
+        "blue"         => Some((85, 85, 255)),
+        "green"        => Some((85, 255, 85)),
+        "aqua"         => Some((85, 255, 255)),
+        "red"          => Some((255, 85, 85)),
+        "light_purple" => Some((255, 85, 255)),
+        "yellow"       => Some((255, 255, 85)),
+        "white"        => Some((255, 255, 255)),
+        _              => None,
+    }
+}
+
+// Default colors from NetworkChatPlugin.java mDefaultMessageColors.
+// Returns None for channel types not defined there.
+fn default_color_for_type(channel_type: &str) -> Option<Rgb> {
+    match channel_type {
+        "announcement" => Some((255, 85, 85)),   // NamedTextColor.RED
+        "global"       => Some((255, 255, 255)), // NamedTextColor.WHITE
+        "local"        => Some((255, 255, 85)),  // NamedTextColor.YELLOW
+        "world"        => Some((85, 85, 255)),   // NamedTextColor.BLUE
+        "party"        => Some((255, 85, 255)),  // NamedTextColor.LIGHT_PURPLE
+        "team"         => Some((255, 255, 255)), // NamedTextColor.WHITE
+        "whisper"      => Some((170, 170, 170)), // NamedTextColor.GRAY
+        _              => None,
+    }
+}
+
+fn parse_channel_json(json_str: &str) -> Option<ChannelInfo> {
+    let v: Value = serde_json::from_str(json_str).ok()?;
+    let name = v.get("name")?.as_str()?.to_string();
+    let channel_type = v.get("type")?.as_str()?.to_string();
+    let color = v
+        .get("messageColor")
+        .and_then(Value::as_str)
+        .and_then(parse_color);
+    Some(ChannelInfo {
+        name,
+        channel_type,
+        color,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Redis state: player name cache + channel info cache
+// ---------------------------------------------------------------------------
+
+struct RedisState {
+    uuid_map: HashMap<String, String>,
+    // None value = already queried, not found in Redis
+    channel_map: HashMap<String, Option<ChannelInfo>>,
     conn: Option<redis::aio::MultiplexedConnection>,
 }
 
-impl UuidCache {
+impl RedisState {
     async fn new(uri: Option<&str>) -> Self {
         let Some(uri) = uri else {
             return Self {
-                map: HashMap::new(),
+                uuid_map: HashMap::new(),
+                channel_map: HashMap::new(),
                 conn: None,
             };
         };
@@ -102,9 +181,10 @@ impl UuidCache {
         let client = match redis::Client::open(uri) {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("Redis: invalid URI: {e}. UUID lookups will fall back to raw UUIDs.");
+                eprintln!("Redis: invalid URI: {e}. UUID lookups and channel info will be unavailable.");
                 return Self {
-                    map: HashMap::new(),
+                    uuid_map: HashMap::new(),
+                    channel_map: HashMap::new(),
                     conn: None,
                 };
             }
@@ -113,38 +193,66 @@ impl UuidCache {
         let mut conn = match client.get_multiplexed_async_connection().await {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("Redis: connection failed: {e}. UUID lookups will fall back to raw UUIDs.");
+                eprintln!("Redis: connection failed: {e}. UUID lookups and channel info will be unavailable.");
                 return Self {
-                    map: HashMap::new(),
+                    uuid_map: HashMap::new(),
+                    channel_map: HashMap::new(),
                     conn: None,
                 };
             }
         };
 
-        let map: HashMap<String, String> = conn
+        let uuid_map: HashMap<String, String> = conn
             .hgetall(UUID2NAME_KEY)
             .await
             .unwrap_or_default();
-        eprintln!("Redis: loaded {} UUID→name mappings from {UUID2NAME_KEY}", map.len());
+        eprintln!(
+            "Redis: loaded {} UUID→name mappings from {UUID2NAME_KEY}",
+            uuid_map.len()
+        );
 
         Self {
-            map,
+            uuid_map,
+            channel_map: HashMap::new(),
             conn: Some(conn),
         }
     }
 
-    async fn lookup(&mut self, uuid: &str) -> String {
-        if let Some(name) = self.map.get(uuid) {
+    async fn lookup_player(&mut self, uuid: &str) -> String {
+        if let Some(name) = self.uuid_map.get(uuid) {
             return name.clone();
         }
         if let Some(conn) = &mut self.conn {
-            let result: redis::RedisResult<Option<String>> = conn.hget(UUID2NAME_KEY, uuid).await;
+            let result: redis::RedisResult<Option<String>> =
+                conn.hget(UUID2NAME_KEY, uuid).await;
             if let Ok(Some(name)) = result {
-                self.map.insert(uuid.to_string(), name.clone());
+                self.uuid_map.insert(uuid.to_string(), name.clone());
                 return name;
             }
         }
         uuid.to_string()
+    }
+
+    // Returns (name, channel_type, per-channel color override) if found.
+    async fn lookup_channel(&mut self, channel_id: &str) -> Option<(String, String, Option<Rgb>)> {
+        if !self.channel_map.contains_key(channel_id) {
+            let info = match &mut self.conn {
+                Some(conn) => {
+                    let result: redis::RedisResult<Option<String>> =
+                        conn.hget(REDIS_CHANNELS_PATH, channel_id).await;
+                    match result {
+                        Ok(Some(json_str)) => parse_channel_json(&json_str),
+                        _ => None,
+                    }
+                }
+                None => None,
+            };
+            self.channel_map.insert(channel_id.to_string(), info);
+        }
+        self.channel_map
+            .get(channel_id)?
+            .as_ref()
+            .map(|info| (info.name.clone(), info.channel_type.clone(), info.color))
     }
 }
 
@@ -172,10 +280,39 @@ fn plain_text(v: &Value) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// Message parsing and formatting
+// Message formatting
 // ---------------------------------------------------------------------------
 
-async fn format_message(body: &[u8], cache: &mut UuidCache, debug: bool) -> Option<String> {
+struct FormattedMessage {
+    // Plain text for the log file (no ANSI codes).
+    plain: String,
+    // ANSI-colored for stdout: channel name and message body are colored,
+    // brackets, sender, and separator are not.
+    colored: String,
+}
+
+fn build_message(
+    shard_prefix: &str,
+    label: &str,
+    sender: &str,
+    message: &str,
+    color: Option<Rgb>,
+) -> FormattedMessage {
+    let plain = format!("{shard_prefix}<{label}> {sender} » {message}");
+    let colored = match color {
+        Some((r, g, b)) => format!(
+            "{shard_prefix}<\x1b[38;2;{r};{g};{b}m{label}\x1b[0m> {sender} » \x1b[38;2;{r};{g};{b}m{message}\x1b[0m"
+        ),
+        None => plain.clone(),
+    };
+    FormattedMessage { plain, colored }
+}
+
+async fn format_message(
+    body: &[u8],
+    redis: &mut RedisState,
+    debug: bool,
+) -> Option<FormattedMessage> {
     let root: Value = serde_json::from_slice(body).ok()?;
     if root.get("channel")?.as_str()? != CHAT_CHANNEL {
         return None;
@@ -191,33 +328,54 @@ async fn format_message(body: &[u8], cache: &mut UuidCache, debug: bool) -> Opti
     let data = root.get("data")?;
     let sender = data.get("senderName").and_then(Value::as_str).unwrap_or("?");
     let message = data.get("message").map(plain_text).unwrap_or_default();
+    let extra = data.get("extra").and_then(Value::as_object);
 
-    let line = match data.get("extra") {
-        Some(Value::Object(extra)) => {
-            if let Some(receiver_uuid) = extra.get("receiver").and_then(Value::as_str) {
-                // Whisper / DM
-                let receiver = cache.lookup(receiver_uuid).await;
-                format!("<whisper> {sender} → {receiver} » {message}")
-            } else if extra.contains_key("fromWorld") {
-                // World channel — includes shard and world name
-                let shard = extra.get("fromShard").and_then(Value::as_str).unwrap_or("?");
-                format!("[{shard}] <wc> {sender} » {message}")
-            } else if let Some(shard) = extra.get("fromShard").and_then(Value::as_str) {
-                // Local channel
-                format!("[{shard}] <l> {sender} » {message}")
-            } else if let Some(team) = extra.get("team").and_then(Value::as_str) {
-                // Team channel
-                format!("<team:{team}> {sender} » {message}")
-            } else {
-                // Unknown extra structure; treat as global
-                format!("<g> {sender} » {message}")
-            }
+    // Whispers are handled specially: the channel name in Redis is auto-generated
+    // and not human-readable, so we use the extra data format instead.
+    if let Some(extra) = extra {
+        if let Some(receiver_uuid) = extra.get("receiver").and_then(Value::as_str) {
+            let receiver = redis.lookup_player(receiver_uuid).await;
+            let plain = format!("<whisper> {sender} → {receiver} » {message}");
+            let (r, g, b) = default_color_for_type("whisper").unwrap();
+            let colored = format!(
+                "<\x1b[38;2;{r};{g};{b}mwhisper\x1b[0m> {sender} → {receiver} » \x1b[38;2;{r};{g};{b}m{message}\x1b[0m"
+            );
+            return Some(FormattedMessage { plain, colored });
         }
-        // No extra: global, party, or announcement — indistinguishable from message data alone
-        _ => format!("<g> {sender} » {message}"),
+    }
+
+    // Shard prefix for channels where location context is useful (world/local).
+    let shard_prefix = extra
+        .and_then(|e| e.get("fromShard").and_then(Value::as_str))
+        .map(|s| format!("[{s}] "))
+        .unwrap_or_default();
+
+    // Look up channel by ID from Redis for name and color.
+    if let Some(channel_id) = data.get("channelId").and_then(Value::as_str) {
+        if let Some((name, channel_type, per_channel_color)) =
+            redis.lookup_channel(channel_id).await
+        {
+            let color = per_channel_color.or_else(|| default_color_for_type(&channel_type));
+            return Some(build_message(&shard_prefix, &name, sender, &message, color));
+        }
+    }
+
+    // Fallback when Redis is unavailable or channel not found: use heuristics.
+    let (label, color) = if let Some(extra) = extra {
+        if extra.contains_key("fromWorld") {
+            ("wc".to_string(), default_color_for_type("world"))
+        } else if extra.contains_key("fromShard") {
+            ("l".to_string(), default_color_for_type("local"))
+        } else if let Some(team) = extra.get("team").and_then(Value::as_str) {
+            (format!("team:{team}"), default_color_for_type("team"))
+        } else {
+            ("g".to_string(), default_color_for_type("global"))
+        }
+    } else {
+        ("g".to_string(), default_color_for_type("global"))
     };
 
-    Some(line)
+    Some(build_message(&shard_prefix, &label, sender, &message, color))
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +384,8 @@ async fn format_message(body: &[u8], cache: &mut UuidCache, debug: bool) -> Opti
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let uri = env::var("AMQP_URI").unwrap_or_else(|_| "amqp://guest:guest@127.0.0.1:5672".into());
+    let uri =
+        env::var("AMQP_URI").unwrap_or_else(|_| "amqp://guest:guest@127.0.0.1:5672".into());
     let queue = env::var("SHARD_NAME").unwrap_or_else(|_| "chat-logger".into());
     let redis_uri = env::var("REDIS_URI").ok();
     let debug = env::var("CHAT_LOGGER_DEBUG").is_ok();
@@ -239,7 +398,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let mut cache = UuidCache::new(redis_uri.as_deref()).await;
+    let mut redis = RedisState::new(redis_uri.as_deref()).await;
 
     let conn = Connection::connect(
         &uri,
@@ -294,11 +453,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         match consumer.next().await {
             Some(Ok(delivery)) => {
-                if let Some(line) = format_message(&delivery.data, &mut cache, debug).await {
+                if let Some(msg) = format_message(&delivery.data, &mut redis, debug).await {
                     let now = Local::now();
                     let ts = now.format("%Y-%m-%d %H:%M:%S");
-                    println!("[{ts}]: {line}");
-                    if let Err(e) = log.write_line(&line) {
+                    println!("[{ts}]: {}", msg.colored);
+                    if let Err(e) = log.write_line(&msg.plain) {
                         eprintln!("Failed to write log line: {e}");
                     }
                 }
