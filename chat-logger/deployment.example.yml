@@ -30,10 +30,11 @@ spec:
         - name: chat-logger-logs
           hostPath:
             type: Directory
-            path: /nfs/chat-logger/play/logs
+            path: /nfs/chat-logs/play
       containers:
       - name: chat-logger
         image: ghcr.io/teammonumenta/monumenta-automation/monumenta-chat-logger-rust:latest
+        imagePullPolicy: Always
         tty: false
         stdin: false
         volumeMounts:
@@ -47,6 +48,13 @@ spec:
         # RabbitMQ connection string.
         - name: AMQP_URI
           value: "amqp://guest:guest@rabbitmq:5672"
+        # Redis connection string for UUID→player name lookups via the uuid2name hash.
+        # Remove this entry to disable Redis and log raw UUIDs instead.
+        - name: REDIS_URI
+          value: "redis://redis:6379"
+        # Uncomment to print raw JSON of each chat message to stderr (for development only).
+        #- name: CHAT_LOGGER_DEBUG
+        #  value: "1"
         resources:
           limits:
             cpu: 100m
