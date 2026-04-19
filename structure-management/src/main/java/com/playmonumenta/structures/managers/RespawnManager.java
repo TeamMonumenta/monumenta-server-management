@@ -103,7 +103,7 @@ public class RespawnManager {
 	private boolean mStructuresLoaded = false;
 	private final Map<ZoneService.ZoneInstance, RespawningStructure> mStructuresByZone = new LinkedHashMap<>();
 
-	public RespawnManager(StructuresPlugin plugin, World world, YamlConfiguration config) {
+	public RespawnManager(StructuresPlugin plugin, World world, YamlConfiguration config, YamlConfiguration shardState) {
 		INSTANCE = this;
 		mPlugin = plugin;
 		mWorld = world;
@@ -128,6 +128,7 @@ public class RespawnManager {
 
 		// Load the structures asynchronously so this doesn't hold up the start of the server
 		ConfigurationSection respawnSection = config.getConfigurationSection("respawning_structures");
+		@Nullable ConfigurationSection shardStateSection = shardState.getConfigurationSection("respawning_structures");
 
 		Set<String> keys;
 		if (respawnSection == null) {
@@ -148,8 +149,11 @@ public class RespawnManager {
 				continue;
 			}
 
+			@Nullable ConfigurationSection shardSection = shardStateSection != null
+				? shardStateSection.getConfigurationSection(key) : null;
+
 			futures.add(
-				RespawningStructure.fromConfig(mPlugin, mWorld, key, respawnSection.getConfigurationSection(key))
+				RespawningStructure.fromConfig(mPlugin, mWorld, key, respawnSection.getConfigurationSection(key), shardSection)
 					.whenComplete((structure, ex) -> {
 						if (ex != null) {
 							MMLog.warning("Failed to load respawning structure entry '" + key + "'", ex);
@@ -305,20 +309,26 @@ public class RespawnManager {
 			throw new Exception("Structures haven't finished loading yet!");
 		}
 
-		// Create the top-level config to return
 		YamlConfiguration config = new YamlConfiguration();
-
-		// Add global config
 		config.set("check_respawn_period", mTickPeriod);
-
-		// Create the container for respawning structures and iterate over them
 		ConfigurationSection respawnConfig = config.createSection("respawning_structures");
 		for (Map.Entry<String, RespawningStructure> entry : mRespawns.entrySet()) {
-			// Create the container for this structure's data and load it with values
 			respawnConfig.createSection(entry.getKey(), entry.getValue().getConfig());
 		}
-
 		return config;
+	}
+
+	public YamlConfiguration getShardState() throws Exception {
+		if (!mStructuresLoaded) {
+			throw new Exception("Structures haven't finished loading yet!");
+		}
+
+		YamlConfiguration state = new YamlConfiguration();
+		ConfigurationSection structures = state.createSection("respawning_structures");
+		for (Map.Entry<String, RespawningStructure> entry : mRespawns.entrySet()) {
+			structures.createSection(entry.getKey(), entry.getValue().getShardState());
+		}
+		return state;
 	}
 
 	public void spawnerBreakEvent(Location loc) {
