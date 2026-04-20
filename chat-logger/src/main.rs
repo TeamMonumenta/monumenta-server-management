@@ -267,6 +267,56 @@ fn plain_text(v: &Value) -> String {
     }
 }
 
+// Renders a component tree as ANSI-colored text. Each node's `color` field
+// overrides the inherited default; child nodes with no color inherit from their
+// parent. `default_color` is the channel color used when no component overrides it.
+fn colored_text(v: &Value, default_color: Option<Rgb>) -> String {
+    fn apply(s: &str, color: Option<Rgb>) -> String {
+        if s.is_empty() {
+            return String::new();
+        }
+        match color {
+            Some((r, g, b)) => format!("\x1b[38;2;{r};{g};{b}m{s}\x1b[0m"),
+            None => s.to_string(),
+        }
+    }
+
+    match v {
+        Value::String(s) => apply(s, default_color),
+        Value::Object(obj) => {
+            let color = obj
+                .get("color")
+                .and_then(Value::as_str)
+                .and_then(parse_color)
+                .or(default_color);
+            let mut out = String::new();
+            if let Some(Value::String(t)) = obj.get("text") {
+                out.push_str(&apply(t, color));
+            } else if let Some(Value::String(key)) = obj.get("translate") {
+                let parts: Vec<String> = obj
+                    .get("with")
+                    .and_then(Value::as_array)
+                    .map(|a| a.iter().map(|c| colored_text(c, color)).collect())
+                    .unwrap_or_default();
+                if key == "chat.square_brackets" {
+                    out.push_str(&apply("[", color));
+                    out.push_str(&parts.concat());
+                    out.push_str(&apply("]", color));
+                } else {
+                    out.push_str(&parts.concat());
+                }
+            }
+            if let Some(Value::Array(extra)) = obj.get("extra") {
+                for child in extra {
+                    out.push_str(&colored_text(child, color));
+                }
+            }
+            out
+        }
+        _ => String::new(),
+    }
+}
+
 // Collects ⟦…⟧ annotations for hover events that carry information not visible
 // in plain text (spoiler reveal text, shared item identity).
 fn collect_annotations(v: &Value, out: &mut Vec<String>) {
@@ -328,32 +378,31 @@ fn build_message(
     shard_prefix: &str,
     label: &str,
     sender: &str,
-    message: &str,
+    plain_msg: &str,
+    colored_msg: &str,
     annotations: &[String],
-    color: Option<Rgb>,
+    label_color: Option<Rgb>,
 ) -> FormattedMessage {
     let ann_plain = if annotations.is_empty() {
         String::new()
     } else {
         format!(" {}", annotations.join(" "))
     };
-    let plain = format!("{shard_prefix}<{label}> {sender} » {message}{ann_plain}");
+    let plain = format!("{shard_prefix}<{label}> {sender} » {plain_msg}{ann_plain}");
 
     let ann_colored = if annotations.is_empty() {
         String::new()
     } else {
         // Muted gray — visually distinct from channel-colored message text.
-        format!(
-            " \x1b[38;2;130;130;130m{}\x1b[0m",
-            annotations.join(" ")
-        )
+        format!(" \x1b[38;2;130;130;130m{}\x1b[0m", annotations.join(" "))
     };
-    let colored = match color {
-        Some((r, g, b)) => format!(
-            "{shard_prefix}<\x1b[38;2;{r};{g};{b}m{label}\x1b[0m> {sender} » \x1b[38;2;{r};{g};{b}m{message}\x1b[0m{ann_colored}"
-        ),
-        None => format!("{shard_prefix}<{label}> {sender} » {message}{ann_colored}"),
+    let colored_label = match label_color {
+        Some((r, g, b)) => format!("\x1b[38;2;{r};{g};{b}m{label}\x1b[0m"),
+        None => label.to_string(),
     };
+    let colored = format!(
+        "{shard_prefix}<{colored_label}> {sender} » {colored_msg}{ann_colored}"
+    );
     FormattedMessage { plain, colored }
 }
 
@@ -389,6 +438,10 @@ async fn format_message(
     if let Some(extra) = extra {
         if let Some(receiver_uuid) = extra.get("receiver").and_then(Value::as_str) {
             let receiver = redis.lookup_player(receiver_uuid).await;
+            let whisper_color = default_color_for_type("whisper");
+            let colored_msg = msg_value
+                .map(|v| colored_text(v, whisper_color))
+                .unwrap_or_default();
             let ann_plain = if annotations.is_empty() {
                 String::new()
             } else {
@@ -400,9 +453,9 @@ async fn format_message(
                 format!(" \x1b[38;2;130;130;130m{}\x1b[0m", annotations.join(" "))
             };
             let plain = format!("<whisper> {sender} → {receiver} » {message}{ann_plain}");
-            let (r, g, b) = default_color_for_type("whisper").unwrap();
+            let (r, g, b) = whisper_color.unwrap();
             let colored = format!(
-                "<\x1b[38;2;{r};{g};{b}mwhisper\x1b[0m> {sender} → {receiver} » \x1b[38;2;{r};{g};{b}m{message}\x1b[0m{ann_colored}"
+                "<\x1b[38;2;{r};{g};{b}mwhisper\x1b[0m> {sender} → {receiver} » {colored_msg}{ann_colored}"
             );
             return Some(FormattedMessage { plain, colored });
         }
@@ -420,22 +473,30 @@ async fn format_message(
             redis.lookup_channel(channel_id).await
         {
             let color = per_channel_color.or_else(|| default_color_for_type(&channel_type));
+            let colored_msg = msg_value
+                .map(|v| colored_text(v, color))
+                .unwrap_or_default();
             return Some(build_message(
                 &shard_prefix,
                 &name,
                 sender,
                 &message,
+                &colored_msg,
                 &annotations,
                 color,
             ));
         }
     }
 
+    let colored_msg = msg_value
+        .map(|v| colored_text(v, None))
+        .unwrap_or_default();
     Some(build_message(
         &shard_prefix,
         "unknown",
         sender,
         &message,
+        &colored_msg,
         &annotations,
         None,
     ))
