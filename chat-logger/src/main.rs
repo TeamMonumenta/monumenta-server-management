@@ -175,9 +175,11 @@ struct RedisState {
 impl RedisState {
     async fn new(uri: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let client = redis::Client::open(uri)?;
-        let timeout = Duration::from_secs(10);
+        let config = redis::AsyncConnectionConfig::new()
+            .set_connection_timeout(Some(Duration::from_secs(10)))
+            .set_response_timeout(Some(Duration::from_secs(10)));
         let mut conn = client
-            .get_multiplexed_async_connection_with_timeouts(timeout, timeout)
+            .get_multiplexed_async_connection_with_config(&config)
             .await?;
 
         let uuid_map: HashMap<String, String> = conn.hgetall(UUID2NAME_KEY).await?;
