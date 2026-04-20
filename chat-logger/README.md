@@ -22,7 +22,7 @@ The service reconnects automatically to RabbitMQ on connection loss, using lapin
 |----------|---------|-------------|
 | `AMQP_URI` | `amqp://guest:guest@127.0.0.1:5672` | RabbitMQ connection string |
 | `SHARD_NAME` | `chat-logger` | Queue name. Must be unique across the network. |
-| `REDIS_URI` | _(none)_ | Redis connection string (e.g. `redis://127.0.0.1:6379`). Used to resolve player UUIDs to names via the `uuid2name` hash. If unset or unreachable, UUIDs are logged as-is. |
+| `REDIS_URI` | _(required)_ | Redis connection string (e.g. `redis://127.0.0.1:6379`). Used to resolve player UUIDs to names and look up channel info. Process exits if unset or unreachable. |
 | `CHAT_LOGGER_DEBUG` | _(unset)_ | If set to any value, prints the full raw JSON of each chat message to stderr before formatting. |
 
 ## Log output

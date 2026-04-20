@@ -4,6 +4,7 @@ use lapin::{
     types::{AMQPValue, FieldTable},
     Connection, ConnectionProperties,
 };
+use moka::future::Cache;
 use redis::AsyncCommands;
 use serde_json::Value;
 use std::{
@@ -12,6 +13,7 @@ use std::{
     fs::{File, OpenOptions},
     io::{BufWriter, Write},
     path::{Path, PathBuf},
+    time::Duration,
 };
 use tokio::signal::unix::{signal, SignalKind};
 use tokio_stream::StreamExt;
@@ -89,6 +91,7 @@ impl RollingLog {
 
 type Rgb = (u8, u8, u8);
 
+#[derive(Clone)]
 struct ChannelInfo {
     name: String,
     channel_type: String,
@@ -164,96 +167,67 @@ fn parse_channel_json(json_str: &str) -> Option<ChannelInfo> {
 
 struct RedisState {
     uuid_map: HashMap<String, String>,
-    // None value = already queried, not found in Redis
-    channel_map: HashMap<String, Option<ChannelInfo>>,
-    conn: Option<redis::aio::MultiplexedConnection>,
+    // None value = already queried, not found in Redis. TTL 1h, max 512 entries.
+    channel_map: Cache<String, Option<ChannelInfo>>,
+    conn: redis::aio::MultiplexedConnection,
 }
 
 impl RedisState {
-    async fn new(uri: Option<&str>) -> Self {
-        let Some(uri) = uri else {
-            return Self {
-                uuid_map: HashMap::new(),
-                channel_map: HashMap::new(),
-                conn: None,
-            };
-        };
+    async fn new(uri: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let client = redis::Client::open(uri)?;
+        let mut conn = client.get_multiplexed_async_connection().await?;
 
-        let client = match redis::Client::open(uri) {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!("Redis: invalid URI: {e}. UUID lookups and channel info will be unavailable.");
-                return Self {
-                    uuid_map: HashMap::new(),
-                    channel_map: HashMap::new(),
-                    conn: None,
-                };
-            }
-        };
-
-        let mut conn = match client.get_multiplexed_async_connection().await {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!("Redis: connection failed: {e}. UUID lookups and channel info will be unavailable.");
-                return Self {
-                    uuid_map: HashMap::new(),
-                    channel_map: HashMap::new(),
-                    conn: None,
-                };
-            }
-        };
-
-        let uuid_map: HashMap<String, String> = conn
-            .hgetall(UUID2NAME_KEY)
-            .await
-            .unwrap_or_default();
+        let uuid_map: HashMap<String, String> = conn.hgetall(UUID2NAME_KEY).await?;
         eprintln!(
             "Redis: loaded {} UUID→name mappings from {UUID2NAME_KEY}",
             uuid_map.len()
         );
 
-        Self {
+        let channel_map = Cache::builder()
+            .max_capacity(512)
+            .time_to_live(Duration::from_secs(3600))
+            .build();
+
+        Ok(Self {
             uuid_map,
-            channel_map: HashMap::new(),
-            conn: Some(conn),
-        }
+            channel_map,
+            conn,
+        })
     }
 
     async fn lookup_player(&mut self, uuid: &str) -> String {
         if let Some(name) = self.uuid_map.get(uuid) {
             return name.clone();
         }
-        if let Some(conn) = &mut self.conn {
-            let result: redis::RedisResult<Option<String>> =
-                conn.hget(UUID2NAME_KEY, uuid).await;
-            if let Ok(Some(name)) = result {
-                self.uuid_map.insert(uuid.to_string(), name.clone());
-                return name;
-            }
+        let result: redis::RedisResult<Option<String>> =
+            self.conn.hget(UUID2NAME_KEY, uuid).await;
+        if let Ok(Some(name)) = result {
+            self.uuid_map.insert(uuid.to_string(), name.clone());
+            return name;
         }
         uuid.to_string()
     }
 
     // Returns (name, channel_type, per-channel color override) if found.
     async fn lookup_channel(&mut self, channel_id: &str) -> Option<(String, String, Option<Rgb>)> {
-        if !self.channel_map.contains_key(channel_id) {
-            let info = match &mut self.conn {
-                Some(conn) => {
-                    let result: redis::RedisResult<Option<String>> =
-                        conn.hget(REDIS_CHANNELS_PATH, channel_id).await;
-                    match result {
-                        Ok(Some(json_str)) => parse_channel_json(&json_str),
-                        _ => None,
-                    }
-                }
-                None => None,
-            };
-            self.channel_map.insert(channel_id.to_string(), info);
+        if let Some(cached) = self.channel_map.get(channel_id).await {
+            return cached
+                .as_ref()
+                .map(|info| (info.name.clone(), info.channel_type.clone(), info.color));
         }
-        self.channel_map
-            .get(channel_id)?
+        let result: redis::RedisResult<Option<String>> =
+            self.conn.hget(REDIS_CHANNELS_PATH, channel_id).await;
+        let info = match result {
+            Ok(Some(json_str)) => parse_channel_json(&json_str),
+            _ => None,
+        };
+        let ret = info
             .as_ref()
-            .map(|info| (info.name.clone(), info.channel_type.clone(), info.color))
+            .map(|i| (i.name.clone(), i.channel_type.clone(), i.color));
+        self.channel_map
+            .insert(channel_id.to_string(), info)
+            .await;
+        ret
     }
 }
 
@@ -361,22 +335,7 @@ async fn format_message(
         }
     }
 
-    // Fallback when Redis is unavailable or channel not found: use heuristics.
-    let (label, color) = if let Some(extra) = extra {
-        if extra.contains_key("fromWorld") {
-            ("wc".to_string(), default_color_for_type("world"))
-        } else if extra.contains_key("fromShard") {
-            ("l".to_string(), default_color_for_type("local"))
-        } else if let Some(team) = extra.get("team").and_then(Value::as_str) {
-            (format!("team:{team}"), default_color_for_type("team"))
-        } else {
-            ("g".to_string(), default_color_for_type("global"))
-        }
-    } else {
-        ("g".to_string(), default_color_for_type("global"))
-    };
-
-    Some(build_message(&shard_prefix, &label, sender, &message, color))
+    Some(build_message(&shard_prefix, "unknown", sender, &message, None))
 }
 
 // ---------------------------------------------------------------------------
@@ -388,7 +347,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let uri =
         env::var("AMQP_URI").unwrap_or_else(|_| "amqp://guest:guest@127.0.0.1:5672".into());
     let queue = env::var("SHARD_NAME").unwrap_or_else(|_| "chat-logger".into());
-    let redis_uri = env::var("REDIS_URI").ok();
+    let redis_uri = env::var("REDIS_URI").unwrap_or_else(|_| {
+        eprintln!("REDIS_URI environment variable is required");
+        std::process::exit(1);
+    });
     let debug = env::var("CHAT_LOGGER_DEBUG").is_ok();
 
     let mut log = match RollingLog::open(Path::new("/logs")) {
@@ -399,7 +361,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let mut redis = RedisState::new(redis_uri.as_deref()).await;
+    let mut redis = match RedisState::new(&redis_uri).await {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Failed to connect to Redis: {e}");
+            std::process::exit(1);
+        }
+    };
 
     let conn = Connection::connect(
         &uri,
