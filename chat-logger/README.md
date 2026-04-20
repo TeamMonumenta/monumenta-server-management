@@ -14,6 +14,24 @@ Each log line is prefixed with a timestamp and channel indicator:
 
 Channel prefixes: `<l>` local, `<wc>` world, `<whisper>` DM, `<team:X>` team, `<g>` global/party/announcement.
 
+### Special message content
+
+Some messages carry extra information that has no plain-text representation. These are appended inline using `⟦…⟧` annotations (U+27E6/U+27E7), which are unlikely to appear in normal chat and are grep-friendly.
+
+**Spoilers** — a player sends `||hidden text||`, which renders in-game as bold `SPOILER` with the original text revealed on hover. The reveal text is logged in a spoiler annotation:
+
+```
+[2026-04-18 14:23:06]: [valley] <l> Playername » SPOILER ⟦spoiler: hidden text⟧
+```
+
+**Item shares** — a player sends `<mainhand>` (or similar), which substitutes their held item as a clickable component. The item's display name is rendered in brackets and the item type and stack size are logged in an annotation:
+
+```
+[2026-04-18 14:23:07]: [valley] <l> Playername » [Pulsating Dust] ⟦item: 64x minecraft:sugar⟧
+```
+
+In console output, `⟦…⟧` annotations are rendered in gray to distinguish them from the channel-colored message text.
+
 The service reconnects automatically to RabbitMQ on connection loss, using lapin's built-in auto-recovery. Non-recoverable errors exit the process (rely on Kubernetes to restart the pod).
 
 ## Configuration

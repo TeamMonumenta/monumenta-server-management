@@ -242,6 +242,19 @@ fn plain_text(v: &Value) -> String {
             let mut out = String::new();
             if let Some(Value::String(t)) = obj.get("text") {
                 out.push_str(t);
+            } else if let Some(Value::String(key)) = obj.get("translate") {
+                let parts: Vec<String> = obj
+                    .get("with")
+                    .and_then(Value::as_array)
+                    .map(|a| a.iter().map(plain_text).collect())
+                    .unwrap_or_default();
+                if key == "chat.square_brackets" {
+                    out.push('[');
+                    out.push_str(&parts.concat());
+                    out.push(']');
+                } else {
+                    out.push_str(&parts.concat());
+                }
             }
             if let Some(Value::Array(extra)) = obj.get("extra") {
                 for child in extra {
@@ -251,6 +264,51 @@ fn plain_text(v: &Value) -> String {
             out
         }
         _ => String::new(),
+    }
+}
+
+// Collects ⟦…⟧ annotations for hover events that carry information not visible
+// in plain text (spoiler reveal text, shared item identity).
+fn collect_annotations(v: &Value, out: &mut Vec<String>) {
+    let obj = match v.as_object() {
+        Some(o) => o,
+        None => return,
+    };
+    if let Some(hover) = obj.get("hoverEvent") {
+        match hover.get("action").and_then(Value::as_str) {
+            Some("show_text") => {
+                if let Some(contents) = hover.get("contents") {
+                    let text = plain_text(contents);
+                    if !text.is_empty() {
+                        out.push(format!("⟦spoiler: {text}⟧"));
+                    }
+                }
+            }
+            Some("show_item") => {
+                if let Some(contents) = hover.get("contents") {
+                    let id = contents.get("id").and_then(Value::as_str).unwrap_or("?");
+                    let count = contents.get("count").and_then(Value::as_u64).unwrap_or(1);
+                    out.push(format!("⟦item: {count}x {id}⟧"));
+                }
+            }
+            _ => {}
+        }
+    }
+    for child in obj
+        .get("extra")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        collect_annotations(child, out);
+    }
+    for child in obj
+        .get("with")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        collect_annotations(child, out);
     }
 }
 
@@ -271,14 +329,30 @@ fn build_message(
     label: &str,
     sender: &str,
     message: &str,
+    annotations: &[String],
     color: Option<Rgb>,
 ) -> FormattedMessage {
-    let plain = format!("{shard_prefix}<{label}> {sender} » {message}");
+    let ann_plain = if annotations.is_empty() {
+        String::new()
+    } else {
+        format!(" {}", annotations.join(" "))
+    };
+    let plain = format!("{shard_prefix}<{label}> {sender} » {message}{ann_plain}");
+
+    let ann_colored = if annotations.is_empty() {
+        String::new()
+    } else {
+        // Muted gray — visually distinct from channel-colored message text.
+        format!(
+            " \x1b[38;2;130;130;130m{}\x1b[0m",
+            annotations.join(" ")
+        )
+    };
     let colored = match color {
         Some((r, g, b)) => format!(
-            "{shard_prefix}<\x1b[38;2;{r};{g};{b}m{label}\x1b[0m> {sender} » \x1b[38;2;{r};{g};{b}m{message}\x1b[0m"
+            "{shard_prefix}<\x1b[38;2;{r};{g};{b}m{label}\x1b[0m> {sender} » \x1b[38;2;{r};{g};{b}m{message}\x1b[0m{ann_colored}"
         ),
-        None => plain.clone(),
+        None => format!("{shard_prefix}<{label}> {sender} » {message}{ann_colored}"),
     };
     FormattedMessage { plain, colored }
 }
@@ -302,7 +376,12 @@ async fn format_message(
 
     let data = root.get("data")?;
     let sender = data.get("senderName").and_then(Value::as_str).unwrap_or("?");
-    let message = data.get("message").map(plain_text).unwrap_or_default();
+    let msg_value = data.get("message");
+    let message = msg_value.map(plain_text).unwrap_or_default();
+    let mut annotations = Vec::new();
+    if let Some(mv) = msg_value {
+        collect_annotations(mv, &mut annotations);
+    }
     let extra = data.get("extra").and_then(Value::as_object);
 
     // Whispers are handled specially: the channel name in Redis is auto-generated
@@ -310,10 +389,20 @@ async fn format_message(
     if let Some(extra) = extra {
         if let Some(receiver_uuid) = extra.get("receiver").and_then(Value::as_str) {
             let receiver = redis.lookup_player(receiver_uuid).await;
-            let plain = format!("<whisper> {sender} → {receiver} » {message}");
+            let ann_plain = if annotations.is_empty() {
+                String::new()
+            } else {
+                format!(" {}", annotations.join(" "))
+            };
+            let ann_colored = if annotations.is_empty() {
+                String::new()
+            } else {
+                format!(" \x1b[38;2;130;130;130m{}\x1b[0m", annotations.join(" "))
+            };
+            let plain = format!("<whisper> {sender} → {receiver} » {message}{ann_plain}");
             let (r, g, b) = default_color_for_type("whisper").unwrap();
             let colored = format!(
-                "<\x1b[38;2;{r};{g};{b}mwhisper\x1b[0m> {sender} → {receiver} » \x1b[38;2;{r};{g};{b}m{message}\x1b[0m"
+                "<\x1b[38;2;{r};{g};{b}mwhisper\x1b[0m> {sender} → {receiver} » \x1b[38;2;{r};{g};{b}m{message}\x1b[0m{ann_colored}"
             );
             return Some(FormattedMessage { plain, colored });
         }
@@ -331,11 +420,25 @@ async fn format_message(
             redis.lookup_channel(channel_id).await
         {
             let color = per_channel_color.or_else(|| default_color_for_type(&channel_type));
-            return Some(build_message(&shard_prefix, &name, sender, &message, color));
+            return Some(build_message(
+                &shard_prefix,
+                &name,
+                sender,
+                &message,
+                &annotations,
+                color,
+            ));
         }
     }
 
-    Some(build_message(&shard_prefix, "unknown", sender, &message, None))
+    Some(build_message(
+        &shard_prefix,
+        "unknown",
+        sender,
+        &message,
+        &annotations,
+        None,
+    ))
 }
 
 // ---------------------------------------------------------------------------
