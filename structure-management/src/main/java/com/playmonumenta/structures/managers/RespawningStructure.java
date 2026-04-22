@@ -95,7 +95,8 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 		return mConfigLabel.compareTo(other.mConfigLabel);
 	}
 
-	public static CompletableFuture<RespawningStructure> fromConfig(StructuresPlugin plugin, World world, String configLabel, ConfigurationSection config) {
+	public static CompletableFuture<RespawningStructure> fromConfig(StructuresPlugin plugin, World world, String configLabel,
+	                                                               ConfigurationSection config, @Nullable ConfigurationSection shardState) {
 		CompletableFuture<RespawningStructure> future = new CompletableFuture<>();
 
 		try {
@@ -111,8 +112,6 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 				throw new Exception("Invalid z value");
 			} else if (!config.isInt("respawn_period")) {
 				throw new Exception("Invalid respawn_period value");
-			} else if (!config.isInt("ticks_until_respawn")) {
-				throw new Exception("Invalid ticks_until_respawn value");
 			} else if (!config.isInt("extra_detection_radius")) {
 				throw new Exception("Invalid extra_detection_radius value");
 			}
@@ -127,21 +126,28 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 				specialPaths = config.getStringList("structure_special_paths");
 			}
 
-			String nextRespawnPath = null;
-			if (config.isString("next_respawn_path")) {
-				nextRespawnPath = config.getString("next_respawn_path");
-			}
+			// Runtime state from shard_state.yml, with defaults for fresh/missing state
+			int ticksLeft = shardState != null && shardState.isInt("ticks_until_respawn")
+				? shardState.getInt("ticks_until_respawn") : 0;
+
+			String nextRespawnPath = shardState != null && shardState.isString("next_respawn_path")
+				? shardState.getString("next_respawn_path") : null;
 
 			SpawnerBreakTrigger spawnerBreakTrigger = null;
 			if (config.isConfigurationSection("spawner_break_trigger")) {
+				// fromConfig defaults spawner_count_remaining to spawner_count when key is absent
 				spawnerBreakTrigger = SpawnerBreakTrigger.fromConfig(
-						config.getConfigurationSection("spawner_break_trigger"));
+					config.getConfigurationSection("spawner_break_trigger"));
+				// Override with persisted count if available
+				if (shardState != null && shardState.isInt("spawner_count_remaining")) {
+					spawnerBreakTrigger.mSpawnerCountRemaining = shardState.getInt("spawner_count_remaining");
+				}
 			}
 
 			return withParameters(plugin, world, config.getInt("extra_detection_radius"), configLabel,
 					config.getString("name"), config.getStringList("structure_paths"),
 					new Vector(config.getInt("x"), config.getInt("y"), config.getInt("z")),
-					config.getInt("respawn_period"), config.getInt("ticks_until_respawn"),
+					config.getInt("respawn_period"), ticksLeft,
 					postRespawnCommand, specialPaths, nextRespawnPath, spawnerBreakTrigger);
 		} catch (Exception ex) {
 			future.completeExceptionally(ex);
@@ -449,7 +455,6 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 
 	public Map<String, Object> getConfig() {
 		Map<String, Object> configMap = new LinkedHashMap<>();
-
 		configMap.put("name", mName);
 		configMap.put("structure_paths", mGenericVariants);
 		configMap.put("x", mLoadPos.getBlockX());
@@ -457,21 +462,28 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 		configMap.put("z", mLoadPos.getBlockZ());
 		configMap.put("extra_detection_radius", mExtraRadius);
 		configMap.put("respawn_period", mRespawnTime);
-		configMap.put("ticks_until_respawn", mTicksLeft);
 		if (mPostRespawnCommand != null) {
 			configMap.put("post_respawn_command", mPostRespawnCommand);
 		}
 		if (!mSpecialVariants.isEmpty()) {
 			configMap.put("structure_special_paths", mSpecialVariants);
 		}
-		if (mNextRespawnPath != null) {
-			configMap.put("next_respawn_path", mNextRespawnPath);
-		}
 		if (mSpawnerBreakTrigger != null) {
 			configMap.put("spawner_break_trigger", mSpawnerBreakTrigger.getConfig());
 		}
-
 		return configMap;
+	}
+
+	public Map<String, Object> getShardState() {
+		Map<String, Object> stateMap = new LinkedHashMap<>();
+		stateMap.put("ticks_until_respawn", mTicksLeft);
+		if (mNextRespawnPath != null) {
+			stateMap.put("next_respawn_path", mNextRespawnPath);
+		}
+		if (mSpawnerBreakTrigger != null) {
+			stateMap.put("spawner_count_remaining", mSpawnerBreakTrigger.mSpawnerCountRemaining);
+		}
+		return stateMap;
 	}
 
 	public void tick(int ticks) {
