@@ -13,10 +13,10 @@ import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.lang.ref.Cleaner;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.CommandSender;
@@ -33,7 +33,7 @@ public class MessageManager implements Listener {
 
 	private static @Nullable MessageManager INSTANCE = null;
 	private static final Cleaner mCleaner = Cleaner.create();
-	private static final Map<UUID, WeakReference<Message>> mMessages = new HashMap<>();
+	private static final Map<UUID, WeakReference<Message>> mMessages = new ConcurrentHashMap<>();
 
 	private MessageManager() {
 		INSTANCE = this;
