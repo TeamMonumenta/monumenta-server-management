@@ -4,6 +4,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.playmonumenta.networkchat.Message;
+import com.playmonumenta.networkchat.NetworkChatPlugin;
+import com.playmonumenta.networkchat.NetworkChatProperties;
 import com.playmonumenta.networkchat.PlayerState;
 import com.playmonumenta.networkchat.PlayerStateManager;
 import com.playmonumenta.networkchat.channel.property.ChannelAccess;
@@ -280,6 +282,18 @@ public abstract class Channel {
 	// Distributes a received message to the appropriate local player chat states. May be local or remote messages.
 	// Note that sending to player chat state allows chat to be paused.
 	public abstract void distributeMessage(Message message);
+
+	// Returns the shard that originated this message, or null for network-wide channels.
+	public @Nullable String getOriginShard(Message message) {
+		return null;
+	}
+
+	// Whether this shard should log this message. Default: log if originating shard or ChatLogAllServers.
+	public boolean shouldLog(Message message) {
+		String originShard = getOriginShard(message);
+		boolean isRemote = originShard != null && !originShard.equals(NetworkChatPlugin.getShardName());
+		return !isRemote || NetworkChatProperties.getChatLogAllServers();
+	}
 
 	// Get how the message appears to a given recipient.
 	public abstract Component shownMessage(CommandSender recipient, Message message);

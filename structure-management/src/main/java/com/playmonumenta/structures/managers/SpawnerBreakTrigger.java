@@ -100,11 +100,8 @@ public class SpawnerBreakTrigger {
 
 	public Map<String, Object> getConfig() {
 		Map<String, Object> configMap = new LinkedHashMap<>();
-
 		configMap.put("spawner_count", mSpawnerCount);
-		configMap.put("spawner_count_remaining", mSpawnerCountRemaining);
 		configMap.put("scripted_quests_component", mQuestComponentStr);
-
 		return configMap;
 	}
 }

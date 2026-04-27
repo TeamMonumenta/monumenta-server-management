@@ -19,7 +19,6 @@ import com.playmonumenta.structures.managers.RespawnManager;
 import com.playmonumenta.structures.utils.CommandUtils;
 import com.playmonumenta.structures.utils.MMLog;
 import java.io.File;
-import java.io.IOException;
 import java.util.concurrent.Executor;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -33,8 +32,6 @@ public class StructuresPlugin extends JavaPlugin implements Executor {
 	public @Nullable RespawnManager mRespawnManager = null;
 
 	private static @Nullable StructuresPlugin INSTANCE = null;
-
-	private @Nullable YamlConfiguration mConfig = null;
 
 	@Override
 	public void onLoad() {
@@ -71,8 +68,8 @@ public class StructuresPlugin extends JavaPlugin implements Executor {
 
 	@Override
 	public void onDisable() {
-		// Save current structure respawn times
-		saveConfig();
+		// Persist per-shard runtime state (timers, spawner counts, etc.)
+		saveState();
 
 		// Cancel structure respawning and clear list
 		if (mRespawnManager != null) {
@@ -100,56 +97,51 @@ public class StructuresPlugin extends JavaPlugin implements Executor {
 	}
 
 	public File getConfigFile() {
-		File configFile = new File(getDataFolder(), "config.yml");
+		return new File(getDataFolder(), "config.yml");
+	}
 
-		if (!configFile.exists()) {
-			try {
-				// Create parent directories if they do not exist
-				if (!configFile.getParentFile().mkdirs()) {
-					throw new IOException();
-				}
-
-				// Create the file if it does not exist
-				if (!configFile.createNewFile()) {
-					throw new IOException();
-				}
-			} catch (IOException ex) {
-				MMLog.severe("Failed to create non-existent configuration file");
-			}
-
-			// TODO: Put sample config file in here also
-		}
-
-		return configFile;
+	public File getShardStateFile() {
+		return new File(getDataFolder(), "shard_state.yml");
 	}
 
 	@Override
 	public void reloadConfig() {
-		// Do not save first
 		if (mRespawnManager != null) {
 			mRespawnManager.cleanup();
 			mRespawnManager = null;
 		}
 
-		File configFile = getConfigFile();
-
-		mConfig = YamlConfiguration.loadConfiguration(configFile);
+		// loadConfiguration returns empty config if file doesn't exist
+		YamlConfiguration config = YamlConfiguration.loadConfiguration(getConfigFile());
+		YamlConfiguration shardState = YamlConfiguration.loadConfiguration(getShardStateFile());
 
 		CommandUtils.reloadStructurePathSuggestions();
 
 		/* TODO: Non-hardcoded worlds! These should be saved into the respawning structure */
-		mRespawnManager = new RespawnManager(this, Bukkit.getWorlds().get(0), mConfig);
+		mRespawnManager = new RespawnManager(this, Bukkit.getWorlds().get(0), config, shardState);
 	}
 
+	/** Saves config.yml (structure definitions). Called when static config changes. */
 	@Override
 	public void saveConfig() {
 		if (mRespawnManager != null) {
 			File configFile = getConfigFile();
 			try {
-				mConfig = mRespawnManager.getConfig();
-				mConfig.save(configFile);
+				mRespawnManager.getConfig().save(configFile);
 			} catch (Exception ex) {
 				MMLog.severe("Could not save config to " + configFile, ex);
+			}
+		}
+	}
+
+	/** Saves shard_state.yml (timers, spawner counts). Called at shutdown. */
+	public void saveState() {
+		if (mRespawnManager != null) {
+			File shardStateFile = getShardStateFile();
+			try {
+				mRespawnManager.getShardState().save(shardStateFile);
+			} catch (Exception ex) {
+				MMLog.severe("Could not save shard state to " + shardStateFile, ex);
 			}
 		}
 	}

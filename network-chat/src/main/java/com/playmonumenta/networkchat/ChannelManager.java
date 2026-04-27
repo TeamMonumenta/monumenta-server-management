@@ -765,6 +765,11 @@ public class ChannelManager implements Listener {
 			shouldLoad = PlayerStateManager.isAnyParticipantLocal(participants);
 		}
 
+		// When logging all servers, load all channels so messages can be formatted for logging.
+		if (!shouldLoad && NetworkChatProperties.getChatLogAllServers()) {
+			shouldLoad = channelData != null;
+		}
+
 		if (oldChannel == null && !shouldLoad) {
 			// Channel wasn't loaded, and doesn't need to be loaded.
 

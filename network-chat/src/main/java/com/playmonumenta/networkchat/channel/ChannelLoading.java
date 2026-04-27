@@ -3,6 +3,7 @@ package com.playmonumenta.networkchat.channel;
 import com.google.gson.JsonObject;
 import com.playmonumenta.networkchat.ChannelManager;
 import com.playmonumenta.networkchat.Message;
+import com.playmonumenta.networkchat.MessageManager;
 import com.playmonumenta.networkchat.PlayerState;
 import com.playmonumenta.networkchat.channel.property.ChannelAccess;
 import com.playmonumenta.networkchat.channel.property.ChannelSettings;
@@ -148,7 +149,7 @@ public class ChannelLoading extends Channel {
 		// If the newly loaded channel is valid, distribute messages that were missed
 		if (channel != null && !(channel instanceof ChannelFuture)) {
 			for (Message message : mQueuedMessages) {
-				channel.distributeMessage(message);
+				MessageManager.processMessage(channel, message);
 			}
 		}
 	}

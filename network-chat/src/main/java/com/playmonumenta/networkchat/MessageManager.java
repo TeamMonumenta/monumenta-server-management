@@ -2,6 +2,8 @@ package com.playmonumenta.networkchat;
 
 import com.google.gson.JsonObject;
 import com.playmonumenta.networkchat.channel.Channel;
+import com.playmonumenta.networkchat.channel.ChannelLoading;
+import com.playmonumenta.networkchat.utils.ChatLogger;
 import com.playmonumenta.networkchat.utils.CommandUtils;
 import com.playmonumenta.networkchat.utils.MMLog;
 import com.playmonumenta.networkchat.utils.MessagingUtils;
@@ -11,10 +13,10 @@ import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.lang.ref.Cleaner;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.CommandSender;
@@ -31,7 +33,7 @@ public class MessageManager implements Listener {
 
 	private static @Nullable MessageManager INSTANCE = null;
 	private static final Cleaner mCleaner = Cleaner.create();
-	private static final Map<UUID, WeakReference<Message>> mMessages = new HashMap<>();
+	private static final Map<UUID, WeakReference<Message>> mMessages = new ConcurrentHashMap<>();
 
 	private MessageManager() {
 		INSTANCE = this;
@@ -166,14 +168,29 @@ public class MessageManager implements Listener {
 		}
 
 		Channel channel = message.getChannel();
-		if (channel == null) {
+		if (channel == null || channel instanceof ChannelLoading) {
 			UUID channelId = message.getChannelUniqueId();
 			if (channelId != null) {
+				// Channel not loaded yet; defer logging+distribution until after channel loads
 				ChannelManager.loadChannel(channelId, message);
+			} else {
+				ChatLogger.log(MessagingUtils.plainText(message.shownMessage(Bukkit.getConsoleSender())));
 			}
 		} else {
-			channel.distributeMessage(message);
+			processMessage(channel, message);
 		}
+	}
+
+	public static void processMessage(Channel channel, Message message) {
+		if (channel.shouldLog(message)) {
+			String originShard = channel.getOriginShard(message);
+			String logLine = MessagingUtils.plainText(message.shownMessage(Bukkit.getConsoleSender()));
+			if (originShard != null) {
+				logLine = "[" + originShard + "] " + logLine;
+			}
+			ChatLogger.log(logLine);
+		}
+		channel.distributeMessage(message);
 	}
 
 	public void deleteMessageHandler(JsonObject object) {

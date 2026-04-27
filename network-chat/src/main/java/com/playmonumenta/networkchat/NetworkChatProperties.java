@@ -21,6 +21,7 @@ public class NetworkChatProperties {
 	private boolean mChatCommandDeleteEnabled = true;
 	private boolean mChatRequiresPlayer = false;
 	private boolean mSudoEnabled = false;
+	private boolean mChatLogAllServers = true;
 
 	private NetworkChatProperties() {
 		INSTANCE = this;
@@ -57,6 +58,10 @@ public class NetworkChatProperties {
 		return getInstance().mChatRequiresPlayer;
 	}
 
+	public static boolean getChatLogAllServers() {
+		return getInstance().mChatLogAllServers;
+	}
+
 	public static void load(Plugin plugin, @Nullable CommandSender sender) {
 		getInstance().loadInternal(plugin, sender);
 	}
@@ -89,6 +94,10 @@ public class NetworkChatProperties {
 			mSudoEnabled = config.getBoolean("SudoEnabled", mChatCommandDeleteEnabled);
 		}
 
+		if (config.isBoolean("ChatLogAllServers")) {
+			mChatLogAllServers = config.getBoolean("ChatLogAllServers", mChatLogAllServers);
+		}
+
 		MMLog.info("Properties:");
 		if (sender != null) {
 			sender.sendMessage("Properties:");
@@ -110,6 +119,7 @@ public class NetworkChatProperties {
 		out.add("mChatCommandDeleteEnabled = " + mChatCommandDeleteEnabled);
 		out.add("mChatRequiresPlayer = " + mChatRequiresPlayer);
 		out.add("mSudoEnabled = " + mSudoEnabled);
+		out.add("mChatLogAllServers = " + mChatLogAllServers);
 
 		return out;
 	}
@@ -156,6 +166,10 @@ public class NetworkChatProperties {
 
 		if (!config.contains("SudoEnabled")) {
 			config.set("SudoEnabled", mSudoEnabled);
+		}
+
+		if (!config.contains("ChatLogAllServers")) {
+			config.set("ChatLogAllServers", mChatLogAllServers);
 		}
 
 		try {

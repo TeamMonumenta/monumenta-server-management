@@ -5,6 +5,7 @@ import com.playmonumenta.networkchat.ChannelManager;
 import com.playmonumenta.networkchat.Message;
 import com.playmonumenta.networkchat.MessageManager;
 import com.playmonumenta.networkchat.NetworkChatPlugin;
+import com.playmonumenta.networkchat.NetworkChatProperties;
 import com.playmonumenta.networkchat.PlayerState;
 import com.playmonumenta.networkchat.PlayerStateManager;
 import com.playmonumenta.networkchat.RemotePlayerListener;
@@ -34,7 +35,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -223,6 +223,25 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 	@Override
 	public String getClassId() {
 		return CHANNEL_CLASS_ID;
+	}
+
+	@Override
+	public boolean shouldLog(Message message) {
+		if (NetworkChatProperties.getChatLogAllServers()) {
+			return true;
+		}
+		JsonObject extra = message.getExtraData();
+		if (extra == null) {
+			return false;
+		}
+		try {
+			UUID receiverUuid = UUID.fromString(extra.getAsJsonPrimitive("receiver").getAsString());
+			UUID senderUuid = message.getSenderId();
+			return (senderUuid != null && PlayerStateManager.getPlayerState(senderUuid) != null)
+				|| PlayerStateManager.getPlayerState(receiverUuid) != null;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 
 	@Override
@@ -446,7 +465,7 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 
 	@Override
 	public void distributeMessage(Message message) {
-		showMessage(Bukkit.getConsoleSender(), message);
+		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
 
 		JsonObject extraData = message.getExtraData();
 		if (extraData == null) {
