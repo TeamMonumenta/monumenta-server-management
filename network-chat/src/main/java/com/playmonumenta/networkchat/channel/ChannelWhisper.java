@@ -50,6 +50,7 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 
 	public ChannelWhisper(UUID from, UUID to) {
 		this(UUID.randomUUID(), Instant.now(), List.of(from, to));
+		tempDebug(this, "constructed from public constructor");
 	}
 
 	private ChannelWhisper(UUID channelId, Instant lastUpdate, List<UUID> participants) {
@@ -64,6 +65,7 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 		mDefaultSettings = new ChannelSettings();
 		mDefaultSettings.clearSound();
 		mDefaultSettings.addSound(Sound.ENTITY_PLAYER_LEVELUP, 1, 0.5f);
+		tempDebug(this, "constructed from JSON");
 	}
 
 	@Override
@@ -136,10 +138,12 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 				}
 				ChannelManager.registerNewChannel(sender, channel);
 				senderState.setWhisperChannel(recipientUuid, channel);
+				tempDebug(channel, "registered");
 			}
 
 			senderState.setActiveChannel(channel);
 			sender.sendMessage(Component.text("You are now typing whispers to " + recipientName + ".", NamedTextColor.GRAY));
+			tempDebug(channel, "selected as active by " + sender.getName());
 		}
 		return 1;
 	}
@@ -170,18 +174,12 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 				}
 				ChannelManager.registerNewChannel(sender, channel);
 				senderState.setWhisperChannel(recipientUuid, channel);
-				ChannelWhisper finalChannel = channel;
-				MMLog.fine(() -> "Whisper channel registered: channel %s (%s) with participants %s"
-					.formatted(finalChannel.getName(), finalChannel.getUniqueId(),
-						String.join(",", finalChannel.getParticipantNames())));
+				tempDebug(channel, "registered");
 			}
 
 			senderState.joinChannel(channel);
 			channel.sendMessage(sendingPlayer, message);
-			ChannelWhisper finalChannel = channel;
-			MMLog.fine(() -> "Whisper sent in channel %s (%s) with participants %s"
-				.formatted(finalChannel.getName(), finalChannel.getUniqueId(),
-					String.join(",", finalChannel.getParticipantNames())));
+			tempDebug(channel, "message sent by " + sender.getName());
 		}
 		return 1;
 	}
@@ -203,6 +201,7 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 
 			senderState.setActiveChannel(channel);
 			callee.sendMessage(Component.text("You are now typing replies to the last person to whisper to you.", NamedTextColor.GRAY));
+			tempDebug(channel, "selected as active by " + sender.getName());
 		}
 		return 1;
 	}
@@ -224,6 +223,7 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 			}
 
 			channel.sendMessage(sendingPlayer, message);
+			tempDebug(channel, "message sent by " + sender.getName());
 		}
 		return 1;
 	}
@@ -544,5 +544,11 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 			}
 			playerState.playMessageSound(message);
 		}
+	}
+
+	private static void tempDebug(ChannelWhisper channel, String desc) {
+		MMLog.fine(() -> "Whisper channel %s: channel %s (%s) with participants %s"
+			.formatted(desc, channel.getName(), channel.getUniqueId(),
+				String.join(",", channel.getParticipantNames())));
 	}
 }
