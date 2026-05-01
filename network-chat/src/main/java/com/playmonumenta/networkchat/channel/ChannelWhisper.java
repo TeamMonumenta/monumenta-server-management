@@ -174,6 +174,8 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 
 			senderState.joinChannel(channel);
 			channel.sendMessage(sendingPlayer, message);
+			ChannelWhisper finalChannel = channel;
+			MMLog.fine(() -> "Whisper sent in channel %s (%s) with participants %s".formatted(finalChannel.getName(), finalChannel.getUniqueId(), String.join(",", finalChannel.getParticipantNames())));
 		}
 		return 1;
 	}
