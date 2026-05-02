@@ -208,6 +208,10 @@ public class PlayerChatHistory {
 
 	// Re-show chat with deleted messages removed, even while paused.
 	public void refreshChat() {
+		Player player = getPlayer();
+		if (player == null) {
+			return;
+		}
 		mIsReplayingChat = true;
 		mSeenMessages.removeIf(message -> {
 			if (message.senderIsPlayer() && mPlayerId.equals(message.getSenderId())) {
@@ -222,10 +226,10 @@ public class PlayerChatHistory {
 
 		mIsDisplayingMessage = true;
 		for (int i = mSeenMessages.size(); i < MAX_DISPLAYED_MESSAGES; ++i) {
-			getPlayer().sendMessage(emptyMessage);
+			player.sendMessage(emptyMessage);
 		}
 		for (Message message : mSeenMessages) {
-			message.showMessage(getPlayer());
+			message.showMessage(player);
 		}
 		mIsDisplayingMessage = false;
 
@@ -270,8 +274,12 @@ public class PlayerChatHistory {
 			mUnseenMessages.remove(0);
 		}
 
-		mIsDisplayingMessage = true;
 		Player player = getPlayer();
+		if (player == null) {
+			mUnseenMessages.clear();
+			return;
+		}
+		mIsDisplayingMessage = true;
 		for (Message message : mUnseenMessages) {
 			message.showMessage(player);
 		}
