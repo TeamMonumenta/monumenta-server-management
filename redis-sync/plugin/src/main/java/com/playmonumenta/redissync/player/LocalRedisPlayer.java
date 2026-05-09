@@ -58,14 +58,11 @@ public class LocalRedisPlayer {
 
 	@Coroutine
 	static Task<LocalRedisPlayer> fetch(UUID uuid, RedisHandler redisHandler) {
-		Co.await(redisHandler.syncRedis());
-
-		final var commands = redisHandler.commands();
-
-		commands.multi();
-		final var metadata = commands.get(redisHandler.playerMetaDataKey(uuid));
-		final var activeData = commands.hgetall(redisHandler.playerActiveDataKey(uuid));
-		Co.await(Awaitable.from(commands.exec()));
+		Co.await(redisHandler.syncRedis(commands -> {
+			final var metadata = commands.get(redisHandler.playerMetaDataKey(uuid));
+			final var activeData = commands.hgetall(redisHandler.playerActiveDataKey(uuid));
+			Co.await(Awaitable.from(commands.exec()));
+		}));
 
 		// the join() calls should not block, since we already awaited for the multi/exec
 		return Co.ret(new LocalRedisPlayer(

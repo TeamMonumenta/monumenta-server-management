@@ -1,5 +1,6 @@
 package com.playmonumenta.redissync.commands;
 
+import com.playmonumenta.redissync.MonumentaRedisSync;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
@@ -19,7 +20,11 @@ public class PlayerRollback {
 			.withArguments(indexArg)
 			.executesPlayer((sender, args) -> {
 					try {
-						MonumentaRedisSyncAPI.playerRollback(sender, args.getByArgument(playerArg), args.getByArgument(indexArg));
+						MonumentaRedisSync
+							.getInstance()
+							.getPlayerDataManager()
+							.getLocalPlayerData(args.getByArgument(playerArg))
+							.loadHistory(args.getByArgument(indexArg));
 					} catch (Exception ex) {
 						throw CommandAPI.failWithString(ex.getMessage());
 					}

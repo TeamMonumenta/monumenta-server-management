@@ -1,7 +1,9 @@
 package com.playmonumenta.redissync.commands;
 
+import com.playmonumenta.redissync.MonumentaRedisSync;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.NetworkRelayIntegration;
+import com.playmonumenta.redissync.player.ReturnParams;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
@@ -40,7 +42,12 @@ public class TransferServer {
 					Rotation rotation = args.getByArgument(rotationArg);
 					for (Player player : players) {
 						try {
-							MonumentaRedisSyncAPI.sendPlayer(player, server, location, rotation);
+							MonumentaRedisSync
+								.getInstance()
+								.getPlayerDataManager()
+								.getLocalPlayerData(player)
+								// TODO
+								.transfer(server, ReturnParams.create());
 						} catch (Exception ex) {
 							throw CommandAPI.failWithString(ex.getMessage());
 						}
@@ -55,7 +62,12 @@ public class TransferServer {
 			.withAliases("s")
 			.executesPlayer((player, args) -> {
 					try {
-						MonumentaRedisSyncAPI.sendPlayer(player, args.getByArgument(serverArg));
+						MonumentaRedisSync
+							.getInstance()
+							.getPlayerDataManager()
+							.getLocalPlayerData(player)
+							// TODO
+							.transfer(args.getByArgument(serverArg), ReturnParams.create());
 					} catch (Exception ex) {
 						throw CommandAPI.failWithString(ex.getMessage());
 					}

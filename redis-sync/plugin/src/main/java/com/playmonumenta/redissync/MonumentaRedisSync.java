@@ -13,6 +13,7 @@ import com.playmonumenta.redissync.commands.Stash;
 import com.playmonumenta.redissync.commands.TransferServer;
 import com.playmonumenta.redissync.commands.UpgradeAllPlayers;
 import com.playmonumenta.redissync.config.BukkitConfig;
+import com.playmonumenta.redissync.player.PlayerDataManager;
 import com.playmonumenta.redissync.utils.PluginScheduler;
 import com.playmonumenta.redissync.utils.VersionAdapterHolder;
 import java.io.File;
@@ -36,6 +37,7 @@ public class MonumentaRedisSync extends JavaPlugin implements PluginScheduler {
 	private @Nullable RedisAPI mRedisAPI = null;
 	private @Nullable CustomLogger mLogger = null;
 	private @Nullable BukkitConfig mConfig = null;
+	private @Nullable PlayerDataManager mPlayerDataManager = null;
 
 	@Override
 	public void onLoad() {
@@ -56,16 +58,11 @@ public class MonumentaRedisSync extends JavaPlugin implements PluginScheduler {
 		ChangeLogLevel.register(this);
 		RboardCommand.register(this);
 		RemoteDataCommand.register(this);
+		mPlayerDataManager = new PlayerDataManager(this);
 	}
 
 	@Override
 	public void onEnable() {
-		/* Refuse to enable without a version adapter */
-		if (mVersionAdapter == null) {
-			Bukkit.getPluginManager().disablePlugin(this);
-			return;
-		}
-
 		/* Needed to tell Netty where it moved to */
 		System.setProperty("com.playmonumenta.redissync.internal.io.netty", "com.playmonumenta.redissync.internal");
 
@@ -123,6 +120,11 @@ public class MonumentaRedisSync extends JavaPlugin implements PluginScheduler {
 
 	public VersionAdapter getVersionAdapter() {
 		return mVersionAdapter.get();
+	}
+
+	public PlayerDataManager getPlayerDataManager() {
+		Preconditions.checkState(mPlayerDataManager != null, "MonumentaRedisSync is not enabled yet");
+		return mPlayerDataManager;
 	}
 
 	private BukkitConfig loadConfig() {

@@ -114,7 +114,7 @@ public class PlayerDataManager {
 		);
 
 		if (historyMetaData != null) {
-			Co.await(localRedisPlayer.pushHistoryEntry(newData, historyMetaData, mConfig.getHistoryAmount()).begin());
+			Co.await(localRedisPlayer.pushHistoryEntry(newData, historyMetaData, mConfig.getHistoryAmount()));
 		} else {
 			Co.await(localRedisPlayer.savePlayer(newData).begin());
 		}

@@ -149,3 +149,6 @@ build
 .pmdCache
 
 adventure-text-minimessage
+
+# rust
+Cargo.lock

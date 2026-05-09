@@ -1,7 +1,9 @@
 package com.playmonumenta.redissync.commands;
 
+import com.playmonumenta.redissync.MonumentaRedisSync;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.player.PlayerDataManager;
+import com.playmonumenta.redissync.player.ReturnParams;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
@@ -31,7 +33,12 @@ public class Stash {
 						throw CommandAPI.failWithString("This command can only be run by/as players");
 					}
 					try {
-						MonumentaRedisSyncAPI.stashPut(player, args.getByArgument(nameArg));
+						MonumentaRedisSync
+							.getInstance()
+							.getPlayerDataManager()
+							.getLocalPlayerData(player)
+							// TODO
+							.transfer(server, ReturnParams.create());
 					} catch (Exception ex) {
 						throw CommandAPI.failWithString(ex.getMessage());
 					}
@@ -53,7 +60,6 @@ public class Stash {
 						throw CommandAPI.failWithString("This command can only be run by/as players");
 					}
 					try {
-						PlayerDataManager
 						MonumentaRedisSyncAPI.stashGet(player, args.getByArgument(nameArg));
 					} catch (Exception ex) {
 						throw CommandAPI.failWithString(ex.getMessage());

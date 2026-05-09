@@ -1,6 +1,9 @@
 package com.playmonumenta.redissync.player;
 
+import com.floweytf.coro.Co;
 import com.floweytf.coro.concepts.Awaitable;
+import com.floweytf.coro.concepts.Task;
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.playmonumenta.redissync.MonumentaRedisSync;
 import com.playmonumenta.redissync.RedisAPI;
@@ -33,8 +36,9 @@ class RedisHandler implements AutoCloseable {
 		Preconditions.checkState(Thread.currentThread() == mRedisWorkerThread, "expected task to run on redis thread");
 	}
 
-	public Awaitable.Unwrapped<Void> syncRedis() {
-		return Awaitable.runOn(mRedisWorker);
+	public <T> Task<T> syncRedis(Function<RedisAsyncCommands<String, byte[]>, T> task) {
+		Co.await(Awaitable.runOn(mRedisWorker));
+		return Co.ret(task.apply(mCommands));
 	}
 
 	public Awaitable.Unwrapped<Void> syncMain() {
@@ -53,14 +57,9 @@ class RedisHandler implements AutoCloseable {
 		return "%s:playerdata:%s:metadata".formatted(mDomain, playerId);
 	}
 
-	RedisAsyncCommands<String, byte[]> commands() {
-		assertRedisThread();
-		return mCommands;
-	}
-
 	@Override
 	public void close() {
-		mRedisWorker.close();
+		mRedisWorker.shutdown();
 		mConnection.close();
 	}
 }

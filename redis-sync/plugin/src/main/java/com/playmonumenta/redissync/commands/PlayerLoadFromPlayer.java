@@ -1,11 +1,12 @@
 package com.playmonumenta.redissync.commands;
 
-import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
+import com.playmonumenta.redissync.MonumentaRedisSync;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.EntitySelectorArgument;
 import dev.jorel.commandapi.arguments.IntegerArgument;
+import dev.jorel.commandapi.executors.PlayerCommandExecutor;
 
 public class PlayerLoadFromPlayer {
 	@SuppressWarnings("DataFlowIssue")
@@ -17,9 +18,12 @@ public class PlayerLoadFromPlayer {
 			.withPermission(CommandPermission.fromString("monumenta.command.playerloadfromplayer"))
 			.withArguments(playerArg)
 			.withArguments(indexArg)
-			.executesPlayer((sender, args) -> {
+			.executesPlayer((PlayerCommandExecutor) (sender, args) -> {
 					try {
-						MonumentaRedisSyncAPI.playerLoadFromPlayer(sender, args.getByArgument(playerArg), args.getByArgument(indexArg));
+						final var playerDataManager = MonumentaRedisSync.getInstance().getPlayerDataManager();
+						throw new UnsupportedOperationException();
+						/*MonumentaRedisSyncAPI.playerLoadFromPlayer(sender, args.getByArgument(playerArg),
+							args.getByArgument(indexArg));*/
 					} catch (Exception ex) {
 						throw CommandAPI.failWithString(ex.getMessage());
 					}

@@ -7,6 +7,7 @@ import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.EntitySelectorArgument;
+import dev.jorel.commandapi.executors.PlayerCommandExecutor;
 import java.util.List;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -22,9 +23,9 @@ public class PlayerHistory {
 		new CommandAPICommand("playerhistory")
 			.withArguments(playerArg)
 			.withPermission(CommandPermission.fromString("monumenta.command.playerhistory"))
-			.executesPlayer((sender, args) -> {
+			.executesPlayer((PlayerCommandExecutor) (sender, args) -> {
 					try {
-						playerHistory(plugin, sender, args.getByArgument(playerArg));
+						throw new UnsupportedOperationException();
 					} catch (Exception ex) {
 						throw CommandAPI.failWithString(ex.getMessage());
 					}
