@@ -61,6 +61,7 @@ public class ItemHoverReplacement extends InlineReplacement {
 		addHandler(mOffhandRegex, sender -> hoverComponent(sender, false));
 	}
 
+	@SuppressWarnings("EnumOrdinal")
 	public static Component hoverComponent(CommandSender sender, boolean isMainHand) {
 		if (sender instanceof Player player) {
 		    ItemStack item = isMainHand ? player.getInventory().getItemInMainHand() : player.getInventory().getItemInOffHand();
