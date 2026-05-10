@@ -24,7 +24,7 @@ internal fun Project.applyPlugin(vararg names: String) {
     }
 }
 
-internal inline fun <T, reified S : T> DomainObjectCollection<T>.withType(
+internal inline fun <T: Any, reified S : T> DomainObjectCollection<T>.withType(
     noinline configureAction: S.() -> Unit
 ): DomainObjectCollection<S> = withType(S::class.java, configureAction)
 
@@ -66,6 +66,6 @@ internal fun Project.charset(name: String) {
     }
 }
 
-internal inline fun <reified T> ExtensionContainer.withType(f: T.() -> Unit) {
+internal inline fun <reified T: Any> ExtensionContainer.withType(f: T.() -> Unit) {
     getByType(T::class.java).apply(f)
 }

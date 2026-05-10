@@ -13,7 +13,7 @@ nullaway-plugin = "2.3.0"
 pluginYml = "0.6.0"
 git-version-plugin = "4.2.0"
 shadow-plugin = "8.3.9"
-paperweight = "2.0.0-build.5+2.0.0-beta.18"
+paperweight = "2.1.0-build.3+2.0.0-beta.21"
 spotless = "6.25.0"
 
 [libraries]
