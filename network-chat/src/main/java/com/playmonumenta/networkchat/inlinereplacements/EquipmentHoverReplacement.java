@@ -11,6 +11,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.PlayerInventory;
 import org.intellij.lang.annotations.RegExp;
 
 public class EquipmentHoverReplacement extends InlineReplacement {
@@ -45,21 +46,23 @@ public class EquipmentHoverReplacement extends InlineReplacement {
 			"equipmenthover"
 		);
 		addHandler(mEquipmentRegex, sender -> {
-			if (
-				sender instanceof Player player &&
-				!BANNED_MATERIALS.contains(player.getInventory().getItemInMainHand().getType()) &&
-				!BANNED_MATERIALS.contains(player.getInventory().getItemInOffHand().getType())
-			) {
-				List<Component> lines = new ArrayList<>();
-				lines.add(Component.text(player.getName() + "'s Equipment", NamedTextColor.WHITE, TextDecoration.BOLD).decoration(TextDecoration.ITALIC, false));
-				lines.add(player.getInventory().getHelmet() != null ? player.getInventory().getHelmet().displayName().decoration(TextDecoration.ITALIC, false) : Component.text("No Helmet", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-				lines.add(player.getInventory().getChestplate() != null ? player.getInventory().getChestplate().displayName().decoration(TextDecoration.ITALIC, false) : Component.text("No Chestplate", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-				lines.add(player.getInventory().getLeggings() != null ? player.getInventory().getLeggings().displayName().decoration(TextDecoration.ITALIC, false) : Component.text("No Leggings", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-				lines.add(player.getInventory().getBoots() != null ? player.getInventory().getBoots().displayName().decoration(TextDecoration.ITALIC, false) : Component.text("No Boots", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-				lines.add(player.getInventory().getItemInOffHand().getType() != Material.AIR ? player.getInventory().getItemInOffHand().displayName().decoration(TextDecoration.ITALIC, false) : Component.text("No Offhand", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-				lines.add(player.getInventory().getItemInMainHand().getType() != Material.AIR ? player.getInventory().getItemInMainHand().displayName().decoration(TextDecoration.ITALIC, false) : Component.text("No Mainhand", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-				return Component.text("EQUIPMENT").decoration(TextDecoration.BOLD, true)
-					.hoverEvent(Component.join(JoinConfiguration.newlines(), lines));
+			if (sender instanceof Player player) {
+				PlayerInventory inv = player.getInventory();
+				if (
+					!BANNED_MATERIALS.contains(inv.getItemInMainHand().getType()) &&
+					!BANNED_MATERIALS.contains(inv.getItemInOffHand().getType())
+				) {
+					List<Component> lines = new ArrayList<>();
+					lines.add(Component.text(player.getName() + "'s Equipment", NamedTextColor.WHITE, TextDecoration.BOLD));
+					lines.add(inv.getHelmet() != null ? inv.getHelmet().displayName() : Component.text("No Helmet", NamedTextColor.GRAY));
+					lines.add(inv.getChestplate() != null ? inv.getChestplate().displayName() : Component.text("No Chestplate", NamedTextColor.GRAY));
+					lines.add(inv.getLeggings() != null ? inv.getLeggings().displayName() : Component.text("No Leggings", NamedTextColor.GRAY));
+					lines.add(inv.getBoots() != null ? inv.getBoots().displayName() : Component.text("No Boots", NamedTextColor.GRAY));
+					lines.add(inv.getItemInOffHand().getType() != Material.AIR ? inv.getItemInOffHand().displayName() : Component.text("No Offhand", NamedTextColor.GRAY));
+					lines.add(inv.getItemInMainHand().getType() != Material.AIR ? inv.getItemInMainHand().displayName() : Component.text("No Mainhand", NamedTextColor.GRAY));
+					return Component.text("EQUIPMENT").decoration(TextDecoration.BOLD, true)
+						.hoverEvent(Component.join(JoinConfiguration.newlines(), lines));
+				}
 			}
 			return Component.text("<equipment>");
 		});

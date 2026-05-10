@@ -12,7 +12,6 @@ import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.JoinConfiguration;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
@@ -75,23 +74,19 @@ public class ItemHoverReplacement extends InlineReplacement {
 						Component author = bookMeta.author();
 						if (bookMeta.hasAuthor() && author != null) {
 							lines.add(Component.translatable("book.byAuthor", List.of(author))
-								.color(NamedTextColor.GRAY)
-								.decoration(TextDecoration.ITALIC, false));
+								.color(NamedTextColor.GRAY));
 						}
 						BookMeta.Generation generation = bookMeta.getGeneration();
 						if (bookMeta.hasGeneration() && generation != null) {
 							int generationId = generation.ordinal();
-							lines.add(Component.translatable(String.format("book.generation.%d", generationId), NamedTextColor.GRAY)
-								.decoration(TextDecoration.ITALIC, false));
+							lines.add(Component.translatable(String.format("book.generation.%d", generationId), NamedTextColor.GRAY));
 						}
 					}
 				}
 
 				if (!meta.hasItemFlag(ItemFlag.HIDE_ENCHANTS)) {
 					for (Map.Entry<Enchantment, Integer> entry : meta.getEnchants().entrySet()) {
-						lines.add(entry.getKey().displayName(entry.getValue())
-							.color(NamedTextColor.GRAY)
-							.decoration(TextDecoration.ITALIC, false));
+						lines.add(entry.getKey().displayName(entry.getValue()).color(NamedTextColor.GRAY));
 					}
 				}
 
@@ -130,8 +125,7 @@ public class ItemHoverReplacement extends InlineReplacement {
 						};
 
 						lines.add(Component.empty());
-						lines.add(Component.translatable(whenInSlotTranslatable, NamedTextColor.GRAY)
-							.decoration(TextDecoration.ITALIC, false));
+						lines.add(Component.translatable(whenInSlotTranslatable, NamedTextColor.GRAY));
 						for (AttributeAndModifier attributeAndModifier : slotAttributes) {
 							Attribute attribute = attributeAndModifier.attribute;
 
@@ -150,40 +144,36 @@ public class ItemHoverReplacement extends InlineReplacement {
 							);
 
 							lines.add(Component.translatable(modifierTranslatable, modifierTranslatableArguments)
-								.color(NamedTextColor.BLUE)
-								.decoration(TextDecoration.ITALIC, false));
+								.color(NamedTextColor.BLUE));
 						}
 					}
 				}
 
 				if (!meta.hasItemFlag(ItemFlag.HIDE_UNBREAKABLE) && meta.isUnbreakable()) {
-					lines.add(Component.translatable("item.unbreakable", NamedTextColor.BLUE)
-						.decoration(TextDecoration.ITALIC, false));
+					lines.add(Component.translatable("item.unbreakable", NamedTextColor.BLUE));
 				}
 
 				Set<Namespaced> destroyables = meta.getDestroyableKeys();
 				if (!meta.hasItemFlag(ItemFlag.HIDE_DESTROYS) && !destroyables.isEmpty()) {
 					lines.add(Component.empty());
-					lines.add(Component.translatable("item.canBreak", NamedTextColor.GRAY)
-						.decoration(TextDecoration.ITALIC, false));
+					lines.add(Component.translatable("item.canBreak", NamedTextColor.GRAY));
 					for (Namespaced destoryable : destroyables) {
 						lines.add(Component.translatable(
 							String.format("block.%s.%s", destoryable.getNamespace(), destoryable.getKey()),
 							NamedTextColor.DARK_GRAY
-						).decoration(TextDecoration.ITALIC, false));
+						));
 					}
 				}
 
 				Set<Namespaced> placeables = meta.getPlaceableKeys();
 				if (!meta.hasItemFlag(ItemFlag.HIDE_DESTROYS) && !placeables.isEmpty()) {
 					lines.add(Component.empty());
-					lines.add(Component.translatable("item.canPlace", NamedTextColor.GRAY)
-						.decoration(TextDecoration.ITALIC, false));
+					lines.add(Component.translatable("item.canPlace", NamedTextColor.GRAY));
 					for (Namespaced placeable : placeables) {
 						lines.add(Component.translatable(
 							String.format("block.%s.%s", placeable.getNamespace(), placeable.getKey()),
 							NamedTextColor.DARK_GRAY
-						).decoration(TextDecoration.ITALIC, false));
+						));
 					}
 				}
 
