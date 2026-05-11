@@ -1,4 +1,4 @@
-package com.playmonumenta.structures;
+package com.playmonumenta.structures.events;
 
 import com.playmonumenta.structures.managers.RespawningStructure;
 import java.time.Instant;
@@ -27,7 +27,7 @@ public class StructureConquerEvent extends Event {
 		return mTimestamp;
 	}
 
-	// The location is the last spawner broken
+	// The location is the last spawner broken.
 
 	public Location getLocation() {
 		return mLocation.clone();
