@@ -4,7 +4,6 @@ import com.fastasyncworldedit.core.util.collection.BlockSet;
 import com.fastasyncworldedit.core.util.collection.MemBlockSet;
 import com.playmonumenta.structures.StructuresAPI;
 import com.playmonumenta.structures.StructuresPlugin;
-import com.playmonumenta.structures.events.StructureRespawnEvent;
 import com.playmonumenta.structures.utils.MMLog;
 import com.playmonumenta.structures.utils.MessagingUtils;
 import com.sk89q.worldedit.math.BlockVector3;
@@ -42,8 +41,8 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 
 		public boolean within(Vector vec) {
 			return vec.getBlockX() >= mLowerCorner.getBlockX() && vec.getBlockX() <= mUpperCorner.getBlockX() &&
-				vec.getBlockY() >= mLowerCorner.getBlockY() && vec.getBlockY() <= mUpperCorner.getBlockY() &&
-				vec.getBlockZ() >= mLowerCorner.getBlockZ() && vec.getBlockZ() <= mUpperCorner.getBlockZ();
+					vec.getBlockY() >= mLowerCorner.getBlockY() && vec.getBlockY() <= mUpperCorner.getBlockY() &&
+					vec.getBlockZ() >= mLowerCorner.getBlockZ() && vec.getBlockZ() <= mUpperCorner.getBlockZ();
 		}
 	}
 
@@ -157,18 +156,18 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 	}
 
 	public static CompletableFuture<RespawningStructure> withParameters(StructuresPlugin plugin,
-																		World world,
-																		int extraRadius,
-																		String configLabel,
-																		String name,
-																		List<String> genericPaths,
-																		Vector loadPos,
-																		int respawnTime,
-																		int ticksLeft,
-																		@Nullable String postRespawnCommand,
-																		@Nullable List<String> specialPaths,
-																		@Nullable String nextRespawnPath,
-																		@Nullable SpawnerBreakTrigger spawnerBreakTrigger) {
+	                                                                    World world,
+	                                                                    int extraRadius,
+	                                                                    String configLabel,
+	                                                                    String name,
+	                                                                    List<String> genericPaths,
+	                                                                    Vector loadPos,
+	                                                                    int respawnTime,
+	                                                                    int ticksLeft,
+	                                                                    @Nullable String postRespawnCommand,
+	                                                                    @Nullable List<String> specialPaths,
+	                                                                    @Nullable String nextRespawnPath,
+	                                                                    @Nullable SpawnerBreakTrigger spawnerBreakTrigger) {
 
 		CompletableFuture<RespawningStructure> future = new CompletableFuture<>();
 
@@ -182,10 +181,10 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 			}
 
 			RespawningStructure structure = new RespawningStructure(world, extraRadius,
-				configLabel, name, genericPaths,
-				loadPos, respawnTime, ticksLeft,
-				postRespawnCommand,
-				nextRespawnPath, spawnerBreakTrigger);
+					configLabel, name, genericPaths,
+					loadPos, respawnTime, ticksLeft,
+					postRespawnCommand,
+					nextRespawnPath, spawnerBreakTrigger);
 
 			// Load the first schematic to get its size
 			return StructuresAPI.loadStructure(structure.mGenericVariants.get(0)).thenApply((clipboard) -> {
@@ -203,7 +202,7 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 				structure.mInnerBounds = new StructureBounds(structure.mLoadPos, structure.mLoadPos.clone().add(new Vector(structureSize.getX(), structureSize.getY(), structureSize.getZ())));
 				Vector extraRadiusVec = new Vector(structure.mExtraRadius, structure.mExtraRadius, structure.mExtraRadius);
 				structure.mOuterBounds = new StructureBounds(structure.mInnerBounds.mLowerCorner.clone().subtract(extraRadiusVec),
-					structure.mInnerBounds.mUpperCorner.clone().add(extraRadiusVec));
+						structure.mInnerBounds.mUpperCorner.clone().add(extraRadiusVec));
 
 				// save locations of structure void blocks
 				int size1 = 1 + (Math.max(clipboard.getDimensions().getBlockX(), Math.max(clipboard.getDimensions().getBlockY(), clipboard.getDimensions().getBlockZ())) >> 4);
@@ -235,16 +234,16 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 	}
 
 	private RespawningStructure(World world,
-								int extraRadius,
-								String configLabel,
-								String name,
-								List<String> genericPaths,
-								Vector loadPos,
-								int respawnTime,
-								int ticksLeft,
-								@Nullable String postRespawnCommand,
-								@Nullable String nextRespawnPath,
-								@Nullable SpawnerBreakTrigger spawnerBreakTrigger) {
+	                            int extraRadius,
+	                            String configLabel,
+	                            String name,
+	                            List<String> genericPaths,
+	                            Vector loadPos,
+	                            int respawnTime,
+	                            int ticksLeft,
+	                            @Nullable String postRespawnCommand,
+	                            @Nullable String nextRespawnPath,
+	                            @Nullable SpawnerBreakTrigger spawnerBreakTrigger) {
 		mWorld = world;
 		mRandom = new Random();
 		mConfigLabel = configLabel;
@@ -275,12 +274,12 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 
 	public String getInfoString() {
 		return "name='" + mName + "' pos=(" + mLoadPos.getBlockX() + " " +
-			mLoadPos.getBlockY() + " " + mLoadPos.getBlockZ() +
-			") paths={" + String.join(" ", mGenericVariants) + "} period=" + mRespawnTime + " ticksLeft=" +
-			mTicksLeft +
-			(mPostRespawnCommand == null ? "" : " respawnCmd='" + mPostRespawnCommand + "'") +
-			(mSpecialVariants.isEmpty() ? "" : " specialPaths={" + String.join(" ", mSpecialVariants) + "}") +
-			(mSpawnerBreakTrigger == null ? "" : " spawnerTrigger={" + mSpawnerBreakTrigger.getInfoString() + "}");
+				mLoadPos.getBlockY() + " " + mLoadPos.getBlockZ() +
+				") paths={" + String.join(" ", mGenericVariants) + "} period=" + mRespawnTime + " ticksLeft=" +
+				mTicksLeft +
+				(mPostRespawnCommand == null ? "" : " respawnCmd='" + mPostRespawnCommand + "'") +
+				(mSpecialVariants.isEmpty() ? "" : " specialPaths={" + String.join(" ", mSpecialVariants) + "}") +
+				(mSpawnerBreakTrigger == null ? "" : " spawnerTrigger={" + mSpawnerBreakTrigger.getInfoString() + "}");
 	}
 
 	public void activateSpecialStructure(@Nullable String nextRespawnPath) {
@@ -332,12 +331,8 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 		StructuresAPI.loadAndPasteStructure(respawnPath, new Location(mWorld, mLoadPos.getBlockX(), mLoadPos.getBlockY(), mLoadPos.getBlockZ()), true, false).whenComplete((unused, exception) -> {
 			if (exception != null) {
 				MMLog.severe("Failed to respawn structure '" + mConfigLabel + "'", exception);
-			} else {
-				StructureRespawnEvent event = new StructureRespawnEvent(this, mForcedRespawn, mConquered);
-				Bukkit.getPluginManager().callEvent(event);
-				if (mPostRespawnCommand != null) {
-					Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), mPostRespawnCommand);
-				}
+			} else if (mPostRespawnCommand != null) {
+				Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), mPostRespawnCommand);
 			}
 		});
 	}
@@ -369,7 +364,7 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 						for (Player p : mWorld.getPlayers()) {
 							if (isNearby(p)) {
 								p.sendMessage(Component.text(mName + " will forcibly respawn in "
-									+ minutesLeft + " minutes!", NamedTextColor.RED, TextDecoration.BOLD));
+										+ minutesLeft + " minutes!", NamedTextColor.RED, TextDecoration.BOLD));
 							}
 						}
 					}
@@ -382,10 +377,10 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 
 	public void tellRespawnTime(Player player) {
 		Component message = Component.text(
-			mTicksLeft <= MIN_TICKS_LEFT_WITH_PLAYERS_INSIDE && !mForcedRespawn && mNextRespawnPath == null
-				? mName + " will respawn once all players have left the area."
-				: mName + " is respawning in " + MessagingUtils.durationToString(mTicksLeft) + (mForcedRespawn || mNextRespawnPath != null ? "" : " once all players have left the area."),
-			mTicksLeft <= 600 ? NamedTextColor.RED : NamedTextColor.GREEN
+				mTicksLeft <= MIN_TICKS_LEFT_WITH_PLAYERS_INSIDE && !mForcedRespawn && mNextRespawnPath == null
+						? mName + " will respawn once all players have left the area."
+						: mName + " is respawning in " + MessagingUtils.durationToString(mTicksLeft) + (mForcedRespawn || mNextRespawnPath != null ? "" : " once all players have left the area."),
+				mTicksLeft <= 600 ? NamedTextColor.RED : NamedTextColor.GREEN
 		).decorate(TextDecoration.BOLD);
 
 		boolean within = isWithin(player);
@@ -400,15 +395,15 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 		player.sendMessage(message);
 		if (within) {
 			long otherPlayersWithin = player.getWorld().getPlayers().stream()
-				.filter(p -> p != player && isWithin(p) && p.getGameMode() != GameMode.SPECTATOR && p.getGameMode() != GameMode.CREATIVE)
-				.count();
+					.filter(p -> p != player && isWithin(p) && p.getGameMode() != GameMode.SPECTATOR && p.getGameMode() != GameMode.CREATIVE)
+					.count();
 			if (otherPlayersWithin > 0) {
 				player.sendMessage(Component.text((otherPlayersWithin == 1 ? "There is one other player here." : "There are " + otherPlayersWithin + " other players here."), NamedTextColor.AQUA).decoration(TextDecoration.BOLD, false));
 			}
 		}
 		if (mConquered && !mForcedRespawn) {
 			player.sendMessage(Component.text("[Force " + mName + " to respawn]", NamedTextColor.LIGHT_PURPLE)
-				.clickEvent(ClickEvent.runCommand("/compassrespawn " + mConfigLabel)));
+					.clickEvent(ClickEvent.runCommand("/compassrespawn " + mConfigLabel)));
 		}
 	}
 
@@ -431,8 +426,8 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 	public boolean isWithin(Location location) {
 		Vector playerLoc = location.toVector();
 		return mWorld.equals(location.getWorld()) && mInnerBounds.within(playerLoc)
-			&& (mStructureVoidBlocks == null || !mStructureVoidBlocks.contains(playerLoc.getBlockX() - mInnerBounds.mLowerCorner.getBlockX(),
-			playerLoc.getBlockY() - mInnerBounds.mLowerCorner.getBlockY(), playerLoc.getBlockZ() - mInnerBounds.mLowerCorner.getBlockZ()));
+				&& (mStructureVoidBlocks == null || !mStructureVoidBlocks.contains(playerLoc.getBlockX() - mInnerBounds.mLowerCorner.getBlockX(),
+				playerLoc.getBlockY() - mInnerBounds.mLowerCorner.getBlockY(), playerLoc.getBlockZ() - mInnerBounds.mLowerCorner.getBlockZ()));
 	}
 
 	public void tellRespawnTimeIfNearby(Player player) {
@@ -493,8 +488,8 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 
 	public void tick(int ticks) {
 		if (!mName.isEmpty() &&
-			((mTicksLeft >= 2400 && (mTicksLeft - ticks) < 2400) ||
-				(mTicksLeft >= 600 && (mTicksLeft - ticks) < 600))) {
+				((mTicksLeft >= 2400 && (mTicksLeft - ticks) < 2400) ||
+						(mTicksLeft >= 600 && (mTicksLeft - ticks) < 600))) {
 			for (Player player : mWorld.getPlayers()) {
 				if (isNearby(player)) {
 					tellRespawnTime(player);
@@ -546,10 +541,10 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 		// There was no player nearby last check (they teleported in)
 		// There is no player within the POI itself, just nearby OR respawn is forced
 		return isPlayerNearby &&
-			(mForcedRespawn || // The POI was force to respawn by a player
-				isAmped || // The POI is amplified for the next spawn
-				mPlayerNearbyLastTick == NearbyState.NO_PLAYER_WITHIN || // There was no player nearby last check (they teleported in)
-				!isPlayerWithin);
+				(mForcedRespawn || // The POI was force to respawn by a player
+						isAmped || // The POI is amplified for the next spawn
+						mPlayerNearbyLastTick == NearbyState.NO_PLAYER_WITHIN || // There was no player nearby last check (they teleported in)
+						!isPlayerWithin);
 	}
 
 	// This event is called every time a spawner is broken anywhere
@@ -581,12 +576,12 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 		mConquered = true;
 		for (Player player : mWorld.getPlayers()) {
 			if (player.getGameMode() != GameMode.SPECTATOR &&
-				isNearby(player)) {
+					isNearby(player)) {
 				if (mTicksLeft <= 0) {
 					player.sendMessage(Component.text(mName + " has been conquered! It will respawn once all players leave the area.", NamedTextColor.GOLD, TextDecoration.BOLD));
 				} else {
 					player.sendMessage(Component.text(mName + " has been conquered! It will respawn in " +
-						minutesLeft + " minute" + minutesPlural + "!", NamedTextColor.GOLD, TextDecoration.BOLD));
+							minutesLeft + " minute" + minutesPlural + "!", NamedTextColor.GOLD, TextDecoration.BOLD));
 				}
 			}
 		}
@@ -610,14 +605,6 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 
 	public World getWorld() {
 		return mWorld;
-	}
-
-	public StructureBounds getInnerBounds() {
-		return mInnerBounds;
-	}
-
-	public StructureBounds getOuterBounds() {
-		return mOuterBounds;
 	}
 
 	public int getSpawnerCount() {
