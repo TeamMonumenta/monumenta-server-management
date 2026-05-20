@@ -69,6 +69,10 @@ public class ItemHoverReplacement extends InlineReplacement {
 				lines.add(item.displayName());
 				ItemMeta meta = item.getItemMeta();
 
+				if (meta == null) {
+					return item.displayName().hoverEvent(Component.join(JoinConfiguration.newlines(), lines));
+				}
+
 				if (!meta.hasItemFlag(ItemFlag.HIDE_POTION_EFFECTS)) {
 					if (meta instanceof BookMeta bookMeta) {
 						Component author = bookMeta.author();
