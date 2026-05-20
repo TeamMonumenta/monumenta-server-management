@@ -64,7 +64,7 @@ public class ItemHoverReplacement extends InlineReplacement {
 	public static Component hoverComponent(CommandSender sender, boolean isMainHand) {
 		if (sender instanceof Player player) {
 		    ItemStack item = isMainHand ? player.getInventory().getItemInMainHand() : player.getInventory().getItemInOffHand();
-			if (!BANNED_MATERIALS.contains(player.getInventory().getItemInOffHand().getType())) {
+			if (!BANNED_MATERIALS.contains(item.getType())) {
 				List<Component> lines = new ArrayList<>();
 				lines.add(item.displayName());
 				ItemMeta meta = item.getItemMeta();
