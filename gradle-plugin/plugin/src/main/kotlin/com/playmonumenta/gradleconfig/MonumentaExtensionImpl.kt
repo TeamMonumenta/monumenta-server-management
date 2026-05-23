@@ -26,7 +26,8 @@ private fun setupProject(
     target: Project,
     javadoc: Boolean,
     pmdWarningsAsErrors: Boolean,
-    checkstyleWarningsAsErrors: Boolean
+    checkstyleWarningsAsErrors: Boolean,
+    overrideJavaVersion: Boolean
 ) {
     project.applyPlugin(
         "pmd",
@@ -145,8 +146,11 @@ private fun setupProject(
         }
 
         withSourcesJar()
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+
+        if (!overrideJavaVersion) {
+            sourceCompatibility = JavaVersion.VERSION_21
+            targetCompatibility = JavaVersion.VERSION_21
+        }
     }
 }
 
@@ -221,6 +225,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
     private var checkstyleWarningsAsErrors: Boolean = false
     private var serverConfigSubdir: String = "plugins"
     private var deployArtifactTaskName: String = "shadowJar"
+    private var overrideJavaVersion = false
 
     private val deferActions: MutableList<() -> Unit> = ArrayList()
 
@@ -470,7 +475,8 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
                 target,
                 !disableJavadoc && proj !in adapterImplProjects,
                 pmdWarningsAsErrors,
-                checkstyleWarningsAsErrors
+                checkstyleWarningsAsErrors,
+                overrideJavaVersion
             )
         }
 
@@ -550,5 +556,9 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
 
     override fun deployArtifactTask(taskName: String) {
         deployArtifactTaskName = taskName
+    }
+
+    override fun overrideJavaVersion() {
+        overrideJavaVersion = true
     }
 }

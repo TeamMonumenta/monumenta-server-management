@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "com.playmonumenta.gradle-config"
-version = "5.1.2"
+version = "5.2.0"
 
 repositories {
     mavenCentral()
