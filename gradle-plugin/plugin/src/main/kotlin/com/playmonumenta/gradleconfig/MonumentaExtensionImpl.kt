@@ -499,7 +499,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
                     repo.maven { maven ->
                         maven.name = "MainMaven"
                         maven.url =
-                            URI(if (pluginProject.version.toString().endsWith("SNAPSHOT")) snapshotUrl else releasesUrl)
+                            URI(if (pluginProject.version.toString().contains("dev")) snapshotUrl else releasesUrl)
                         maven.credentials { cred ->
                             cred.username = mavenUsername
                             cred.password = mavenPassword
