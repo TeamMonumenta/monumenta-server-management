@@ -1,18 +1,15 @@
 package com.playmonumenta.gradleconfig
 
-import com.palantir.gradle.gitversion.VersionDetails
+import com.diffplug.gradle.spotless.SpotlessExtension
+import com.diffplug.spotless.LineEnding
 import com.playmonumenta.gradleconfig.ssh.easySetup
-import groovy.lang.Closure
 import net.ltgt.gradle.errorprone.CheckSeverity
 import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
 import net.minecrell.pluginyml.bungee.BungeePluginDescription
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.api.plugins.BasePluginExtension
-import org.gradle.api.plugins.ExtraPropertiesExtension
 import org.gradle.api.plugins.JavaPluginExtension
-import com.diffplug.gradle.spotless.SpotlessExtension
-import com.diffplug.spotless.LineEnding
 import org.gradle.api.plugins.quality.Checkstyle
 import org.gradle.api.plugins.quality.CheckstyleExtension
 import org.gradle.api.plugins.quality.PmdExtension
@@ -24,7 +21,13 @@ import org.gradle.external.javadoc.StandardJavadocDocletOptions
 import org.gradle.jvm.tasks.Jar
 import java.net.URI
 
-private fun setupProject(project: Project, target: Project, javadoc: Boolean, pmdWarningsAsErrors: Boolean, checkstyleWarningsAsErrors: Boolean) {
+private fun setupProject(
+    project: Project,
+    target: Project,
+    javadoc: Boolean,
+    pmdWarningsAsErrors: Boolean,
+    checkstyleWarningsAsErrors: Boolean
+) {
     project.applyPlugin(
         "pmd",
         "java-library",
@@ -106,8 +109,10 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean, pm
     project.tasks.withType(Checkstyle::class.java) {
         it.minHeapSize.set("1g")
         it.maxHeapSize.set("1g")
-        it.configProperties?.set("checkstyle.suppressions.file",
-            project.rootProject.file("config/checkstyle/suppressions.xml").absolutePath)
+        it.configProperties?.set(
+            "checkstyle.suppressions.file",
+            project.rootProject.file("config/checkstyle/suppressions.xml").absolutePath
+        )
     }
 
     with(project.extensions.getByType(SpotlessExtension::class.java)) {
@@ -146,27 +151,53 @@ private fun setupProject(project: Project, target: Project, javadoc: Boolean, pm
 }
 
 private fun setupVersion(project: Project, prefix: String?) {
-    val gitStatus = ProcessBuilder("git", "status", "--porcelain")
-        .directory(project.rootDir)
-        .redirectErrorStream(true)
-        .start()
-        .inputStream.bufferedReader().readText().trim()
-    if (gitStatus.isNotEmpty()) {
+    fun run(vararg cmd: String): String? {
+        return try {
+            val process = ProcessBuilder("git", *cmd)
+                .directory(project.rootDir)
+                .redirectErrorStream(true)
+                .start()
+
+            val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+            val exitCode = process.waitFor()
+
+            if (exitCode == 0) output else null
+        } catch (e: Exception) {
+            project.logger.warn(
+                "Failed to execute git command '{}': {}",
+                cmd.joinToString(" "),
+                e.message
+            )
+            null
+        }
+    }
+
+    val gitStatus = run("status", "--porcelain", "--", project.projectDir.path).orEmpty()
+    val gitTag = run("describe", "--tags", "--abbrev=0", "--first-parent", "--match=${prefix ?: ""}*")
+    val gitHash = run("rev-parse", "--short", "HEAD") ?: "unknown"
+    val gitDistance = if (!gitTag.isNullOrBlank()) {
+        run("rev-list", "--count", "$gitTag..HEAD", "--first-parent", "--", project.projectDir.path)?.toIntOrNull() ?: 0
+    } else {
+        0
+    }
+
+    val isDirty = gitStatus.isNotEmpty()
+
+    if (isDirty) {
         project.logger.lifecycle("Dirty files at version check for '{}': {}", project.name, gitStatus)
     }
-    project.applyPlugin("com.palantir.git-version")
-    val extra = project.extensions.getByType(ExtraPropertiesExtension::class.java)
 
-    @Suppress("UNCHECKED_CAST")
-    val gitVersion = extra.get("gitVersion") as Closure<String>
-    @Suppress("UNCHECKED_CAST")
-    val versionDetails = extra.get("versionDetails") as Closure<VersionDetails>
+    val baseVersion = gitTag?.removePrefix(prefix ?: "") ?: "0.0.1"
 
     project.group = "com.playmonumenta"
 
-    val gitResult = prefix?.let { gitVersion.call(mapOf("prefix" to it)) } ?: gitVersion.call(prefix)
-    val details = versionDetails.call()
-    project.version = gitResult + (if (details.isCleanTag) "" else "-SNAPSHOT")
+    project.version = when {
+        isDirty && gitDistance > 0 -> "${baseVersion}-dev.${gitDistance}+${gitHash}.dirty"
+        isDirty -> "${baseVersion}-dev+${gitHash}.dirty"
+        gitDistance > 0 -> "${baseVersion}-dev.${gitDistance}+${gitHash}"
+        else -> baseVersion
+    }
+
     project.logger.lifecycle("Project '{}' version: {}", project.name, project.version)
 }
 
@@ -434,7 +465,13 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
             *simpleProjects.toTypedArray(),
             *adapterImplProjects.toTypedArray()
         ).filterNotNull().forEach { proj ->
-            setupProject(proj, target, !disableJavadoc && proj !in adapterImplProjects, pmdWarningsAsErrors, checkstyleWarningsAsErrors)
+            setupProject(
+                proj,
+                target,
+                !disableJavadoc && proj !in adapterImplProjects,
+                pmdWarningsAsErrors,
+                checkstyleWarningsAsErrors
+            )
         }
 
         if (hasAdapter) {
@@ -481,8 +518,15 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
             when (deployArtifactTaskName) {
                 "shadowJar" -> {
                     val shadowJar = pluginProject.tasks.getByName("shadowJar") as Jar
-                    easySetup(pluginProject, shadowJar, shadowJar.archiveFile, shadowJar.archiveBaseName.get(), serverConfigSubdir)
+                    easySetup(
+                        pluginProject,
+                        shadowJar,
+                        shadowJar.archiveFile,
+                        shadowJar.archiveBaseName.get(),
+                        serverConfigSubdir
+                    )
                 }
+
                 "reobfJar" -> {
                     val reobfJar = pluginProject.tasks.getByName("reobfJar")
                     val outputJar = pluginProject.layout.file(
@@ -490,6 +534,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
                     )
                     easySetup(pluginProject, reobfJar, outputJar, pluginName!!, serverConfigSubdir)
                 }
+
                 else -> throw IllegalStateException("deployArtifactTask(\"$deployArtifactTaskName\") is not supported; use \"shadowJar\" or \"reobfJar\"")
             }
         }
