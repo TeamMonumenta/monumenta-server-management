@@ -26,8 +26,7 @@ private fun setupProject(
     target: Project,
     javadoc: Boolean,
     pmdWarningsAsErrors: Boolean,
-    checkstyleWarningsAsErrors: Boolean,
-    overrideJavaVersion: Boolean
+    checkstyleWarningsAsErrors: Boolean
 ) {
     project.applyPlugin(
         "pmd",
@@ -146,11 +145,8 @@ private fun setupProject(
         }
 
         withSourcesJar()
-
-        if (!overrideJavaVersion) {
-            sourceCompatibility = JavaVersion.VERSION_21
-            targetCompatibility = JavaVersion.VERSION_21
-        }
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 }
 
@@ -225,7 +221,6 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
     private var checkstyleWarningsAsErrors: Boolean = false
     private var serverConfigSubdir: String = "plugins"
     private var deployArtifactTaskName: String = "shadowJar"
-    private var overrideJavaVersion = false
 
     private val deferActions: MutableList<() -> Unit> = ArrayList()
 
@@ -475,8 +470,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
                 target,
                 !disableJavadoc && proj !in adapterImplProjects,
                 pmdWarningsAsErrors,
-                checkstyleWarningsAsErrors,
-                overrideJavaVersion
+                checkstyleWarningsAsErrors
             )
         }
 
@@ -505,7 +499,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
                     repo.maven { maven ->
                         maven.name = "MainMaven"
                         maven.url =
-                            URI(if (pluginProject.version.toString().contains("dev")) snapshotUrl else releasesUrl)
+                            URI(if (pluginProject.version.toString().endsWith("SNAPSHOT")) snapshotUrl else releasesUrl)
                         maven.credentials { cred ->
                             cred.username = mavenUsername
                             cred.password = mavenPassword
@@ -556,9 +550,5 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
 
     override fun deployArtifactTask(taskName: String) {
         deployArtifactTaskName = taskName
-    }
-
-    override fun overrideJavaVersion() {
-        overrideJavaVersion = true
     }
 }
