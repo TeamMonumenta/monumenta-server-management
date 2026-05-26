@@ -33,7 +33,8 @@ monumenta {
 	id("MonumentaNetworkChat")
 	name("MonumentaNetworkChat")
 	paper(
-		"com.playmonumenta.networkchat.NetworkChatPlugin", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.19",
+		"com.playmonumenta.networkchat.NetworkChatPlugin", BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
+        "1.19", "1.19-R0.1-SNAPSHOT",
 		depends = listOf(
 			"CommandAPI",
 			"MonumentaCommon",
@@ -42,7 +43,7 @@ monumenta {
 			"PlaceholderAPI",
 			"ProtocolLib"
 		),
-		softDepends = listOf("ViaVersion")
+		softDepends = listOf("ViaVersion"),
 	)
 	gitPrefix("network-chat/")
 }

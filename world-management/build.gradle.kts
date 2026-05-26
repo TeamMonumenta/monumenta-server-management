@@ -26,7 +26,7 @@ monumenta {
 	paper(
 		"com.playmonumenta.worlds.paper.WorldManagementPlugin",
 		BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
-		"1.20",
+		"1.20", "1.20-R0.1-SNAPSHOT",
 		depends = listOf("CommandAPI", "MonumentaCommon", "MonumentaRedisSync"),
 		softDepends = listOf("MonumentaNetworkRelay")
 	)

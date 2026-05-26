@@ -49,9 +49,9 @@ private fun setupProject(
     }
 
     with(project.dependencies) {
-        add("errorprone", "com.google.errorprone:error_prone_core:2.29.1")
-        add("errorprone", "com.uber.nullaway:nullaway:0.10.18")
-        add("compileOnly", "com.google.errorprone:error_prone_annotations:2.29.1")
+        add("errorprone", "com.google.errorprone:error_prone_core:2.49.0")
+        add("errorprone", "com.uber.nullaway:nullaway:0.13.4")
+        add("compileOnly", "com.google.errorprone:error_prone_annotations:2.49.0")
     }
 
     project.tasks.withType<_, JavaCompile> {
@@ -148,8 +148,8 @@ private fun setupProject(
         withSourcesJar()
 
         if (!overrideJavaVersion) {
-            sourceCompatibility = JavaVersion.VERSION_21
-            targetCompatibility = JavaVersion.VERSION_21
+            sourceCompatibility = JavaVersion.VERSION_25
+            targetCompatibility = JavaVersion.VERSION_25
         }
     }
 }
@@ -322,10 +322,10 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
         main: String,
         order: BukkitPluginDescription.PluginLoadOrder,
         apiVersion: String,
+        apiJarVersion: String,
         authors: List<String>,
         depends: List<String>,
         softDepends: List<String>,
-        apiJarVersion: String,
         action: BukkitPluginDescription.() -> Unit
     ) {
         if (isBukkitConfigured) {
@@ -391,7 +391,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
         }
 
         if (adapterApiPaperDep != null) {
-            project.addCompileOnly("io.papermc.paper:paper-api:$adapterApiPaperDep-R0.1-SNAPSHOT")
+            project.addCompileOnly("io.papermc.paper:paper-api:$adapterApiPaperDep")
         }
 
         pluginProject.addImplementation(
@@ -409,7 +409,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
 
         val paperweightDepsExt = project.dependencies.extensions.getByName("paperweight")
         paperweightDepsExt.javaClass.getMethod("paperDevBundle", String::class.java)
-            .invoke(paperweightDepsExt, "${devBundle}-R0.1-SNAPSHOT")
+            .invoke(paperweightDepsExt, devBundle)
 
         pluginProject.addRuntimeOnly(
             pluginProject.dependencies.project(
