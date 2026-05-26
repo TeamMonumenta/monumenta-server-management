@@ -138,4 +138,6 @@ interface MonumentaExtension {
      * @param taskName The task name, e.g. `"reobfJar"`.
      */
     fun deployArtifactTask(taskName: String)
+
+    fun overrideJavaVersion()
 }
