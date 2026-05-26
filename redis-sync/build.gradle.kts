@@ -15,12 +15,13 @@ monumenta {
 	name("MonumentaRedisSync")
 	pluginProject("redissync")
 	paper(
-		"com.playmonumenta.redissync.MonumentaRedisSync", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20",
+		"com.playmonumenta.redissync.MonumentaRedisSync", BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
+        "1.20", "1.20-R0.1-SNAPSHOT",
 		depends = listOf("CommandAPI", "MonumentaCommon", "MonumentaNetworkRelay"),
 	)
 
-	versionAdapterApi("adapter_api", paper = "1.18.2")
-	versionAdapter("adapter_v1_20_R3", "1.20.4") {
+	versionAdapterApi("adapter_api", paper = "1.18.2-R0.1-SNAPSHOT")
+	versionAdapter("adapter_v1_20_R3", "1.20.4-R0.1-SNAPSHOT") {
 		dependencies {
 			compileOnly(mixinapi)
 		}

@@ -31,7 +31,8 @@ monumenta {
 	id("MonumentaStructureManagement")
 	name("MonumentaStructureManagement")
     paper(
-        "com.playmonumenta.structures.StructuresPlugin", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20",
+        "com.playmonumenta.structures.StructuresPlugin", BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
+        "1.20", "1.20-R0.1-SNAPSHOT",
         depends = listOf("CommandAPI", "MonumentaCommon", "FastAsyncWorldEdit", "ScriptedQuests")
     )
 	gitPrefix("structure-management/")

@@ -29,6 +29,7 @@ monumenta {
 		"com.playmonumenta.common.MonumentaCommonPlugin",
 		BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
 		"1.20",
+        "1.20-R0.1-SNAPSHOT",
 		depends = listOf("CommandAPI"),
 		softDepends = listOf("dynmap")
 	)

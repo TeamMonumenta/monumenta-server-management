@@ -8,7 +8,7 @@ jvm = { id = "org.jetbrains.kotlin.jvm", version = "2.2.21" }
 jsch = "2.27.6"
 jna = "5.18.1"
 junixsocket = "2.10.1"
-errorprone-plugin = "4.3.0"
+errorprone-plugin = "5.1.0"
 nullaway-plugin = "2.3.0"
 pluginYml = "0.6.0"
 git-version-plugin = "4.2.0"

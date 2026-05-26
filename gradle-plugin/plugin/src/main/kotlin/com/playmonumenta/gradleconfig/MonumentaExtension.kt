@@ -79,17 +79,16 @@ interface MonumentaExtension {
      * @param main The main class.
      * @param order The load order.
      * @param apiVersion The version of paper api to use. Don't include `R0.1-SNAPSHOT`. This should look like an MC version.
+     * @param apiJarVersion The actual version of the paper API jar.
      * @param authors The list of authors. Defaults to `"Team Monumenta"`
      * @param depends The list of dependencies that are required for the plugin to start.
      * @param softDepends The list of optional dependencies.
-     * @param apiJarVersion The actual version of the paper API jar. Used for weird edgecases.
      */
     fun paper(
-        main: String, order: BukkitPluginDescription.PluginLoadOrder, apiVersion: String,
+        main: String, order: BukkitPluginDescription.PluginLoadOrder, apiVersion: String, apiJarVersion: String,
         authors: List<String> = listOf("Team Monumenta"),
         depends: List<String> = listOf(),
         softDepends: List<String> = listOf(),
-        apiJarVersion: String = "$apiVersion-R0.1-SNAPSHOT",
         action: BukkitPluginDescription.() -> Unit = {}
     )
 
