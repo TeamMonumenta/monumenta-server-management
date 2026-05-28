@@ -13,12 +13,6 @@ repositories {
 	maven("https://maven.playmonumenta.com/snapshots/")
 }
 
-java {
-	toolchain {
-		languageVersion.set(JavaLanguageVersion.of(21))
-	}
-}
-
 dependencies {
 	compileOnly("io.papermc.paper:paper-api:1.18.2-R0.1-SNAPSHOT")
 	compileOnly("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
