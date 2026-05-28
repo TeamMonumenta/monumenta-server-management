@@ -16,6 +16,7 @@ include("world-management")
 
 include("redis-sync:adapter_api")
 include("redis-sync:adapter_v1_20_R3")
+include("redis-sync:adapter_26_1_2")
 include(":redis-sync:redissync-example")
 include(":redis-sync:redissync")
 project(":redis-sync:redissync-example").projectDir = file("redis-sync/example")

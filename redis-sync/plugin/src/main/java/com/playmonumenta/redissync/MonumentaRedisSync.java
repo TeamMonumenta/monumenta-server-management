@@ -12,6 +12,7 @@ import com.playmonumenta.redissync.commands.TransferServer;
 import com.playmonumenta.redissync.commands.UpgradeAllPlayers;
 import com.playmonumenta.redissync.utils.MMLog;
 import java.io.File;
+import java.lang.reflect.Method;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -31,6 +32,16 @@ public class MonumentaRedisSync extends JavaPlugin {
 		String packageName = this.getServer().getClass().getPackage().getName();
 		String version = packageName.substring(packageName.lastIndexOf('.') + 1);
 
+		if (version.equals("craftbukkit")) {
+			// https://github.com/PaperMC/paperweight-test-plugin/blob/multi-project/paper_hooks/src/main/java/my/plugin/hooks/PaperHooks.java
+			// use PaperHooks fallback
+			String minecraftVersion = minecraftVersionFromServerBuildInfo();
+			if (minecraftVersion == null) {
+				minecraftVersion = Bukkit.getServer().getMinecraftVersion();
+			}
+			version = minecraftVersion.replace(".", "_");
+		}
+
 		try {
 			final Class<?> clazz = Class.forName("com.playmonumenta.redissync.adapters.VersionAdapter_" + version);
 			// Check if we have a valid adapter class at that location.
@@ -43,6 +54,17 @@ public class MonumentaRedisSync extends JavaPlugin {
 		}
 		MMLog.info("Loading support for " + version);
 	}
+
+	private static @Nullable String minecraftVersionFromServerBuildInfo() {
+      try {
+        final Class<?> cls = Class.forName("io.papermc.paper.ServerBuildInfo");
+        final Method method = cls.getMethod("minecraftVersionId");
+        final Object instance = cls.getMethod("buildInfo").invoke(null);
+        return (String) method.invoke(instance);
+      } catch (final Throwable e) {
+        return null;
+      }
+    }
 
 	@Override
 	public void onLoad() {
