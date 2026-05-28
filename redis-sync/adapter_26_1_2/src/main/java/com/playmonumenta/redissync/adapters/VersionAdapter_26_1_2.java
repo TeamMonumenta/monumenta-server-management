@@ -19,7 +19,7 @@ import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.scores.Scoreboard;
 import org.apache.logging.log4j.Logger;
-import org.bukkit.craftbukkit.v1_20_R3.scoreboard.CraftScoreboard;
+import org.bukkit.craftbukkit.scoreboard.CraftScoreboard;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
@@ -49,6 +49,7 @@ public class VersionAdapter_26_1_2 implements VersionAdapter {
 		ByteArrayInputStream inBytes = new ByteArrayInputStream(data);
 		CompoundTag nbt = NbtIo.readCompressed(inBytes, NbtAccounter.unlimitedHeap());
 
+		// TODO: REPLACE THIS WITH NBTAPI!
 		applyInt(shardData, nbt, "SpawnX");
 		applyInt(shardData, nbt, "SpawnY");
 		applyInt(shardData, nbt, "SpawnZ");
@@ -59,7 +60,7 @@ public class VersionAdapter_26_1_2 implements VersionAdapter {
 		if (shardData.has("flying")) {
 			final CompoundTag abilities;
 			if (nbt.contains("abilities")) {
-				abilities = nbt.getCompound("abilities");
+				abilities = nbt.getCompoundOrEmpty("abilities");
 			} else {
 				abilities = new CompoundTag();
 				nbt.put("abilities", abilities);
@@ -86,6 +87,7 @@ public class VersionAdapter_26_1_2 implements VersionAdapter {
 	public VersionAdapter.SaveData extractSaveData(Object nbtObj, @Nullable VersionAdapter.ReturnParams returnParams) throws IOException {
 		CompoundTag nbt = (CompoundTag) nbtObj;
 
+		// TODO: REPLACE THIS WITH NBTAPI!
 		JsonObject obj = new JsonObject();
 		copyInt(obj, nbt, "SpawnX");
 		copyInt(obj, nbt, "SpawnY");
@@ -95,7 +97,7 @@ public class VersionAdapter_26_1_2 implements VersionAdapter {
 		copyStr(obj, nbt, "SpawnDimension");
 		// flying is nested in the abilities structure
 		if (nbt.contains("abilities")) {
-			CompoundTag abilities = nbt.getCompound("abilities");
+			CompoundTag abilities = nbt.getCompoundOrEmpty("abilities");
 			copyBool(obj, abilities, "flying");
 		}
 		copyBool(obj, nbt, "FallFlying");
@@ -141,9 +143,9 @@ public class VersionAdapter_26_1_2 implements VersionAdapter {
 	@Override
 	public Object upgradePlayerData(Object nbtCompoundTag) {
 		CompoundTag nbt = (CompoundTag) nbtCompoundTag;
-		int i = nbt.contains("DataVersion", 3) ? nbt.getInt("DataVersion") : -1;
+		int i = nbt.getIntOr("DataVersion", -1);
 		nbt = MCDataConverter.convertTag(MCTypeRegistry.PLAYER, nbt, i,
-			SharedConstants.getCurrentVersion().getDataVersion().getVersion());
+			SharedConstants.getCurrentVersion().dataVersion().version());
 		return nbt;
 	}
 
@@ -233,45 +235,45 @@ public class VersionAdapter_26_1_2 implements VersionAdapter {
 
 	private void copyStr(JsonObject obj, CompoundTag nbt, String key) {
 		if (nbt.contains(key)) {
-			obj.addProperty(key, nbt.getString(key));
+			obj.addProperty(key, nbt.getString(key).orElse(null));
 			nbt.remove(key);
 		}
 	}
 
 	private void copyInt(JsonObject obj, CompoundTag nbt, String key) {
 		if (nbt.contains(key)) {
-			obj.addProperty(key, nbt.getInt(key));
+			obj.addProperty(key, nbt.getInt(key).orElse(null));
 			nbt.remove(key);
 		}
 	}
 
 	private void copyLong(JsonObject obj, CompoundTag nbt, String key) {
 		if (nbt.contains(key)) {
-			obj.addProperty(key, nbt.getLong(key));
+			obj.addProperty(key, nbt.getLong(key).orElse(null));
 			nbt.remove(key);
 		}
 	}
 
 	private void copyFloat(JsonObject obj, CompoundTag nbt, String key) {
 		if (nbt.contains(key)) {
-			obj.addProperty(key, nbt.getFloat(key));
+			obj.addProperty(key, nbt.getFloat(key).orElse(null));
 			nbt.remove(key);
 		}
 	}
 
 	private void copyBool(JsonObject obj, CompoundTag nbt, String key) {
 		if (nbt.contains(key)) {
-			obj.addProperty(key, nbt.getBoolean(key));
+			obj.addProperty(key, nbt.getBoolean(key).orElse(null));
 			nbt.remove(key);
 		}
 	}
 
 	private void copyFloatList(JsonObject obj, CompoundTag nbt, String key) {
 		if (nbt.contains(key)) {
-			ListTag list = nbt.getList(key, 5);  // 5 = float list
+			ListTag list = nbt.getList(key).orElse(null);  // 5 = float list
 			JsonArray arr = new JsonArray();
 			for (int i = 0; i < list.size(); i++) {
-				arr.add(list.getFloat(i));
+				arr.add(list.getFloat(i).orElse(null));
 			}
 			obj.add(key, arr);
 			nbt.remove(key);
@@ -280,10 +282,10 @@ public class VersionAdapter_26_1_2 implements VersionAdapter {
 
 	private void copyDoubleList(JsonObject obj, CompoundTag nbt, String key) {
 		if (nbt.contains(key)) {
-			ListTag list = nbt.getList(key, 6);  // 6 = double list
+			ListTag list = nbt.getList(key).orElse(null);  // 6 = double list
 			JsonArray arr = new JsonArray();
 			for (int i = 0; i < list.size(); i++) {
-				arr.add(list.getDouble(i));
+				arr.add(list.getDouble(i).orElse(null));
 			}
 			obj.add(key, arr);
 			nbt.remove(key);
@@ -292,10 +294,10 @@ public class VersionAdapter_26_1_2 implements VersionAdapter {
 
 	private void copyCompoundOfDoubles(JsonObject obj, CompoundTag nbt, String key) {
 		if (nbt.contains(key)) {
-			CompoundTag compound = nbt.getCompound(key);
+			CompoundTag compound = nbt.getCompound(key).orElse(null);
 			JsonObject sObj = new JsonObject();
-			for (String comp : compound.getAllKeys()) {
-				sObj.addProperty(comp, compound.getDouble(comp));
+			for (String comp : compound.keySet()) {
+				sObj.addProperty(comp, compound.getDouble(comp).orElse(null));
 			}
 			obj.add(key, sObj);
 			nbt.remove(key);
