@@ -414,8 +414,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
         pluginProject.addRuntimeOnly(
             pluginProject.dependencies.project(
                 mapOf(
-                    "path" to project.path,
-                    "configuration" to "reobf"
+                    "path" to project.path
                 )
             )
         )
