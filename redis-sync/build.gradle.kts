@@ -27,5 +27,10 @@ monumenta {
 			compileOnly(mixinapi)
 		}
 	}
+	versionAdapter("adapter_26_1_2", "26.1.2.build.+") {
+		dependencies {
+			compileOnly(mixinapi)
+		}
+	}
 	gitPrefix("redis-sync/")
 }
