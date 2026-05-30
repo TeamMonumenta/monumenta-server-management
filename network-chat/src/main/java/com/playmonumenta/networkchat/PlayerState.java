@@ -484,7 +484,6 @@ public class PlayerState {
 
 	// For channel deletion
 	public void unregisterChannel(UUID channelId) {
-		channelUpdated(channelId, null);
 		if (channelId.equals(mActiveChannelId)) {
 			unsetActiveChannel();
 		}
