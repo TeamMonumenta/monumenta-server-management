@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.logging.log4j.Level;
@@ -26,7 +25,6 @@ public class WorldManagementPlugin extends JavaPlugin {
 	private static boolean mAllowInstanceAutocreation = false;
 	private static int mUnloadInactiveWorldAfterTicks = 10 * 60 * 20;
 	private static @Nullable String mNotifyWorldPermission = "monumenta.worldmanagement.worldnotify";
-	private static String mCopyWorldCommand = "cp -a";
 	private static final Map<String, ShardInfo> mShardInfoMap = new HashMap<>();
 
 	private @Nullable WorldManagementListener mListener = null;
@@ -126,9 +124,6 @@ public class WorldManagementPlugin extends JavaPlugin {
 		}
 		printConfig("notify-world-permission", mNotifyWorldPermission);
 
-		mCopyWorldCommand = config.getString("copy-world-command", mCopyWorldCommand);
-		printConfig("copy-world-command", mCopyWorldCommand);
-
 		reload();
 	}
 
@@ -199,17 +194,6 @@ public class WorldManagementPlugin extends JavaPlugin {
 
 	public static @Nullable String getNotifyWorldPermission() {
 		return mNotifyWorldPermission;
-	}
-
-	public static String getCopyWorldCommand() {
-		return mCopyWorldCommand;
-	}
-
-	public static String[] getCopyWorldCommandWithArgs(String... args) {
-		String[] cmdParts = mCopyWorldCommand.split("\\s+");
-		String[] result = Arrays.copyOf(cmdParts, cmdParts.length + args.length);
-		System.arraycopy(args, 0, result, cmdParts.length, args.length);
-		return result;
 	}
 
 	@Override
