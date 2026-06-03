@@ -1,5 +1,6 @@
 package com.playmonumenta.worlds.paper;
 
+import com.playmonumenta.worlds.common.MMLog;
 import com.playmonumenta.worlds.common.utils.FileUtils;
 import de.tr7zw.nbtapi.NBT;
 import de.tr7zw.nbtapi.iface.ReadWriteNBT;
@@ -47,12 +48,14 @@ public final class WorldCopier {
 	// Copies the world folder at source to dest, regenerating all entity UUIDs and updating
 	// level.dat's LevelName to match the destination folder name.
 	public static void copyWorldRegenUuids(Path source, Path dest) throws IOException {
+		MMLog.trace("WorldCopier: copyWorldRegenUuids source=" + source + " dest=" + dest);
 		// Reject unsupported (multi-dimension/nested) layouts before copying anything, so we fail in
 		// milliseconds rather than partway through copying gigabytes of region data.
 		validateSingleDimension(source);
 
 		// Start from a clean slate so retries after a partial failure don't trip over leftover files.
 		if (Files.exists(dest)) {
+			MMLog.trace("WorldCopier: dest exists, deleting recursively: " + dest);
 			FileUtils.deleteRecursively(dest);
 		}
 		try {
@@ -63,18 +66,24 @@ public final class WorldCopier {
 					Path target = dest.resolve(name);
 					if (Files.isDirectory(entry)) {
 						if (name.equals("entities")) {
+							MMLog.trace("WorldCopier: rewriting entities dir " + entry);
 							rewriteEntitiesDir(entry, target);
 						} else {
+							MMLog.trace("WorldCopier: raw-copying dir " + entry);
 							copyTreeRaw(entry, target);
 						}
 					} else if (name.equals("level.dat")) {
+						MMLog.trace("WorldCopier: copying level.dat " + entry);
 						copyLevelDat(entry, target, dest.getFileName().toString());
 					} else {
+						MMLog.trace("WorldCopier: raw-copying file " + entry);
 						Files.copy(entry, target);
 					}
 				}
 			}
+			MMLog.trace("WorldCopier: copyWorldRegenUuids completed for dest=" + dest);
 		} catch (IOException | RuntimeException | Error ex) {
+			MMLog.trace("WorldCopier: copyWorldRegenUuids failed for dest=" + dest + ": " + ex);
 			// Don't leave a half-written world behind; it would block the next attempt and is invalid anyway.
 			try {
 				FileUtils.deleteRecursively(dest);
@@ -143,8 +152,10 @@ public final class WorldCopier {
 				}
 				Path target = dstDir.resolve(name);
 				if (REGION_FILE.matcher(name).matches()) {
+					MMLog.trace("WorldCopier: rewriting entities region " + name);
 					rewriteEntitiesRegion(entry, target);
 				} else {
+					MMLog.trace("WorldCopier: raw-copying non-region entities file " + name);
 					Files.copy(entry, target);
 				}
 			}
@@ -154,8 +165,11 @@ public final class WorldCopier {
 	// Streams one entities region file, regenerating entity UUIDs chunk by chunk and dropping chunks
 	// that hold no entities. Only one chunk is held in memory at a time.
 	private static void rewriteEntitiesRegion(Path src, Path dst) throws IOException {
-		if (Files.size(src) < HEADER_BYTES) {
+		long srcSize = Files.size(src);
+		MMLog.trace("WorldCopier: rewriteEntitiesRegion src=" + src + " size=" + srcSize);
+		if (srcSize < HEADER_BYTES) {
 			// Truncated/empty region file with no header; nothing to regenerate.
+			MMLog.trace("WorldCopier: region smaller than header (" + srcSize + " < " + HEADER_BYTES + "), raw-copying");
 			Files.copy(src, dst);
 			return;
 		}
@@ -178,16 +192,27 @@ public final class WorldCopier {
 			out.write(new byte[HEADER_BYTES]);
 			int nextSector = HEADER_SECTORS;
 
+			int present = 0;
+			int dropped = 0;
+			int rewritten = 0;
 			for (int i = 0; i < 1024; i++) {
 				int loc = locations[i];
 				if (loc == 0) {
 					continue;
 				}
+				present++;
+				final int fi = i;
+				final int floc = loc;
+				MMLog.trace(() -> "WorldCopier: chunk index=" + fi + " loc=0x" + Integer.toHexString(floc)
+					+ " sectorOffset=" + (floc >>> 8) + " sectorCount=" + (floc & 0xFF));
 				byte[] chunkNbt = readChunkNbt(in, loc, src, i);
 				ReadWriteNBT chunk = NBT.readNBT(new ByteArrayInputStream(chunkNbt));
 				ReadWriteNBTCompoundList entityList = chunk.getCompoundList("Entities");
+				MMLog.trace("WorldCopier: chunk index=" + i + " decompressedNbtBytes=" + chunkNbt.length
+					+ " entityCount=" + entityList.size());
 				if (entityList.size() == 0) {
 					// Drop empty entity chunks rather than writing empty sections.
+					dropped++;
 					continue;
 				}
 				for (ReadWriteNBT entity : entityList) {
@@ -197,7 +222,10 @@ public final class WorldCopier {
 				int sectors = writeChunk(out, nextSector, chunk, src, i);
 				newLocations[i] = (nextSector << 8) | sectors;
 				nextSector += sectors;
+				rewritten++;
 			}
+			MMLog.trace("WorldCopier: region " + src.getFileName() + " present=" + present
+				+ " rewritten=" + rewritten + " dropped=" + dropped + " outSectors=" + nextSector);
 
 			ByteBuffer outHeader = ByteBuffer.allocate(HEADER_BYTES);
 			for (int i = 0; i < 1024; i++) {
@@ -216,6 +244,8 @@ public final class WorldCopier {
 		in.seek((long) sectorOffset * SECTOR_BYTES);
 		int length = in.readInt();
 		int compression = in.readUnsignedByte();
+		MMLog.trace("WorldCopier: readChunkNbt index=" + index + " byteOffset=" + ((long) sectorOffset * SECTOR_BYTES)
+			+ " length=" + length + " compression=" + compression);
 		if ((compression & EXTERNAL_FLAG) != 0) {
 			throw new IOException("External (.mcc) entities chunk in " + src + " at index " + index
 				+ "; oversized entities chunks are not supported");
@@ -230,6 +260,8 @@ public final class WorldCopier {
 		}
 		byte[] payload = new byte[length - 1];
 		in.readFully(payload);
+		MMLog.trace(() -> "WorldCopier: readChunkNbt index=" + index + " payloadBytes=" + payload.length
+			+ " firstBytes=" + hexPreview(payload));
 		return decompress(compression, payload);
 	}
 
@@ -242,6 +274,8 @@ public final class WorldCopier {
 		int frameLength = compressed.length + 1; // compression-type byte + data
 		int totalBytes = frameLength + 4; // plus the 4-byte length prefix
 		int sectors = (totalBytes + SECTOR_BYTES - 1) / SECTOR_BYTES;
+		MMLog.trace("WorldCopier: writeChunk index=" + index + " sector=" + sector + " rawNbtBytes="
+			+ nbtBytes.size() + " compressedBytes=" + compressed.length + " sectors=" + sectors);
 		if (sectors > MAX_SECTORS_PER_CHUNK) {
 			throw new IOException("Reserialized entities chunk in " + src + " at index " + index
 				+ " needs " + sectors + " sectors (> " + MAX_SECTORS_PER_CHUNK + "); cannot store inline");
@@ -282,6 +316,7 @@ public final class WorldCopier {
 	}
 
 	private static byte[] decompress(int compression, byte[] data) throws IOException {
+		MMLog.trace("WorldCopier: decompress type=" + compression + " inBytes=" + data.length);
 		switch (compression) {
 			case 1:
 				try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(data))) {
@@ -296,6 +331,16 @@ public final class WorldCopier {
 			default:
 				throw new IOException("Unknown chunk compression type " + compression);
 		}
+	}
+
+	// Hex dump of up to the first 16 bytes of a buffer, for trace logging.
+	private static String hexPreview(byte[] data) {
+		StringBuilder sb = new StringBuilder();
+		int n = Math.min(16, data.length);
+		for (int i = 0; i < n; i++) {
+			sb.append(String.format("%02x ", data[i]));
+		}
+		return sb.toString().trim();
 	}
 
 	private static byte[] deflate(byte[] data) throws IOException {
