@@ -40,6 +40,7 @@ public class PlayerState {
 	private final UUID mPlayerId;
 	private final ConcurrentSkipListSet<UUID> mPreviousPlayerIds = new ConcurrentSkipListSet<>();
 	private boolean mChatPaused;
+	private boolean mUnregisteringChannel = false;
 	private @Nullable UUID mActiveChannelId;
 	private ChannelSettings mDefaultChannelSettings = new ChannelSettings();
 	private DefaultChannels mDefaultChannels = new DefaultChannels();
@@ -484,6 +485,11 @@ public class PlayerState {
 
 	// For channel deletion
 	public void unregisterChannel(UUID channelId) {
+		if (mUnregisteringChannel) {
+			return;
+		}
+		mUnregisteringChannel = true;
+		channelUpdated(channelId, null);
 		if (channelId.equals(mActiveChannelId)) {
 			unsetActiveChannel();
 		}
@@ -499,6 +505,7 @@ public class PlayerState {
 		}
 		mChannelSettings.remove(channelId);
 		mDefaultChannels.unsetChannel(channelId);
+		mUnregisteringChannel = false;
 	}
 
 	public boolean isListening(Channel channel) {
