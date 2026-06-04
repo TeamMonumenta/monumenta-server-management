@@ -29,4 +29,26 @@ public class OptSpace {
 			return Tag.selfClosingInserting(Component.space().append(component));
 		});
 	}
+
+	public static TagResolver optAppendNewline() {
+		return TagResolver.resolver("opt_append_newline", (ArgumentQueue args, Context context) -> {
+			String contents = args.popOr("Expected minimessage value").value();
+			Component component = context.deserialize(contents);
+			if (MessagingUtils.plainText(component).isEmpty()) {
+				return Tag.selfClosingInserting(Component.empty());
+			}
+			return Tag.selfClosingInserting(component.append(Component.newline()));
+		});
+	}
+
+	public static TagResolver optPrependNewline() {
+		return TagResolver.resolver("opt_prepend_newline", (ArgumentQueue args, Context context) -> {
+			String contents = args.popOr("Expected minimessage value").value();
+			Component component = context.deserialize(contents);
+			if (MessagingUtils.plainText(component).isEmpty()) {
+				return Tag.selfClosingInserting(Component.empty());
+			}
+			return Tag.selfClosingInserting(Component.newline().append(component));
+		});
+	}
 }

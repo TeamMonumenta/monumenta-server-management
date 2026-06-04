@@ -66,7 +66,9 @@ public class MessagingUtils {
 						StandardTags.gradient(),
 						StandardTags.rainbow(),
 						OptSpace.optPrependSpace(),
-						OptSpace.optAppendSpace()
+						OptSpace.optAppendSpace(),
+						OptSpace.optPrependNewline(),
+						OptSpace.optAppendNewline()
 					).build()
 				)
 				.build();
