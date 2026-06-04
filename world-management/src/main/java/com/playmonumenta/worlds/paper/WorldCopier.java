@@ -13,6 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.zip.DataFormatException;
@@ -45,6 +46,10 @@ public final class WorldCopier {
 	private static final int UNCOMPRESSED = 3;
 	private static final int EXTERNAL_FLAG = 0x80;
 	private static final Pattern REGION_FILE = Pattern.compile("r\\.-?\\d+\\.-?\\d+\\.mca");
+	// Top-level entries skipped entirely when copying a template: server-managed scratch state and
+	// per-world runtime data that must not be cloned into the copy.
+	private static final Set<String> EXCLUDED_NAMES = Set.of(
+		"data", "poi", "level.dat_old", "session.lock", "uid.dat");
 
 	private WorldCopier() {
 	}
@@ -67,6 +72,10 @@ public final class WorldCopier {
 			try (DirectoryStream<Path> entries = Files.newDirectoryStream(source)) {
 				for (Path entry : entries) {
 					String name = entry.getFileName().toString();
+					if (EXCLUDED_NAMES.contains(name)) {
+						MMLog.trace("WorldCopier: excluding " + entry);
+						continue;
+					}
 					Path target = dest.resolve(name);
 					if (Files.isDirectory(entry)) {
 						if (name.equals("entities")) {
