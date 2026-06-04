@@ -8,7 +8,6 @@ import de.tr7zw.nbtapi.iface.ReadWriteNBTCompoundList;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.file.DirectoryStream;
@@ -16,10 +15,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPInputStream;
-import java.util.zip.InflaterInputStream;
+import java.util.zip.GZIPOutputStream;
+import java.util.zip.Inflater;
 
 /*
  * Copies a Minecraft world folder in-process while regenerating every entity UUID, so the copy can
@@ -38,7 +39,10 @@ public final class WorldCopier {
 	private static final int HEADER_BYTES = SECTOR_BYTES * HEADER_SECTORS;
 	// The Anvil header stores a chunk's sector count in a single byte.
 	private static final int MAX_SECTORS_PER_CHUNK = 255;
+	// Anvil per-chunk compression types.
+	private static final int GZIP_COMPRESSION = 1;
 	private static final int ZLIB_COMPRESSION = 2;
+	private static final int UNCOMPRESSED = 3;
 	private static final int EXTERNAL_FLAG = 0x80;
 	private static final Pattern REGION_FILE = Pattern.compile("r\\.-?\\d+\\.-?\\d+\\.mca");
 
@@ -205,11 +209,9 @@ public final class WorldCopier {
 				final int floc = loc;
 				MMLog.trace(() -> "WorldCopier: chunk index=" + fi + " loc=0x" + Integer.toHexString(floc)
 					+ " sectorOffset=" + (floc >>> 8) + " sectorCount=" + (floc & 0xFF));
-				byte[] chunkNbt = readChunkNbt(in, loc, src, i);
-				ReadWriteNBT chunk = NBT.readNBT(new ByteArrayInputStream(chunkNbt));
+				ReadWriteNBT chunk = readChunkNbt(in, loc, src, i);
 				ReadWriteNBTCompoundList entityList = chunk.getCompoundList("Entities");
-				MMLog.trace("WorldCopier: chunk index=" + i + " decompressedNbtBytes=" + chunkNbt.length
-					+ " entityCount=" + entityList.size());
+				MMLog.trace("WorldCopier: chunk index=" + i + " entityCount=" + entityList.size());
 				if (entityList.size() == 0) {
 					// Drop empty entity chunks rather than writing empty sections.
 					dropped++;
@@ -237,8 +239,8 @@ public final class WorldCopier {
 		}
 	}
 
-	// Reads and decompresses a single chunk's NBT payload.
-	private static byte[] readChunkNbt(RandomAccessFile in, int loc, Path src, int index) throws IOException {
+	// Reads and decompresses a single chunk, returning its parsed NBT.
+	private static ReadWriteNBT readChunkNbt(RandomAccessFile in, int loc, Path src, int index) throws IOException {
 		int sectorOffset = loc >>> 8;
 		int sectorCount = loc & 0xFF;
 		in.seek((long) sectorOffset * SECTOR_BYTES);
@@ -261,21 +263,104 @@ public final class WorldCopier {
 		byte[] payload = new byte[length - 1];
 		in.readFully(payload);
 		MMLog.trace(() -> "WorldCopier: readChunkNbt index=" + index + " payloadBytes=" + payload.length
-			+ " firstBytes=" + hexPreview(payload));
-		return decompress(compression, payload);
+			+ " compression=" + compression + " firstBytes=" + hexPreview(payload));
+
+		// A region chunk is uncompressed NBT wrapped in the region's compression layer. NBT-API,
+		// however, only reads/writes *gzip*-wrapped NBT (NbtIo.readCompressed/writeCompressed). The
+		// Anvil format defines compression type 1 as exactly that, so a type-1 chunk's payload can be
+		// handed straight to NBT-API. For other types we recover the raw NBT and re-wrap it as gzip.
+		byte[] gzipNbt;
+		if (compression == GZIP_COMPRESSION) {
+			gzipNbt = payload;
+		} else {
+			byte[] rawNbt;
+			switch (compression) {
+				case ZLIB_COMPRESSION:
+					rawNbt = inflate(payload, src, index);
+					break;
+				case UNCOMPRESSED:
+					rawNbt = payload;
+					break;
+				default:
+					throw new IOException("Unknown chunk compression type " + compression + " in " + src
+						+ " at index " + index);
+			}
+			gzipNbt = gzip(rawNbt);
+		}
+		return NBT.readNBT(new ByteArrayInputStream(gzipNbt));
 	}
 
-	// Serializes, compresses, and writes a chunk inline; returns the number of sectors it occupies.
+	// Inflates a zlib (region compression type 2) payload to raw NBT bytes. Uses Inflater directly and
+	// stops once all input is consumed, even if the stored stream omits its trailing adler32 checksum.
+	// Minecraft's chunks can be stored that way; vanilla's structural NBT reader never trips on it, but a
+	// stream wrapper drained to EOF (e.g. InflaterInputStream.readAllBytes) throws "Unexpected end of
+	// ZLIB input stream". The NBT payload itself is always complete by the time input is exhausted.
+	private static byte[] inflate(byte[] data, Path src, int index) throws IOException {
+		Inflater inf = new Inflater();
+		inf.setInput(data);
+		ByteArrayOutputStream out = new ByteArrayOutputStream(Math.max(64, data.length * 4));
+		byte[] buf = new byte[8192];
+		try {
+			while (!inf.finished()) {
+				int n = inf.inflate(buf);
+				if (n > 0) {
+					out.write(buf, 0, n);
+				} else if (inf.finished() || inf.needsDictionary() || inf.needsInput()) {
+					// No more output is obtainable: either the stream ended cleanly or the input is
+					// exhausted (trailer-truncated). Either way the NBT data has been fully recovered.
+					break;
+				}
+			}
+		} catch (DataFormatException ex) {
+			throw new IOException("Corrupt zlib chunk data in " + src + " at index " + index, ex);
+		} finally {
+			inf.end();
+		}
+		return out.toByteArray();
+	}
+
+	private static byte[] gzip(byte[] data) throws IOException {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream(Math.max(32, data.length / 2));
+		try (GZIPOutputStream out = new GZIPOutputStream(baos)) {
+			out.write(data);
+		}
+		return baos.toByteArray();
+	}
+
+	// Reverses gzip(): recovers raw NBT from NBT-API's gzip-wrapped writeCompound output.
+	private static byte[] gunzip(byte[] data) throws IOException {
+		try (GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(data))) {
+			return in.readAllBytes();
+		}
+	}
+
+	// Compresses raw NBT as a zlib stream (Anvil compression type 2), matching vanilla's chunk encoding.
+	private static byte[] deflate(byte[] data) throws IOException {
+		Deflater def = new Deflater(Deflater.DEFAULT_COMPRESSION);
+		ByteArrayOutputStream baos = new ByteArrayOutputStream(Math.max(32, data.length / 2));
+		try (DeflaterOutputStream out = new DeflaterOutputStream(baos, def)) {
+			out.write(data);
+		} finally {
+			def.end();
+		}
+		return baos.toByteArray();
+	}
+
+	// Serializes and writes a chunk inline as zlib (Anvil compression type 2); returns the number of
+	// sectors it occupies. NBT-API can only emit *gzip*-wrapped NBT (writeCompound), so we gunzip that
+	// back to raw NBT and re-deflate it as zlib. Type 2 is what vanilla writes and what external (e.g.
+	// Python) tooling expects, so the copy stays interoperable.
 	private static int writeChunk(RandomAccessFile out, int sector, ReadWriteNBT chunk, Path src, int index) throws IOException {
 		ByteArrayOutputStream nbtBytes = new ByteArrayOutputStream();
 		chunk.writeCompound(nbtBytes);
-		byte[] compressed = deflate(nbtBytes.toByteArray());
+		byte[] rawNbt = gunzip(nbtBytes.toByteArray());
+		byte[] zlibNbt = deflate(rawNbt);
 
-		int frameLength = compressed.length + 1; // compression-type byte + data
+		int frameLength = zlibNbt.length + 1; // compression-type byte + data
 		int totalBytes = frameLength + 4; // plus the 4-byte length prefix
 		int sectors = (totalBytes + SECTOR_BYTES - 1) / SECTOR_BYTES;
-		MMLog.trace("WorldCopier: writeChunk index=" + index + " sector=" + sector + " rawNbtBytes="
-			+ nbtBytes.size() + " compressedBytes=" + compressed.length + " sectors=" + sectors);
+		MMLog.trace("WorldCopier: writeChunk index=" + index + " sector=" + sector
+			+ " rawNbtBytes=" + rawNbt.length + " zlibNbtBytes=" + zlibNbt.length + " sectors=" + sectors);
 		if (sectors > MAX_SECTORS_PER_CHUNK) {
 			throw new IOException("Reserialized entities chunk in " + src + " at index " + index
 				+ " needs " + sectors + " sectors (> " + MAX_SECTORS_PER_CHUNK + "); cannot store inline");
@@ -284,7 +369,7 @@ public final class WorldCopier {
 		out.seek((long) sector * SECTOR_BYTES);
 		out.writeInt(frameLength);
 		out.writeByte(ZLIB_COMPRESSION);
-		out.write(compressed);
+		out.write(zlibNbt);
 		int pad = sectors * SECTOR_BYTES - totalBytes;
 		if (pad > 0) {
 			out.write(new byte[pad]);
@@ -315,24 +400,6 @@ public final class WorldCopier {
 		};
 	}
 
-	private static byte[] decompress(int compression, byte[] data) throws IOException {
-		MMLog.trace("WorldCopier: decompress type=" + compression + " inBytes=" + data.length);
-		switch (compression) {
-			case 1:
-				try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(data))) {
-					return in.readAllBytes();
-				}
-			case 2:
-				try (InputStream in = new InflaterInputStream(new ByteArrayInputStream(data))) {
-					return in.readAllBytes();
-				}
-			case 3:
-				return data;
-			default:
-				throw new IOException("Unknown chunk compression type " + compression);
-		}
-	}
-
 	// Hex dump of up to the first 16 bytes of a buffer, for trace logging.
 	private static String hexPreview(byte[] data) {
 		StringBuilder sb = new StringBuilder();
@@ -341,13 +408,5 @@ public final class WorldCopier {
 			sb.append(String.format("%02x ", data[i]));
 		}
 		return sb.toString().trim();
-	}
-
-	private static byte[] deflate(byte[] data) throws IOException {
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		try (DeflaterOutputStream out = new DeflaterOutputStream(baos, new Deflater(Deflater.DEFAULT_COMPRESSION))) {
-			out.write(data);
-		}
-		return baos.toByteArray();
 	}
 }
