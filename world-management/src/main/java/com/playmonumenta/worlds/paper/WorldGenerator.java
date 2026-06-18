@@ -28,8 +28,7 @@ import org.jetbrains.annotations.Nullable;
  * spares read as outdated, so they are regenerated (and served only as a fallback meanwhile).
  */
 public class WorldGenerator {
-	// This stores the state of a particular template (of which there may be many for this server)
-	// This state is only written on the main thread - no synchronization needed
+	// State is only written on the main thread - no synchronization needed.
 	private static class TemplateState {
 		public final String mName;
 		public final int mLimit;
@@ -177,8 +176,10 @@ public class WorldGenerator {
 		return target.isDirectory() && new File(target, "level.dat").isFile();
 	}
 
-	// Renames a ready spare into place as worldName, preferring a fresh spare and falling back to an
-	// outdated one. Throws immediately if none is available - callers run on the main thread and must not block.
+	/**
+	 * Renames a ready spare into place as worldName. Prefers a fresh spare; falls back to outdated.
+	 * Throws immediately if none is available - callers are on the main thread and must not block.
+	 */
 	public void getWorldInstance(String worldName, String templateName) throws Exception {
 		MMLog.debug("Preparing world " + worldName);
 		if (worldExists(worldName)) {
@@ -225,10 +226,12 @@ public class WorldGenerator {
 		scheduleNext();
 	}
 
-	// Generates the next missing spare, if any, on an async thread, then records the result and schedules
-	// the one after it on the main thread. At most one copy runs at a time.
+	/**
+	 * Starts a background copy for the next missing spare, if any. At most one copy runs at a time;
+	 * the result is recorded on the main thread, which then calls this again to continue filling pools.
+	 */
 	public void scheduleNext() {
-		// Ensure that this logic only runs on the main thread
+		// All state mutations happen on the main thread; if called async, re-schedule there.
 		if (!Bukkit.isPrimaryThread()) {
 			Bukkit.getScheduler().runTask(WorldManagementPlugin.getInstance(), this::scheduleNext);
 			return;
@@ -237,6 +240,8 @@ public class WorldGenerator {
 			return;
 		}
 
+		// Prioritize the template with the fewest ready (fresh) spares so pools fill evenly rather
+		// than draining the configuration in order. Ties keep configuration order (first wins).
 		TemplateState target = null;
 		int index = -1;
 		for (TemplateState state : mTemplates.values()) {
@@ -244,10 +249,12 @@ public class WorldGenerator {
 				continue;
 			}
 			int free = nextFreeIndex(state);
-			if (free >= 0) {
+			if (free < 0) {
+				continue;
+			}
+			if (target == null || state.mFresh.size() < target.mFresh.size()) {
 				target = state;
 				index = free;
-				break;
 			}
 		}
 		if (target == null) {
@@ -282,7 +289,7 @@ public class WorldGenerator {
 		return -1;
 	}
 
-	// Copies the template into the spare slot. Runs async; blocks for potentially a long time.
+	// Copies the template into the spare slot. Called async; blocks for potentially a long time.
 	private void copyOne(TemplateState state, int index) throws Exception {
 		if (!worldExists(state.mName)) {
 			throw new Exception("Template world does not exist: " + state.mName);
@@ -330,9 +337,11 @@ public class WorldGenerator {
 		}
 	}
 
+	/**
+	 * Stops (or resumes) scheduling new copies. Any in-flight copy finishes independently;
+	 * there is no long-lived task to cancel.
+	 */
 	public void cancelGeneration(boolean stopGenerating) {
-		// Main thread. There is no long-lived task to cancel; setting mStopped makes the next main-thread
-		// continuation stop scheduling more work. Any in-flight copy finishes on its own.
 		mStopped = stopGenerating;
 	}
 

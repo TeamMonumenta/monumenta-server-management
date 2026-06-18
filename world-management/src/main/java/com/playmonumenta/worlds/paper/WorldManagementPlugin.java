@@ -33,6 +33,9 @@ public class WorldManagementPlugin extends JavaPlugin {
 	@Override
 	public void onLoad() {
 		MMLog.init(getName());
+		if (WorldCopyTestHarness.isEnabled()) {
+			WorldCopyTestHarness.runAndExit(); // never returns
+		}
 		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
 		WorldCommands.register(this);
 	}
