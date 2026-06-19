@@ -43,7 +43,7 @@ public final class RegionFileRewriter {
 
 	/**
 	 * Rewrites every *.mca file in srcDir into dstDir, regenerating entity UUIDs chunk by chunk.
-	 * .mcc files are not copied here; writeChunk owns them so inline<->external transitions are
+	 * .mcc files are not copied here; writeChunk owns them so inline-external transitions are
 	 * consistent and no orphaned .mcc is left behind.
 	 */
 	public static void rewriteDir(Path srcDir, Path dstDir, RegionKind kind) throws IOException {
