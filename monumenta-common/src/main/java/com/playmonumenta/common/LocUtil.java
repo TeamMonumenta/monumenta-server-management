@@ -74,9 +74,6 @@ public class LocUtil {
 		return !withinRange(a, b, radius);
 	}
 
-	private LocUtil() {
-	}
-
 	/**
 	 * Returns the squared distance between two locations, or empty when null/unloaded/cross-world.
 	 * Only use this if withinRange() absolutely will not work.
