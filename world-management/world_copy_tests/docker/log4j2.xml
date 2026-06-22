@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Minimal log4j2 config for the throwaway world-copy-test Paper container, activated via
+  -Dlog4j2.configurationFile=log4j2.xml (see entrypoint.sh).
+
+  The point: the console appender has no sub-INFO threshold filter. Raising the WorldManagement
+  logger to TRACE at runtime (the run_java_test.py verbose flag, via WorldCopyTestHarness and
+  MMLog.setLevel) therefore actually surfaces WorldCopier's per-chunk MMLog.trace output, because
+  those TRACE events reach the root appender via additivity regardless of the root level. The Root
+  stays at INFO so the container is quiet by default.
+-->
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="[%d{HH:mm:ss} %level]: [%logger] %msg{nolookups}%n%xEx{full}"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>

@@ -25,16 +25,6 @@ unload-inactive-world-after-ticks: 12000
 # Set to null to disable
 notify-world-permission: "monumenta.worldmanagement.worldnotify"
 
-# Command used to create worlds (by copying them).
-# Will be executed via the shell in the server directory like "command srcWorld destWorld"
-# Note that the default here (cp -a) will only work on Linux and Mac
-# If the world contains entities, those entities will have the same UUID as in the source world, and they will conflict
-# This is normally fine as Spigot will assign them new UUIDs when the conflict is detected
-# The exception to this is if any entities are assigned scoreboard values, in which case they may be lost / behave strangely
-# Ideally this would be set to a tool that can copy the worlds and generate new UUIDs for entities
-#   For example use https://github.com/TeamMonumenta/monumenta-automation/blob/master/utility_code/copy_world.py
-copy-world-command: "cp -a"
-
 instancing:
   # Shard name from Monumenta Network Relay API; not fully implemented, use only one entry for now
   shard:

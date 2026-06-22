@@ -18,6 +18,7 @@ fawe = "2.9.1"
 protocollib = "5.0.0"
 gradle-config = "3.+"
 sq = "7.5"
+nbtapi = "2.15.2"
 
 [libraries]
 minimessage = { module = "net.kyori:adventure-text-minimessage", version.ref = "minimessage" }
@@ -40,6 +41,7 @@ fawe-bukkit = { module = "com.fastasyncworldedit:FastAsyncWorldEdit-Bukkit", ver
 protocollib = { module = "com.comphenix.protocol:ProtocolLib", version.ref = "protocollib" }
 sq = { module = "com.playmonumenta:scripted-quests", version.ref = "sq" }
 monumenta-common = { module = "com.playmonumenta:monumenta-common", version.ref = "monumenta-common" }
+nbtapi = { module = "de.tr7zw:item-nbt-api-plugin", version.ref = "nbtapi" }
 
 [plugins]
 gradle-config = { id = "com.playmonumenta.gradle-config", version.ref = "gradle-config" }
