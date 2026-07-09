@@ -55,7 +55,7 @@ public final class TpUtil {
 	 * @param location Location to teleport to
 	 * @return A future that will be completed with the result of the teleport
 	 * <br>This method adds opinionated defaults such as {@link TeleportFlag.EntityState#RETAIN_PASSENGERS} and {@link TeleportFlag.EntityState#RETAIN_VEHICLE}
-
+	 */
 	public static CompletableFuture<Boolean> tpAsync(Entity entity, Location location) {
 		return tpAsync(entity, location, TeleportCause.PLUGIN);
 	}
