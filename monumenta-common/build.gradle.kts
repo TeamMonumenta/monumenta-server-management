@@ -22,7 +22,7 @@ monumenta {
 	paper(
 		"com.playmonumenta.common.MonumentaCommonPlugin",
 		BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
-		"1.20"
+		"1.20.4"
 	)
 	gitPrefix("monumenta-common/")
 }
