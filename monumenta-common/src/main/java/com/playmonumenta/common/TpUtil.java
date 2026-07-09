@@ -89,8 +89,8 @@ public final class TpUtil {
 	private static TeleportFlag[] addOpinionatedDefaults(TeleportFlag[] flags) {
 		final var newFlags = new TeleportFlag[flags.length + 2];
 		int i = 0;
-		for(; i < flags.length; ++i) {
-  		newFlags[i] = flags[i];
+		for (; i < flags.length; ++i) {
+			newFlags[i] = flags[i];
 		}
 		// opinionated defaults
 		newFlags[i] = TeleportFlag.EntityState.RETAIN_PASSENGERS;
