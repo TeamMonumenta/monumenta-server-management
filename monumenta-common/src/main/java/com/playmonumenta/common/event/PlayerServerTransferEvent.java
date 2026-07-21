@@ -1,4 +1,4 @@
-package com.playmonumenta.redissync.event;
+package com.playmonumenta.common.event;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
