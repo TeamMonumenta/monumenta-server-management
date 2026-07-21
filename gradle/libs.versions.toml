@@ -1,5 +1,5 @@
 [versions]
-monumenta-common = "1.2.0-dev1"
+monumenta-common = "1.2.0-dev-zoneLib-3"
 minimessage = "4.11.0"
 commons = "1.3"
 dynmap = "2.0"
