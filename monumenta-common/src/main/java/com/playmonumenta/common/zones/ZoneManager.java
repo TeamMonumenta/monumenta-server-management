@@ -2,6 +2,7 @@ package com.playmonumenta.common.zones;
 
 import com.playmonumenta.common.MonumentaCommonPlugin;
 import com.playmonumenta.common.event.ZoneChangeEvent;
+import com.playmonumenta.common.event.ZonePropertyChangeEvent;
 import com.playmonumenta.common.utils.ArgUtils;
 import com.playmonumenta.common.utils.MMLog;
 import com.playmonumenta.common.utils.MessagingUtils;
