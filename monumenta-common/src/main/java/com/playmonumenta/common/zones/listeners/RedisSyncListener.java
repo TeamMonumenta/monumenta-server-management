@@ -1,7 +1,8 @@
-package com.playmonumenta.zones;
+package com.playmonumenta.common.zones.listeners;
 
-import com.playmonumenta.redissync.event.PlayerServerTransferEvent;
-import com.playmonumenta.redissync.event.PlayerTransferFailEvent;
+import com.playmonumenta.common.event.PlayerServerTransferEvent;
+import com.playmonumenta.common.event.PlayerTransferFailEvent;
+import com.playmonumenta.common.zones.ZoneManager;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;

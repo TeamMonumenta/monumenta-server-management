@@ -1,9 +1,11 @@
-package com.playmonumenta.zones;
+package com.playmonumenta.common.zones;
 
-import com.playmonumenta.zones.utils.ArgUtils;
-import com.playmonumenta.zones.utils.MMLog;
-import com.playmonumenta.zones.utils.MessagingUtils;
-import com.playmonumenta.zones.utils.WorldRegexMatcher;
+import com.playmonumenta.common.MonumentaCommonPlugin;
+import com.playmonumenta.common.event.ZoneChangeEvent;
+import com.playmonumenta.common.utils.ArgUtils;
+import com.playmonumenta.common.utils.MMLog;
+import com.playmonumenta.common.utils.MessagingUtils;
+import com.playmonumenta.common.utils.WorldRegexMatcher;
 import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import dev.jorel.commandapi.arguments.TextArgument;
@@ -39,7 +41,7 @@ public class ZoneManager {
 		protected @MonotonicNonNull ZoneTreeBase mZoneTree = null;
 	}
 
-	private final ZonesPlugin mPlugin;
+	private final MonumentaCommonPlugin mPlugin;
 	private static @MonotonicNonNull ZoneManager INSTANCE = null;
 	static @MonotonicNonNull BukkitRunnable mPlayerTracker = null;
 	static @Nullable BukkitRunnable mAsyncReloadHandler = null;
@@ -55,14 +57,14 @@ public class ZoneManager {
 	private Audience mReloadRequesters = Audience.empty();
 	private Set<CommandSender> mQueuedReloadRequesters = new HashSet<>();
 
-	private ZoneManager(ZonesPlugin plugin) {
+	private ZoneManager(MonumentaCommonPlugin plugin) {
 		mPlugin = plugin;
 		mQueuedReloadRequesters.add(Bukkit.getConsoleSender());
 	}
 
 	public static ZoneManager getInstance() {
 		if (INSTANCE == null) {
-			INSTANCE = new ZoneManager(ZonesPlugin.getInstance());
+			INSTANCE = new ZoneManager(MonumentaCommonPlugin.getInstance());
 		}
 		return INSTANCE;
 	}

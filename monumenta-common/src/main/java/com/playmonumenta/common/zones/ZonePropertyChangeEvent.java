@@ -1,4 +1,4 @@
-package com.playmonumenta.zones;
+package com.playmonumenta.common.zones;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;

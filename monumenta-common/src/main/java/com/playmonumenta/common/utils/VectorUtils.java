@@ -1,4 +1,4 @@
-package com.playmonumenta.zones.utils;
+package com.playmonumenta.common.utils;
 
 import org.bukkit.Axis;
 import org.bukkit.Location;

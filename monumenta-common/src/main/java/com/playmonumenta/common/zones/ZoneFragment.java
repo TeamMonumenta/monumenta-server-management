@@ -1,6 +1,6 @@
-package com.playmonumenta.zones;
+package com.playmonumenta.common.zones;
 
-import com.playmonumenta.zones.utils.VectorUtils;
+import com.playmonumenta.common.utils.VectorUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

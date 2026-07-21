@@ -1,4 +1,4 @@
-package com.playmonumenta.zones.utils;
+package com.playmonumenta.common.utils;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;

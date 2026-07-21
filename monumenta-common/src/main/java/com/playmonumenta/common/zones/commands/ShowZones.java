@@ -1,10 +1,10 @@
-package com.playmonumenta.zones.commands;
+package com.playmonumenta.common.zones.commands;
 
-import com.playmonumenta.zones.Zone;
-import com.playmonumenta.zones.ZoneFragment;
-import com.playmonumenta.zones.ZoneManager;
-import com.playmonumenta.zones.ZonesPlugin;
-import com.playmonumenta.zones.utils.ZoneUtils;
+import com.playmonumenta.common.MonumentaCommonPlugin;
+import com.playmonumenta.common.utils.ZoneUtils;
+import com.playmonumenta.common.zones.Zone;
+import com.playmonumenta.common.zones.ZoneFragment;
+import com.playmonumenta.common.zones.ZoneManager;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
@@ -64,12 +64,12 @@ public class ShowZones {
 		private static final double DELTA_POS = 0.000001;
 		private static final double RENDER_DISTANCE = 16.0; // Really this goes up to 32 blocks, but that's hard to see.
 
-		ZonesPlugin mPlugin;
+		MonumentaCommonPlugin mPlugin;
 		UUID mPlayerUuid;
 		String mNamespaceName;
 		@Nullable String mPropertyName;
 
-		public ShownInfo(ZonesPlugin plugin, UUID playerUuid, String namespaceName, @Nullable String propertyName) {
+		public ShownInfo(MonumentaCommonPlugin plugin, UUID playerUuid, String namespaceName, @Nullable String propertyName) {
 			mPlugin = plugin;
 			mPlayerUuid = playerUuid;
 			mNamespaceName = namespaceName;
@@ -406,7 +406,7 @@ public class ShowZones {
 
 	protected static Map<UUID, ShownInfo> mShownInfo = new HashMap<>();
 
-	public static void register(ZonesPlugin plugin) {
+	public static void register(MonumentaCommonPlugin plugin) {
 		new CommandAPICommand("showzones")
 			.withPermission(CommandPermission.fromString("scriptedquests.showzones"))
 			.withArguments(new LiteralArgument("hide"))
@@ -449,7 +449,7 @@ public class ShowZones {
 		}
 	}
 
-	private static int show(ZonesPlugin plugin, CommandSender sender, String namespaceName, @Nullable String propertyName) throws WrapperCommandSyntaxException {
+	private static int show(MonumentaCommonPlugin plugin, CommandSender sender, String namespaceName, @Nullable String propertyName) throws WrapperCommandSyntaxException {
 		CommandSender callee = sender;
 		if (sender instanceof ProxiedCommandSender proxiedCommandSender) {
 			callee = proxiedCommandSender.getCallee();

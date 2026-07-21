@@ -1,4 +1,4 @@
-package com.playmonumenta.zones;
+package com.playmonumenta.common.zones;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;

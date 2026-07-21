@@ -1,6 +1,6 @@
-package com.playmonumenta.zones.commands;
+package com.playmonumenta.common.zones.commands;
 
-import com.playmonumenta.zones.ZoneManager;
+import com.playmonumenta.common.zones.ZoneManager;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.LiteralArgument;

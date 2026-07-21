@@ -1,4 +1,4 @@
-package com.playmonumenta.zones;
+package com.playmonumenta.common.zones;
 
 import java.io.PrintStream;
 import java.util.HashSet;

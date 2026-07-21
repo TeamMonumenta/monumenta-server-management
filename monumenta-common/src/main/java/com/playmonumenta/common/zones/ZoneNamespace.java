@@ -1,6 +1,7 @@
-package com.playmonumenta.zones;
+package com.playmonumenta.common.zones;
 
-import com.playmonumenta.zones.utils.ZoneUtils;
+import com.playmonumenta.common.MonumentaCommonPlugin;
+import com.playmonumenta.common.utils.ZoneUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -142,7 +143,7 @@ public class ZoneNamespace {
 	}
 
 	protected void refreshDynmapLayer() {
-		if (!ZonesPlugin.getInstance().mShowZonesDynmap) {
+		if (!MonumentaCommonPlugin.getInstance().mShowZonesDynmap) {
 			return;
 		}
 

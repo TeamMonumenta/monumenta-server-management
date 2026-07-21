@@ -1,4 +1,4 @@
-package com.playmonumenta.zones;
+package com.playmonumenta.common.zones;
 
 import java.util.ArrayList;
 import java.util.Collection;
