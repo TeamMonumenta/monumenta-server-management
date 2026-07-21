@@ -190,6 +190,7 @@ public class DataEventListener implements Listener {
 		INSTANCE.mReturnParams.put(player.getUniqueId(), new ReturnParams(returnLoc, returnYaw, returnPitch));
 	}
 
+	@SuppressWarnings("deprecation")
 	protected static void setPlayerAsNotTransferring(Player player) {
 		boolean wasTransferring = INSTANCE.mTransferringPlayers.remove(player.getUniqueId());
 		INSTANCE.mReturnParams.remove(player.getUniqueId());
@@ -198,6 +199,8 @@ public class DataEventListener implements Listener {
 		INSTANCE.mTransferringPlayerShoulderEntities.entrySet().removeIf(entry -> entry.getValue().equals(player.getUniqueId()));
 
 		if (wasTransferring) {
+			com.playmonumenta.redissync.event.PlayerTransferFailEvent legacyEvent = new com.playmonumenta.redissync.event.PlayerTransferFailEvent(player);
+			Bukkit.getPluginManager().callEvent(legacyEvent);
 			PlayerTransferFailEvent event = new PlayerTransferFailEvent(player);
 			Bukkit.getPluginManager().callEvent(event);
 		}
