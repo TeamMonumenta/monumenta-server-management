@@ -8,12 +8,12 @@ import com.destroystokyo.paper.profile.PlayerProfile;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.playmonumenta.common.event.PlayerTransferFailEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.adapters.VersionAdapter.ReturnParams;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
 import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
+import com.playmonumenta.redissync.event.PlayerTransferFailEvent;
 import com.playmonumenta.redissync.utils.MMLog;
 import com.playmonumenta.redissync.utils.ScoreboardUtils;
 import io.lettuce.core.RedisFuture;
@@ -190,7 +190,6 @@ public class DataEventListener implements Listener {
 		INSTANCE.mReturnParams.put(player.getUniqueId(), new ReturnParams(returnLoc, returnYaw, returnPitch));
 	}
 
-	@SuppressWarnings("deprecation")
 	protected static void setPlayerAsNotTransferring(Player player) {
 		boolean wasTransferring = INSTANCE.mTransferringPlayers.remove(player.getUniqueId());
 		INSTANCE.mReturnParams.remove(player.getUniqueId());
@@ -199,8 +198,6 @@ public class DataEventListener implements Listener {
 		INSTANCE.mTransferringPlayerShoulderEntities.entrySet().removeIf(entry -> entry.getValue().equals(player.getUniqueId()));
 
 		if (wasTransferring) {
-			com.playmonumenta.redissync.event.PlayerTransferFailEvent legacyEvent = new com.playmonumenta.redissync.event.PlayerTransferFailEvent(player);
-			Bukkit.getPluginManager().callEvent(legacyEvent);
 			PlayerTransferFailEvent event = new PlayerTransferFailEvent(player);
 			Bukkit.getPluginManager().callEvent(event);
 		}

@@ -6,7 +6,6 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.player.PlayerEvent;
 import org.jetbrains.annotations.NotNull;
 
-@Deprecated
 public class PlayerServerTransferEvent extends PlayerEvent implements Cancellable {
 
 	private static final HandlerList handlers = new HandlerList();

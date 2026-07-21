@@ -5,7 +5,6 @@ import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
-@Deprecated
 public class PlayerTransferFailEvent extends Event {
 	private static final HandlerList handlers = new HandlerList();
 
