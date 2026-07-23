@@ -28,7 +28,7 @@ public class MMLog {
 		return INSTANCE;
 	}
 
-	public static void setLevel(org.apache.logging.log4j.Level level) {
+	public static void setLevel(Level level) {
 		getLogOrThrow().setLevel(level);
 	}
 

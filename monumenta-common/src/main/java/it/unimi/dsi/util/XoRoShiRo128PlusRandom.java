@@ -88,6 +88,7 @@ public class XoRoShiRo128PlusRandom extends Random {
 	 * @param n the positive bound on the random number to be returned.
 	 * @return the next pseudorandom {@code long} value between {@code 0} (inclusive) and {@code n} (exclusive).
 	 */
+	@SuppressWarnings("StatementWithEmptyBody")
 	@Override
 	public long nextLong(final long n) {
 		if (n <= 0) {
