@@ -47,6 +47,7 @@ public class ZoneManager {
 	static @MonotonicNonNull BukkitRunnable mPlayerTracker = null;
 	static @Nullable BukkitRunnable mAsyncReloadHandler = null;
 
+	private CompletableFuture<Void> mReloadFuture = null;
 	private @Nullable ZoneState mReloadingState = null;
 	private ZoneState mActiveState = new ZoneState();
 	private final Map<String, ZoneNamespace> mPluginNamespaces = new HashMap<>();
@@ -77,54 +78,59 @@ public class ZoneManager {
 	/*
 	 * Register a ZoneNamespace from an external plugin.
 	 *
-	 * Returns true on success, false on failure.
+	 * Returns a future for when the reload has completed.
 	 */
-	public boolean registerPluginZoneNamespace(ZoneNamespace namespace) {
+	public CompletableFuture<Void> registerPluginZoneNamespace(ZoneNamespace namespace) {
 		if (namespace == null) {
-			return false;
+			CompletableFuture<Void> future = new CompletableFuture<>();
+			future.completeExceptionally(new Exception("Provided namespace must not be null"));
+			return future;
 		}
 
 		String namespaceName = namespace.getName();
 
 		if (mPluginNamespaces.containsKey(namespaceName)) {
-			return false;
+			CompletableFuture<Void> future = new CompletableFuture<>();
+			future.completeExceptionally(new Exception("Provided namespace is already loaded, potentially by another plugin"));
+			return future;
 		}
 
 		mPluginNamespaces.put(namespaceName, namespace);
-		reload(Bukkit.getConsoleSender());
-		return true;
+		return reload(Bukkit.getConsoleSender());
 	}
 
 	/*
 	 * Unregister a ZoneNamespace from an external plugin.
 	 *
-	 * Returns true on success, false on failure.
+	 * Returns a future for when the reload has completed.
 	 */
-	public boolean unregisterPluginZoneNamespace(String namespaceName) {
+	public CompletableFuture<Void> unregisterPluginZoneNamespace(String namespaceName) {
 		if (!mPluginNamespaces.containsKey(namespaceName)) {
-			return false;
+			CompletableFuture<Void> future = new CompletableFuture<>();
+			future.completeExceptionally(new Exception("Provided namespace name is not loaded"));
+			return future;
 		}
 
 		mPluginNamespaces.remove(namespaceName);
-		reload(Bukkit.getConsoleSender());
-		return true;
+		return reload(Bukkit.getConsoleSender());
 	}
 
 	/*
 	 * Replace a ZoneNamespace from an external plugin.
 	 *
-	 * Returns true on success, false on failure.
+	 * Returns a future for when the reload has completed.
 	 */
-	public boolean replacePluginZoneNamespace(ZoneNamespace namespace) {
+	public CompletableFuture<Void> replacePluginZoneNamespace(ZoneNamespace namespace) {
 		if (namespace == null) {
-			return false;
+			CompletableFuture<Void> future = new CompletableFuture<>();
+			future.completeExceptionally(new Exception("Provided namespace must not be null"));
+			return future;
 		}
 
 		String namespaceName = namespace.getName();
 
 		mPluginNamespaces.put(namespaceName, namespace);
-		reload(Bukkit.getConsoleSender());
-		return true;
+		return reload(Bukkit.getConsoleSender());
 	}
 
 	/*
@@ -267,12 +273,17 @@ public class ZoneManager {
 	/*
 	 * If sender is non-null, it will be sent debugging information
 	 */
-	public void reload(@Nullable CommandSender sender) {
+	public CompletableFuture<Void> reload(@Nullable CommandSender sender) {
 		if (sender == null) {
 			sender = Bukkit.getConsoleSender();
 		}
 		mQueuedReloadRequesters.add(sender);
 		sender.sendMessage(Component.text("Zone reload started in the background, you will be notified of progress.", NamedTextColor.GOLD));
+
+		if (mReloadFuture == null) {
+			mReloadFuture = new CompletableFuture<>();
+		}
+
 		if (mAsyncReloadHandler == null) {
 			// Start a new async task to handle reloads
 			mAsyncReloadHandler = new BukkitRunnable() {
@@ -285,14 +296,20 @@ public class ZoneManager {
 							MessagingUtils.sendStackTrace(mReloadRequesters, e);
 							mReloadRequesters.sendMessage(Component.text("Zones failed to reload.", NamedTextColor.RED));
 						});
+						mReloadFuture.completeExceptionally(e);
+						mReloadFuture = null;
 						return;
 					}
+					mReloadFuture.complete(null);
+					mReloadFuture = null;
 					mAsyncReloadHandler = null;
 				}
 			};
 
 			mAsyncReloadHandler.runTaskAsynchronously(mPlugin);
 		}
+
+		return mReloadFuture;
 	}
 
 	private void handleReloads() {
