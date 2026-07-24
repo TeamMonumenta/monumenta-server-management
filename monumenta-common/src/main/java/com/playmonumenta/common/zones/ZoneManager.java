@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -47,7 +48,7 @@ public class ZoneManager {
 	static @MonotonicNonNull BukkitRunnable mPlayerTracker = null;
 	static @Nullable BukkitRunnable mAsyncReloadHandler = null;
 
-	private CompletableFuture<Void> mReloadFuture = null;
+	private @Nullable CompletableFuture<Void> mReloadFuture = null;
 	private @Nullable ZoneState mReloadingState = null;
 	private ZoneState mActiveState = new ZoneState();
 	private final Map<String, ZoneNamespace> mPluginNamespaces = new HashMap<>();
@@ -131,6 +132,83 @@ public class ZoneManager {
 
 		mPluginNamespaces.put(namespaceName, namespace);
 		return reload(Bukkit.getConsoleSender());
+	}
+
+	public CompletableFuture<Void> bulkPluginZoneNamespaceChanges(
+		Collection<ZoneNamespace> newNamespaces,
+		Collection<ZoneNamespace> replacedNamespaces,
+		Collection<String> removedNamespaces
+	) {
+		// Error checking
+		if (newNamespaces == null || replacedNamespaces == null || removedNamespaces == null) {
+			CompletableFuture<Void> future = new CompletableFuture<>();
+			future.completeExceptionally(new Exception("No collections of namespace changes may be null"));
+			return future;
+		}
+
+		if (
+			safeContainsNull(newNamespaces) ||
+			safeContainsNull(replacedNamespaces) ||
+			safeContainsNull(removedNamespaces)
+		) {
+			CompletableFuture<Void> future = new CompletableFuture<>();
+			future.completeExceptionally(new Exception("No collections of namespace changes may contain null"));
+			return future;
+		}
+
+		Set<String> createNameSet = newNamespaces.stream().map(ZoneNamespace::getName).collect(Collectors.toSet());
+		Set<String> updateNameSet = replacedNamespaces.stream().map(ZoneNamespace::getName).collect(Collectors.toSet());
+		Set<String> deleteNameSet = new HashSet<>(removedNamespaces);
+
+		if (
+			setSharesAny(createNameSet, updateNameSet) ||
+			setSharesAny(updateNameSet, deleteNameSet) ||
+			setSharesAny(createNameSet, deleteNameSet)
+		) {
+			CompletableFuture<Void> future = new CompletableFuture<>();
+			future.completeExceptionally(new Exception("No collections of namespace changes may share namespaces"));
+			return future;
+		}
+
+		for (ZoneNamespace namespace : newNamespaces) {
+			String name = namespace.getName();
+			if (mActiveState.mNamespaces.containsKey(name)) {
+				CompletableFuture<Void> future = new CompletableFuture<>();
+				future.completeExceptionally(new Exception("Namespace '" + name + "' is already loaded, potentially by another plugin; aborting"));
+				return future;
+			}
+		}
+
+		for (String name : removedNamespaces) {
+			if (!mActiveState.mNamespaces.containsKey(name)) {
+				CompletableFuture<Void> future = new CompletableFuture<>();
+				future.completeExceptionally(new Exception("Namespace '" + name + "' is not loaded; aborting"));
+				return future;
+			}
+		}
+
+		// Update backing map of namespaces
+		removedNamespaces.forEach(mPluginNamespaces::remove);
+		replacedNamespaces.forEach(n -> mPluginNamespaces.put(n.getName(), n));
+		newNamespaces.forEach(n -> mPluginNamespaces.put(n.getName(), n));
+
+		// Do reload
+		return reload(Bukkit.getConsoleSender());
+	}
+
+	private boolean safeContainsNull(Collection<?> collection) {
+		try {
+			return collection.contains(null);
+		} catch (NullPointerException ignored) {
+			// Only thrown if null is not supported by the collection; therefore, it doesn't contain null
+			return false;
+		}
+	}
+
+	private <T> boolean setSharesAny(Set<T> a, Set<T> b) {
+		Set<T> c = new HashSet<>(a);
+		c.retainAll(b);
+		return !c.isEmpty();
 	}
 
 	/*
