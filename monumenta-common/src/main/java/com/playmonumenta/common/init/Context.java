@@ -194,6 +194,7 @@ public class Context {
 		 *
 		 * @return the context object
 		 */
+		@SuppressWarnings("EmptyCatch")
 		public Context build() {
 			final var caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
 			final var serviceLoader = ServiceLoader.load(AutoInit.class, caller.getClassLoader());

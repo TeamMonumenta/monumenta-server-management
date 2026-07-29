@@ -10,8 +10,6 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Provides a cleaner way of registering for listeners without having to declare a full method.
- *
- * @param plugin
  */
 public record ListenerRegistry(Plugin plugin) {
 	public void registerListener(Listener listener) {
