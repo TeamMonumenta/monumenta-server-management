@@ -359,11 +359,10 @@ public class ZoneManager {
 		sender.sendMessage(Component.text("Zone reload started in the background, you will be notified of progress.", NamedTextColor.GOLD));
 
 		if (mReloadFuture == null) {
-			mReloadFuture = new CompletableFuture<>();
-		}
-
-		if (mAsyncReloadHandler == null) {
 			// Start a new async task to handle reloads
+			final CompletableFuture<Void> notNullFuture = new CompletableFuture<>();
+			mReloadFuture = notNullFuture;
+
 			mAsyncReloadHandler = new BukkitRunnable() {
 				@Override
 				public void run() {
@@ -374,11 +373,11 @@ public class ZoneManager {
 							MessagingUtils.sendStackTrace(mReloadRequesters, e);
 							mReloadRequesters.sendMessage(Component.text("Zones failed to reload.", NamedTextColor.RED));
 						});
-						mReloadFuture.completeExceptionally(e);
+						notNullFuture.completeExceptionally(e);
 						mReloadFuture = null;
 						return;
 					}
-					mReloadFuture.complete(null);
+					notNullFuture.complete(null);
 					mReloadFuture = null;
 					mAsyncReloadHandler = null;
 				}
