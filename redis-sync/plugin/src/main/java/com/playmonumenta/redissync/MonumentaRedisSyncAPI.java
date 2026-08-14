@@ -16,6 +16,7 @@ import io.lettuce.core.KeyValue;
 import io.lettuce.core.RedisFuture;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -24,7 +25,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
@@ -114,6 +114,7 @@ public class MonumentaRedisSyncAPI {
 		getAllCachedPlayerNames().toArray(String[]::new));
 
 	private static final Trie<UUID> mNameToUuidTrie = new Trie<>();
+	private static final Map<String, UUID> mNameToUuid = new ConcurrentHashMap<>();
 	private static final Map<String, UUID> mNameLowercaseToUuid = new ConcurrentHashMap<>();
 	private static final Map<UUID, String> mUuidToName = new ConcurrentHashMap<>();
 
@@ -122,6 +123,7 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	protected static void updateNameToUuid(String name, UUID uuid) {
+		mNameToUuid.put(name, uuid);
 		mNameLowercaseToUuid.put(name.toLowerCase(Locale.ROOT), uuid);
 		mNameToUuidTrie.put(name, uuid);
 	}
@@ -161,15 +163,20 @@ public class MonumentaRedisSyncAPI {
 
 	// Thread-safe: backed by ConcurrentHashMap, callable from any thread
 	public static @Nullable UUID cachedNameToUuid(String name) {
+		// Player names are case-sensitive (see scoreboard values) - only use case-insensitive version as a fallback.
+		UUID caseSensitiveUuid = mNameToUuid.get(name);
+		if (caseSensitiveUuid != null) {
+			return caseSensitiveUuid;
+		}
 		return mNameLowercaseToUuid.get(name.toLowerCase(Locale.ROOT));
 	}
 
 	public static Set<String> getAllCachedPlayerNames() {
-		return new ConcurrentSkipListSet<>(mUuidToName.values());
+		return Collections.unmodifiableSet(mNameToUuid.keySet());
 	}
 
 	public static Set<UUID> getAllCachedPlayerUuids() {
-		return new ConcurrentSkipListSet<>(mUuidToName.keySet());
+		return Collections.unmodifiableSet(mUuidToName.keySet());
 	}
 
 	public static @Nullable String getCachedCurrentName(String oldName) {

@@ -1,6 +1,7 @@
 package com.playmonumenta.networkrelay.shardhealth;
 
 import com.google.gson.JsonObject;
+import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
@@ -23,6 +24,7 @@ public class AverageShardHealthDataDivideSamplesEvent extends Event {
 		JsonObject pluginDataTotal,
 		JsonObject pluginDataSampleCounts
 	) {
+		super(!Bukkit.isPrimaryThread());
 		mPluginIdentifier = pluginIdentifier;
 		mPluginDataTotal = pluginDataTotal;
 		mPluginDataSampleCounts = pluginDataSampleCounts;
