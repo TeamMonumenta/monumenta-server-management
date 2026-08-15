@@ -1,5 +1,6 @@
 package com.playmonumenta.structures.managers;
 
+import com.playmonumenta.common.zones.ZoneManager;
 import com.playmonumenta.structures.StructuresPlugin;
 import java.util.EnumSet;
 import java.util.List;
@@ -79,7 +80,7 @@ public class EventListener implements Listener {
 		// We need to allow spawning mobs intentionally, but disable natural spawns.
 		if (DISALLOWED_STRUCTURE_SPAWN_REASONS.contains(event.getSpawnReason())) {
 			// We don't care which poi it is, just that the poi exists at that location
-			if (StructuresPlugin.getRespawnManager().mZoneManager.isInside(loc)) {
+			if (ZoneManager.getInstance().getZone(loc, RespawnManager.ZONE_NAMESPACE_INSIDE) != null) {
 				event.setCancelled(true);
 			}
 		}
@@ -94,15 +95,12 @@ public class EventListener implements Listener {
 			return;
 		}
 
-		List<RespawningStructure> structs = StructuresPlugin.getRespawnManager().getStructures(loc, false);
-		if (structs != null) {
-			for (RespawningStructure s : structs) {
-				if (s.getTicksLeft() < Math.min(20 * 11 * 60, s.getRespawnTime())) {
-					s.setRespawnTimer(Math.min(20 * 11 * 60, s.getRespawnTime()));
-				}
-				if (s.isForced()) {
-					s.undoForce();
-				}
+		for (RespawningStructure s : StructuresPlugin.getRespawnManager().getStructures(loc, false)) {
+			if (s.getTicksLeft() < Math.min(20 * 11 * 60, s.getRespawnTime())) {
+				s.setRespawnTimer(Math.min(20 * 11 * 60, s.getRespawnTime()));
+			}
+			if (s.isForced()) {
+				s.undoForce();
 			}
 		}
 	}
