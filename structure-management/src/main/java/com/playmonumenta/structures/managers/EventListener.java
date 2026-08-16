@@ -3,7 +3,6 @@ package com.playmonumenta.structures.managers;
 import com.playmonumenta.common.zones.ZoneManager;
 import com.playmonumenta.structures.StructuresPlugin;
 import java.util.EnumSet;
-import java.util.List;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
