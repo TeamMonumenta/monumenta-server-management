@@ -1,8 +1,7 @@
 [versions]
-monumenta-common = "1.2.0-dev-zoneLib-6"
+monumenta-common = "1.2.0"
 minimessage = "4.11.0"
 commons = "1.3"
-dynmap = "2.0"
 junit = "5.9.3"
 snakeyaml = "2.0"
 annotations = "16.0.2"
