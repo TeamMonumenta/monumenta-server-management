@@ -88,7 +88,6 @@ public class XoRoShiRo128PlusRandom extends Random {
 	 * @param n the positive bound on the random number to be returned.
 	 * @return the next pseudorandom {@code long} value between {@code 0} (inclusive) and {@code n} (exclusive).
 	 */
-	@SuppressWarnings("StatementWithEmptyBody")
 	@Override
 	public long nextLong(final long n) {
 		if (n <= 0) {
@@ -101,8 +100,10 @@ public class XoRoShiRo128PlusRandom extends Random {
 			return (t >>> Long.numberOfLeadingZeros(nMinus1)) & nMinus1;
 		}
 		// Rejection-based algorithm to get uniform integers in the general case
-		for (long u = t >>> 1; u + nMinus1 - (t = u % n) < 0; u = nextLong() >>> 1) {
-			// Loop
+		// Automatically converted from for loop to while loop in order to satisfy review dog
+		long u = t >>> 1;
+		while (u + nMinus1 - (t = u % n) < 0) {
+			u = nextLong() >>> 1;
 		}
 		return t;
 	}
@@ -159,6 +160,8 @@ public class XoRoShiRo128PlusRandom extends Random {
 		}
 	}
 
+	private static final long[] JUMP = { 0xdf900294d8f554a5L, 0x170865df4b3201fcL };
+
 	protected XoRoShiRo128PlusRandom jump(final long[] jump) {
 		long s0 = 0;
 		long s1 = 0;
@@ -177,8 +180,6 @@ public class XoRoShiRo128PlusRandom extends Random {
 		return this;
 	}
 
-
-	private static final long[] JUMP = { 0xdf900294d8f554a5L, 0x170865df4b3201fcL };
 
 	/** The jump function for this generator. It is equivalent to 2<sup>64</sup>
 	 * calls to {@link #nextLong()}; it can be used to generate 2<sup>64</sup>
