@@ -160,6 +160,8 @@ public class XoRoShiRo128PlusRandom extends Random {
 		}
 	}
 
+	private static final long[] JUMP = { 0xdf900294d8f554a5L, 0x170865df4b3201fcL };
+
 	protected XoRoShiRo128PlusRandom jump(final long[] jump) {
 		long s0 = 0;
 		long s1 = 0;
@@ -178,8 +180,6 @@ public class XoRoShiRo128PlusRandom extends Random {
 		return this;
 	}
 
-
-	private static final long[] JUMP = { 0xdf900294d8f554a5L, 0x170865df4b3201fcL };
 
 	/** The jump function for this generator. It is equivalent to 2<sup>64</sup>
 	 * calls to {@link #nextLong()}; it can be used to generate 2<sup>64</sup>
