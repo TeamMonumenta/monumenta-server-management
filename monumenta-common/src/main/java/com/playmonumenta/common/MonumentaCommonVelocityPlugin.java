@@ -20,6 +20,8 @@ public class MonumentaCommonVelocityPlugin {
 	@Inject
 	public MonumentaCommonVelocityPlugin(ProxyServer server) {
 		mServer = server;
+		com.playmonumenta.common.utils.MMLog.init("MonumentaCommon");
+		MMLogVelocity.registerCommand(com.playmonumenta.common.utils.MMLog.getLog(), server.getCommandManager(), this);
 	}
 
 	@Subscribe
