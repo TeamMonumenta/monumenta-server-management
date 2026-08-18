@@ -9,7 +9,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
-public class ShardInfo {
+public class ContentInfo {
 	private final String mInstanceObjective;
 	private final String mBaseWorldName;
 	private final @Nullable String mJoinInstanceCommand;
@@ -19,7 +19,7 @@ public class ShardInfo {
 	private final @Nullable String mVariantObjective;
 	private final Map<Integer, String> mVariantTemplates = new HashMap<>();
 
-	protected ShardInfo(WorldManagementPlugin plugin, ConfigurationSection config) {
+	protected ContentInfo(WorldManagementPlugin plugin, ConfigurationSection config) {
 		mInstanceObjective = config.getString("instance-objective", "Instance");
 		plugin.printConfig("    instance-objective", mInstanceObjective);
 

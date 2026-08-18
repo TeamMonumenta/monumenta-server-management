@@ -27,7 +27,7 @@ public class WorldManagementPlugin extends JavaPlugin {
 	private static int mUnloadInactiveWorldAfterTicks = 10 * 60 * 20;
 	private static @Nullable String mNotifyWorldPermission = "monumenta.worldmanagement.worldnotify";
 	private static String mCopyWorldCommand = "cp -a";
-	private static final Map<String, ShardInfo> mShardInfoMap = new HashMap<>();
+	private static final Map<String, ContentInfo> mContentInfoMap = new HashMap<>();
 
 	private @Nullable WorldManagementListener mListener = null;
 	private @Nullable WorldGenerator mGenerator = null;
@@ -91,19 +91,19 @@ public class WorldManagementPlugin extends JavaPlugin {
 		}
 
 		ConfigurationSection instancingConfig = config.getConfigurationSection("instancing");
-		mShardInfoMap.clear();
+		mContentInfoMap.clear();
 		if (instancingConfig == null) {
 			printConfig("instancing", null);
 		} else {
 			printConfigHeader("instancing");
-			for (String shardName : instancingConfig.getKeys(false)) {
-				ConfigurationSection shardConfig = instancingConfig.getConfigurationSection(shardName);
-				if (shardConfig == null) {
-					printConfig("  " + shardName, null);
+			for (String contentName : instancingConfig.getKeys(false)) {
+				ConfigurationSection contentConfig = instancingConfig.getConfigurationSection(contentName);
+				if (contentConfig == null) {
+					printConfig("  " + contentName, null);
 				} else {
-					printConfigHeader("  " + shardName);
-					ShardInfo shardInfo = new ShardInfo(this, shardConfig);
-					mShardInfoMap.put(shardName, shardInfo);
+					printConfigHeader("  " + contentName);
+					ContentInfo contentInfo = new ContentInfo(this, contentConfig);
+					mContentInfoMap.put(contentName, contentInfo);
 				}
 			}
 		}
@@ -157,35 +157,35 @@ public class WorldManagementPlugin extends JavaPlugin {
 		return mAllowInstanceAutocreation;
 	}
 
-	public static @Nullable ShardInfo getShardInfo(Player player) {
-		// TODO: For now, just use the first shard name.
+	public static @Nullable ContentInfo getContentInfo(Player player) {
+		// TODO: For now, just use the first content name.
 		// Eventually need some sorcery to let a player select a different entry
-		ShardInfo info = null;
-		for (ShardInfo shardInfo : mShardInfoMap.values()) {
-			info = shardInfo;
+		ContentInfo info = null;
+		for (ContentInfo contentInfo : mContentInfoMap.values()) {
+			info = contentInfo;
 			break;
 		}
 		if (info == null) {
-			MMLog.debug("No shard info found.");
+			MMLog.debug("No content info found.");
 			return null;
 		}
 		return info;
 	}
 
-	public static @Nullable ShardInfo getShardInfo(String shardName) {
-		return mShardInfoMap.get(shardName);
+	public static @Nullable ContentInfo getContentInfo(String contentName) {
+		return mContentInfoMap.get(contentName);
 	}
 
 	public static Map<String, Integer> getPregeneratedInstanceLimits() {
 		// TODO Expose an unmodifiable map so the world generator can handle this part
 		Map<String, Integer> templatePregenLimits = new HashMap<>();
-		for (ShardInfo shardInfo : mShardInfoMap.values()) {
-			int shardPregenLimit = shardInfo.getPregeneratedInstances();
-			if (shardPregenLimit > 0) {
-				for (String template : shardInfo.getVariantTemplates()) {
+		for (ContentInfo contentInfo : mContentInfoMap.values()) {
+			int contentPregenLimit = contentInfo.getPregeneratedInstances();
+			if (contentPregenLimit > 0) {
+				for (String template : contentInfo.getVariantTemplates()) {
 					Integer oldLimit = templatePregenLimits.get(template);
-					if (oldLimit == null || oldLimit < shardPregenLimit) {
-						templatePregenLimits.put(template, shardPregenLimit);
+					if (oldLimit == null || oldLimit < contentPregenLimit) {
+						templatePregenLimits.put(template, contentPregenLimit);
 					}
 				}
 			}
