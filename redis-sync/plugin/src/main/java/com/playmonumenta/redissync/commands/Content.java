@@ -33,7 +33,7 @@ public class Content {
 							throw CommandAPI.failWithString("Argument must be a player name with correct capitalization or a UUID");
 						}
 					}
-					Objects.requireNonNull(MonumentaRedisSyncAPI.getPlayerContentDataFromUUID(uuid)).whenComplete((content, throwable) -> {
+					MonumentaRedisSyncAPI.getPlayerContentDataFromUUID(uuid).whenComplete((content, throwable) -> {
 						sender.sendMessage(content);
 					});
 				}))

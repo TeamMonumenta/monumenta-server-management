@@ -988,7 +988,7 @@ public class MonumentaRedisSyncAPI {
 	 * @return CompletableFuture for a string corresponding to the content
 	 */
 
-	public @Nullable static CompletableFuture<String> getPlayerContentDataFromUUID(UUID playerUUID) {
+	public static CompletableFuture<String> getPlayerContentDataFromUUID(UUID playerUUID) {
 		CompletableFuture<String> future;
 
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
@@ -996,7 +996,7 @@ public class MonumentaRedisSyncAPI {
 			return future;
 		} catch (Exception e) {
 			MMLog.severe("Error getting player content", e);
-			return null;
+			return CompletableFuture.failedFuture(e);
 		}
 	}
 
