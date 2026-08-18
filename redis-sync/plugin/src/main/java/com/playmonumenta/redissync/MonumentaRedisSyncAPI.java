@@ -708,7 +708,7 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static String getRedisContentPath(Player player) {
-		return getRedisDataPath(player.getUniqueId());
+		return getRedisContentPath(player.getUniqueId());
 	}
 
 	public static String getRedisContentPath(UUID uuid) {
@@ -977,7 +977,7 @@ public class MonumentaRedisSyncAPI {
 	}
 
 
-	public @Nullable static String getPlayerContentData(Player player) {
+	public @Nullable static CompletableFuture<String> getPlayerContentData(Player player) {
 		return getPlayerContentDataFromUUID(player.getUniqueId());
 	}
 
@@ -985,18 +985,15 @@ public class MonumentaRedisSyncAPI {
 	 * Gets player current content type
 	 *
 	 * @param playerUUID Player UUID to get data for
-	 * @return String corresponding to the content (or null if it doesn't exist)
+	 * @return CompletableFuture for a string corresponding to the content
 	 */
 
-	public @Nullable static String getPlayerContentDataFromUUID(UUID playerUUID) {
+	public @Nullable static CompletableFuture<String> getPlayerContentDataFromUUID(UUID playerUUID) {
 		CompletableFuture<String> future;
 
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 			future = conn.get(getRedisContentPath(playerUUID)).toCompletableFuture();
-		}
-
-		try {
-			return future.join();
+			return future;
 		} catch (Exception e) {
 			MMLog.severe("Error getting player content", e);
 			return null;
@@ -1014,19 +1011,23 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static void setPlayerContentDataFromUUID(UUID playerUUID, String content) {
+		PlayerContentEvent newEvent = new PlayerContentEvent(Bukkit.getPlayer(playerUUID), content);
+		Bukkit.getPluginManager().callEvent(newEvent);
+
 		CompletableFuture<String> future;
 
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 			future = conn.set(getRedisContentPath(playerUUID), content).toCompletableFuture();
 		}
 
-		try{
-			future.join();
-
-			PlayerContentEvent newEvent = new PlayerContentEvent(Bukkit.getPlayer(playerUUID), content);
-			Bukkit.getPluginManager().callEvent(newEvent);
+		try {
+			future.whenComplete((result, throwable) -> {
+				if (throwable != null) {
+					MMLog.severe("Error setting player content", throwable);
+				}
+			});
 		} catch (Exception e) {
-			MMLog.severe("Error getting player content", e);
+			MMLog.severe("Error setting player content", e);
 		}
 	}
 
