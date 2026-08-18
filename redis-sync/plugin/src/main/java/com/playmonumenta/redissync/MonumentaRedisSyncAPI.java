@@ -989,8 +989,14 @@ public class MonumentaRedisSyncAPI {
 	 */
 
 	public @Nullable static String getPlayerContentDataFromUUID(UUID playerUUID) {
+		CompletableFuture<String> future;
+
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
-			return conn.get(getRedisContentPath(playerUUID)).toCompletableFuture().join();
+			future = conn.get(getRedisContentPath(playerUUID)).toCompletableFuture();
+		}
+
+		try {
+			return future.join();
 		} catch (Exception e) {
 			MMLog.severe("Error getting player content", e);
 			return null;
@@ -1008,8 +1014,14 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static void setPlayerContentDataFromUUID(UUID playerUUID, String content) {
+		CompletableFuture<String> future;
+
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
-			conn.set(getRedisContentPath(playerUUID), content).toCompletableFuture().join();
+			future = conn.set(getRedisContentPath(playerUUID), content).toCompletableFuture();
+		}
+
+		try{
+			future.join();
 
 			PlayerContentEvent newEvent = new PlayerContentEvent(Bukkit.getPlayer(playerUUID), content);
 			Bukkit.getPluginManager().callEvent(newEvent);
