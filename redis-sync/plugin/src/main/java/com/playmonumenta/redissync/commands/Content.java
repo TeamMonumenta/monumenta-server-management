@@ -6,6 +6,7 @@ import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.TextArgument;
+import java.util.Objects;
 import java.util.UUID;
 
 public class Content {
@@ -33,7 +34,7 @@ public class Content {
 						}
 					}
 					MonumentaRedisSyncAPI.getPlayerContentDataFromUUID(uuid).whenComplete((content, throwable) -> {
-						sender.sendMessage(content);
+						sender.sendMessage(Objects.requireNonNullElse(content, "Content not set"));
 					});
 				}))
 			.withSubcommand(new CommandAPICommand("set")
