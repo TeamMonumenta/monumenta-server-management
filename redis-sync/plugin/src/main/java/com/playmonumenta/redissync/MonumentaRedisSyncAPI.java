@@ -6,6 +6,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.playmonumenta.common.event.PlayerServerTransferEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
 import com.playmonumenta.redissync.event.PlayerContentEvent;
 import com.playmonumenta.redissync.event.PlayerServerTransferEvent;
@@ -216,6 +217,7 @@ public class MonumentaRedisSyncAPI {
 		sendPlayer(player, target, returnLoc, rotation == null ? null : rotation.getNormalizedYaw(), rotation == null ? null : rotation.getNormalizedPitch());
 	}
 
+	@SuppressWarnings("deprecation")
 	public static void sendPlayer(Player player, String target, @Nullable Location returnLoc, @Nullable Float returnYaw, @Nullable Float returnPitch) throws Exception {
 		MonumentaRedisSync mrs = MonumentaRedisSync.getInstance();
 
@@ -236,6 +238,11 @@ public class MonumentaRedisSyncAPI {
 			DataEventListener.setPlayerReturnParams(player, returnLoc, returnYaw, returnPitch);
 		}
 
+		com.playmonumenta.redissync.event.PlayerServerTransferEvent legacyEvent = new com.playmonumenta.redissync.event.PlayerServerTransferEvent(player, target);
+		Bukkit.getPluginManager().callEvent(legacyEvent);
+		if (legacyEvent.isCancelled()) {
+			return;
+		}
 		PlayerServerTransferEvent event = new PlayerServerTransferEvent(player, target);
 		Bukkit.getPluginManager().callEvent(event);
 		if (event.isCancelled()) {

@@ -1,4 +1,4 @@
-package com.playmonumenta.redissync.event;
+package com.playmonumenta.common.event;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
@@ -6,7 +6,6 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.player.PlayerEvent;
 import org.jetbrains.annotations.NotNull;
 
-@Deprecated
 public class PlayerServerTransferEvent extends PlayerEvent implements Cancellable {
 
 	private static final HandlerList handlers = new HandlerList();
