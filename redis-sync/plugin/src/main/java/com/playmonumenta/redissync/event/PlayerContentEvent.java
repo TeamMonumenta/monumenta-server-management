@@ -8,9 +8,9 @@ import org.jetbrains.annotations.NotNull;
 
 public class PlayerContentEvent extends PlayerEvent {
 
-	private static final HandlerList handlers = new HandlerList();
+	private static final HandlerList HANDLERS = new HandlerList();
 
-	private @NotNull String mContent;
+	private final @NotNull String mContent;
 
 	public PlayerContentEvent(Player player, @NotNull String content) {
 		super(player);
@@ -23,11 +23,10 @@ public class PlayerContentEvent extends PlayerEvent {
 
 	@Override
 	public @NotNull HandlerList getHandlers() {
-		return handlers;
+		return HANDLERS;
 	}
 
 	public static HandlerList getHandlerList() {
-		return handlers;
+		return HANDLERS;
 	}
 }
-
