@@ -1,6 +1,7 @@
 package com.playmonumenta.redissync;
 
 import com.playmonumenta.redissync.adapters.VersionAdapter;
+import com.playmonumenta.redissync.commands.Content;
 import com.playmonumenta.redissync.commands.PlayerHistory;
 import com.playmonumenta.redissync.commands.PlayerLoadFromPlayer;
 import com.playmonumenta.redissync.commands.PlayerRollback;
@@ -8,7 +9,6 @@ import com.playmonumenta.redissync.commands.PlayerTransferHistory;
 import com.playmonumenta.redissync.commands.RboardCommand;
 import com.playmonumenta.redissync.commands.RemoteDataCommand;
 import com.playmonumenta.redissync.commands.Stash;
-import com.playmonumenta.redissync.commands.Content;
 import com.playmonumenta.redissync.commands.TransferServer;
 import com.playmonumenta.redissync.commands.UpgradeAllPlayers;
 import com.playmonumenta.redissync.utils.MMLog;
