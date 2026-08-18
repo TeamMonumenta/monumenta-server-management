@@ -7,6 +7,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
+import com.playmonumenta.redissync.event.PlayerContentEvent;
 import com.playmonumenta.redissync.event.PlayerServerTransferEvent;
 import com.playmonumenta.redissync.utils.MMLog;
 import com.playmonumenta.redissync.utils.Trie;
@@ -1003,6 +1004,9 @@ public class MonumentaRedisSyncAPI {
 	public static void setPlayerContentDataFromUUID(UUID playerUUID, String content) {
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 			conn.set(getRedisContentPath(playerUUID), content).toCompletableFuture().join();
+
+			PlayerContentEvent newEvent = new PlayerContentEvent(Bukkit.getPlayer(playerUUID), content);
+			Bukkit.getPluginManager().callEvent(newEvent);
 		} catch (Exception e) {
 			MMLog.severe("Error getting player content", e);
 		}

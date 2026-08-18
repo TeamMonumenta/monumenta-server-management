@@ -6,13 +6,13 @@ import org.bukkit.event.player.PlayerEvent;
 import org.jetbrains.annotations.NotNull;
 
 
-public class PlayerSetContentEvent extends PlayerEvent {
+public class PlayerContentEvent extends PlayerEvent {
 
 	private static final HandlerList handlers = new HandlerList();
 
 	private @NotNull String mContent;
 
-	public PlayerSetContentEvent(Player player, @NotNull String content) {
+	public PlayerContentEvent(Player player, @NotNull String content) {
 		super(player);
 		mContent = content;
 	}
