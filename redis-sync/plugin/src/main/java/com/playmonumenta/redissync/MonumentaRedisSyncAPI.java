@@ -700,6 +700,14 @@ public class MonumentaRedisSyncAPI {
 		return String.format("%s:playerdata:%s:plugins", CommonConfig.getServerDomain(), uuid.toString());
 	}
 
+	public static String getRedisContentPath(Player player) {
+		return getRedisDataPath(player.getUniqueId());
+	}
+
+	public static String getRedisContentPath(UUID uuid) {
+		return String.format("%s:playerdata:%s:content", CommonConfig.getServerDomain(), uuid.toString());
+	}
+
 	public static String getRedisAdvancementsPath(Player player) {
 		return getRedisAdvancementsPath(player.getUniqueId());
 	}
@@ -960,6 +968,46 @@ public class MonumentaRedisSyncAPI {
 
 		return PlayerWorldData.fromJson(worldShardData, world);
 	}
+
+
+	public @Nullable static String getPlayerContentData(Player player) {
+		return getPlayerContentDataFromUUID(player.getUniqueId());
+	}
+
+	/**
+	 * Gets player current content type
+	 *
+	 * @param playerUUID Player UUID to get data for
+	 * @return String corresponding to the content (or null if it doesn't exist)
+	 */
+
+	public @Nullable static String getPlayerContentDataFromUUID(UUID playerUUID) {
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			return conn.get(getRedisContentPath(playerUUID)).toCompletableFuture().join();
+		} catch (Exception e) {
+			MMLog.severe("Error getting player content", e);
+			return null;
+		}
+	}
+
+	/**
+	 * Sets player current content type
+	 *
+	 * @param player Player to get data for
+	 * @param content String corresponding to the content
+	 */
+	public static void setPlayerContentData(Player player, String content) {
+		setPlayerContentDataFromUUID(player.getUniqueId(), content);
+	}
+
+	public static void setPlayerContentDataFromUUID(UUID playerUUID, String content) {
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			conn.set(getRedisContentPath(playerUUID), content).toCompletableFuture().join();
+		} catch (Exception e) {
+			MMLog.severe("Error getting player content", e);
+		}
+	}
+
 
 	/** Future returns non-null if successfully loaded data, null on error */
 	@Nullable
