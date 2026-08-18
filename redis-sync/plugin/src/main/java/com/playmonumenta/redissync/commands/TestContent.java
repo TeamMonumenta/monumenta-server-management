@@ -54,7 +54,7 @@ public class TestContent {
 					MonumentaRedisSyncAPI.setPlayerContentDataFromUUID(uuid, value);
 
 				}))
-			.register();;
+			.register();
 
 	}
 }
