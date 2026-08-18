@@ -6,6 +6,7 @@ import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.TextArgument;
+import java.util.Objects;
 import java.util.UUID;
 
 public class Content {
@@ -32,7 +33,7 @@ public class Content {
 							throw CommandAPI.failWithString("Argument must be a player name with correct capitalization or a UUID");
 						}
 					}
-					MonumentaRedisSyncAPI.getPlayerContentDataFromUUID(uuid).whenComplete((content, throwable) -> {
+					Objects.requireNonNull(MonumentaRedisSyncAPI.getPlayerContentDataFromUUID(uuid)).whenComplete((content, throwable) -> {
 						sender.sendMessage(content);
 					});
 				}))
