@@ -8,6 +8,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.playmonumenta.common.event.PlayerServerTransferEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
+import com.playmonumenta.redissync.event.PlayerContentEvent;
 import com.playmonumenta.redissync.utils.MMLog;
 import com.playmonumenta.redissync.utils.Trie;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
@@ -706,6 +707,14 @@ public class MonumentaRedisSyncAPI {
 		return String.format("%s:playerdata:%s:plugins", CommonConfig.getServerDomain(), uuid.toString());
 	}
 
+	public static String getRedisContentPath(Player player) {
+		return getRedisContentPath(player.getUniqueId());
+	}
+
+	public static String getRedisContentPath(UUID uuid) {
+		return String.format("%s:playerdata:%s:content", CommonConfig.getServerDomain(), uuid.toString());
+	}
+
 	public static String getRedisAdvancementsPath(Player player) {
 		return getRedisAdvancementsPath(player.getUniqueId());
 	}
@@ -966,6 +975,62 @@ public class MonumentaRedisSyncAPI {
 
 		return PlayerWorldData.fromJson(worldShardData, world);
 	}
+
+
+	public @Nullable static CompletableFuture<String> getPlayerContentData(Player player) {
+		return getPlayerContentDataFromUUID(player.getUniqueId());
+	}
+
+	/**
+	 * Gets player current content type
+	 *
+	 * @param playerUUID Player UUID to get data for
+	 * @return CompletableFuture for a string corresponding to the content
+	 */
+
+	public static CompletableFuture<String> getPlayerContentDataFromUUID(UUID playerUUID) {
+		CompletableFuture<String> future;
+
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			future = conn.get(getRedisContentPath(playerUUID)).toCompletableFuture();
+			return future;
+		} catch (Exception e) {
+			MMLog.severe("Error getting player content", e);
+			return CompletableFuture.failedFuture(e);
+		}
+	}
+
+	/**
+	 * Sets player current content type
+	 *
+	 * @param player Player to get data for
+	 * @param content String corresponding to the content
+	 */
+	public static void setPlayerContentData(Player player, String content) {
+		setPlayerContentDataFromUUID(player.getUniqueId(), content);
+	}
+
+	public static void setPlayerContentDataFromUUID(UUID playerUUID, String content) {
+		PlayerContentEvent newEvent = new PlayerContentEvent(Bukkit.getPlayer(playerUUID), content);
+		Bukkit.getPluginManager().callEvent(newEvent);
+
+		CompletableFuture<String> future;
+
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			future = conn.set(getRedisContentPath(playerUUID), content).toCompletableFuture();
+		}
+
+		try {
+			future.whenComplete((result, throwable) -> {
+				if (throwable != null) {
+					MMLog.severe("Error setting player content", throwable);
+				}
+			});
+		} catch (Exception e) {
+			MMLog.severe("Error setting player content", e);
+		}
+	}
+
 
 	/** Future returns non-null if successfully loaded data, null on error */
 	@Nullable

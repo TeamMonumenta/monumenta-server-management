@@ -1,6 +1,7 @@
 package com.playmonumenta.redissync;
 
 import com.playmonumenta.redissync.adapters.VersionAdapter;
+import com.playmonumenta.redissync.commands.Content;
 import com.playmonumenta.redissync.commands.PlayerHistory;
 import com.playmonumenta.redissync.commands.PlayerLoadFromPlayer;
 import com.playmonumenta.redissync.commands.PlayerRollback;
@@ -65,6 +66,7 @@ public class MonumentaRedisSync extends JavaPlugin {
 		UpgradeAllPlayers.register(this);
 		RboardCommand.register(this);
 		RemoteDataCommand.register(this);
+		Content.register();
 	}
 
 	@Override
