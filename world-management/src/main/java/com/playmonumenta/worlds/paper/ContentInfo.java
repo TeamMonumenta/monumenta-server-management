@@ -1,6 +1,7 @@
 package com.playmonumenta.worlds.paper;
 
 import com.playmonumenta.worlds.common.MMLog;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -10,6 +11,7 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
 public class ContentInfo {
+	private final String mContentName;
 	private final String mInstanceObjective;
 	private final String mBaseWorldName;
 	private final @Nullable String mJoinInstanceCommand;
@@ -17,9 +19,11 @@ public class ContentInfo {
 	private final @Nullable String mRespawnInstanceCommand;
 	private final int mPregeneratedInstances;
 	private final @Nullable String mVariantObjective;
-	private final Map<Integer, String> mVariantTemplates = new HashMap<>();
+	private final Map<Integer, String> mVariantTemplates;
 
-	protected ContentInfo(WorldManagementPlugin plugin, ConfigurationSection config) {
+	protected ContentInfo(WorldManagementPlugin plugin, String contentName, ConfigurationSection config) {
+		mContentName = contentName;
+
 		mInstanceObjective = config.getString("instance-objective", "Instance");
 		plugin.printConfig("    instance-objective", mInstanceObjective);
 
@@ -42,6 +46,7 @@ public class ContentInfo {
 		plugin.printConfig("    variant-objective", mVariantObjective);
 
 		ConfigurationSection variantConfig = config.getConfigurationSection("variants");
+		Map<Integer, String> variantTemplates = new HashMap<>();
 		if (variantConfig == null) {
 			plugin.printConfig("    variants", null);
 		} else {
@@ -49,13 +54,18 @@ public class ContentInfo {
 
 			for (String templateName : variantConfig.getKeys(false)) {
 				int variantId = variantConfig.getInt(templateName, -1);
-				mVariantTemplates.put(variantId, templateName);
+				variantTemplates.put(variantId, templateName);
 			}
 
-			for (Map.Entry<Integer, String> entry : mVariantTemplates.entrySet()) {
+			for (Map.Entry<Integer, String> entry : variantTemplates.entrySet()) {
 				plugin.printConfig("      " + entry.getValue(), entry.getKey());
 			}
 		}
+		mVariantTemplates = Collections.unmodifiableMap(variantTemplates);
+	}
+
+	public String getContentName() {
+		return mContentName;
 	}
 
 	public String getInstanceObjective() {

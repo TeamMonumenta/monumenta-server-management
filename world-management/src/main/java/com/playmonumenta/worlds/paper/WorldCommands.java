@@ -271,6 +271,11 @@ public class WorldCommands {
 						WorldManagementPlugin.getInstance().getWorldGenerator().cancelGeneration(true);
 						sender.sendMessage(Component.text("World generation stopped. Reload config to restart."));
 					}))
+				.withSubcommand(new CommandAPICommand("listremotecontent")
+					.withPermission(CommandPermission.fromString("monumenta.worldmanagement.listremotecontent"))
+					.executes((sender, args) -> {
+						WorldManagementPlugin.getInstance().showShardsSupportingContent(sender);
+					}))
 			).register();
 
 

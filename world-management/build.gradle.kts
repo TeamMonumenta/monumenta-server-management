@@ -27,8 +27,7 @@ monumenta {
 		"com.playmonumenta.worlds.paper.WorldManagementPlugin",
 		BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
 		"1.20",
-		depends = listOf("CommandAPI", "MonumentaCommon", "MonumentaRedisSync"),
-		softDepends = listOf("MonumentaNetworkRelay")
+		depends = listOf("CommandAPI", "MonumentaCommon", "MonumentaNetworkRelay", "MonumentaRedisSync"),
 	)
 	gitPrefix("world-management/")
 }
