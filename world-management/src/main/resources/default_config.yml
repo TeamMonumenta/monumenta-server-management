@@ -36,8 +36,8 @@ notify-world-permission: "monumenta.worldmanagement.worldnotify"
 copy-world-command: "cp -a"
 
 instancing:
-  # Shard name from Monumenta Network Relay API; not fully implemented, use only one entry for now
-  shard:
+  # Content name from Monumenta Redis Sync API; not fully implemented, use only one entry for now
+  content:
     # The scoreboard objective used to determine what world instance a player should be sent to
     instance-objective: Instance
 
