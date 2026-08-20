@@ -116,6 +116,51 @@
             </property>
         </properties>
     </rule>
+    <rule name="UseLocUtilForDistance"
+          language="java"
+          message="Do not call Location.distance() or Location.distanceSquared() directly. Use LocUtil.withinRange(), notWithinRangeSameWorld(), notWithinRangeAnyWorld(), or safeDistanceSquared() instead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Location.distance() and Location.distanceSquared() throw IllegalArgumentException when called across worlds and have no null safety. Use the LocUtil family of methods, which handle null, unloaded worlds, and cross-world comparisons safely.
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+                    //MethodCall[
+                        (@MethodName = 'distance' or @MethodName = 'distanceSquared')
+                        and *[1][pmd-java:typeIs('org.bukkit.Location')]
+                    ]
+                    ]]>
+                </value>
+            </property>
+        </properties>
+    </rule>
+    <rule name="UseLocUtilNegation"
+          language="java"
+          message="Do not negate LocUtil.withinRange() with !. Use notWithinRangeSameWorld() or notWithinRangeAnyWorld() to explicitly define cross-world handling."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            !withinRange() is ambiguous with respect to handling cross-world comparisons. Use notWithinRangeSameWorld() or notWithinRangeAnyWorld() to make the intent explicit.
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+                    //UnaryExpression[
+                        @Operator = '!'
+                        and MethodCall[
+                            @MethodName = 'withinRange'
+                            and *[1][pmd-java:typeIsExactly('com.playmonumenta.common.LocUtil')]
+                        ]
+                    ]
+                    ]]>
+                </value>
+            </property>
+        </properties>
+    </rule>
     <rule name="UseJetbrainsAnnotations"
           language="java"
           message="Use org.jetbrains.annotations.*"

@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
+@SuppressWarnings("unused")
 public class NetworkRelayAPI {
 	public enum ServerType {
 		PROXY("proxy"),
@@ -134,23 +135,27 @@ public class NetworkRelayAPI {
 		return RemotePlayerAPI.isPlayerOnline(playerUuid);
 	}
 
-	@Nullable
-	public static String getPlayerShard(String playerName) {
+	public static @Nullable String getPlayerShard(String playerName) {
 		return RemotePlayerAPI.getPlayerShard(playerName);
 	}
 
-	@Nullable
-	public static String getPlayerShard(UUID playerUuid) {
+	public static @Nullable String getPlayerShard(UUID playerUuid) {
 		return RemotePlayerAPI.getPlayerShard(playerUuid);
 	}
 
-	@Nullable
-	public static RemotePlayerData getRemotePlayer(String playerName) {
+	public static @Nullable String getPlayerProxy(String playerName) {
+		return RemotePlayerAPI.getPlayerProxy(playerName);
+	}
+
+	public static @Nullable String getPlayerProxy(UUID playerUuid) {
+		return RemotePlayerAPI.getPlayerProxy(playerUuid);
+	}
+
+	public static @Nullable RemotePlayerData getRemotePlayer(String playerName) {
 		return RemotePlayerAPI.getRemotePlayer(playerName);
 	}
 
-	@Nullable
-	public static RemotePlayerData getRemotePlayer(UUID playerUuid) {
+	public static @Nullable RemotePlayerData getRemotePlayer(UUID playerUuid) {
 		return RemotePlayerAPI.getRemotePlayer(playerUuid);
 	}
 
@@ -210,10 +215,10 @@ public class NetworkRelayAPI {
 	public static @Nullable Long getProxyToShardPingMs(String proxy, String shard) {
 		JsonObject proxyHeartbeat = getHeartbeatPluginData(proxy, NETWORK_RELAY_HEARTBEAT_IDENTIFIER);
 		if (
-			proxyHeartbeat != null
-				&& proxyHeartbeat.get("shard-pings") instanceof JsonObject shardPingsJson
-				&& shardPingsJson.get(shard) instanceof JsonPrimitive shardPingJson
-				&& shardPingJson.isNumber()
+			proxyHeartbeat != null &&
+			proxyHeartbeat.get("shard-pings") instanceof JsonObject shardPingsJson &&
+			shardPingsJson.get(shard) instanceof JsonPrimitive shardPingJson &&
+			shardPingJson.isNumber()
 		) {
 			return shardPingJson.getAsLong();
 		}

@@ -1,13 +1,25 @@
 package com.playmonumenta.worlds.paper;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 import com.playmonumenta.worlds.common.MMLog;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.apache.logging.log4j.Level;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
@@ -25,7 +37,9 @@ public class WorldManagementPlugin extends JavaPlugin {
 	private static boolean mAllowInstanceAutocreation = false;
 	private static int mUnloadInactiveWorldAfterTicks = 10 * 60 * 20;
 	private static @Nullable String mNotifyWorldPermission = "monumenta.worldmanagement.worldnotify";
-	private static final Map<String, ShardInfo> mShardInfoMap = new HashMap<>();
+	private static final Map<String, ContentInfo> mContentInfoMap = new HashMap<>();
+	private static final ConcurrentMap<String, ConcurrentMap<String, ContentInfo>> mRemoteContentByContent = new ConcurrentHashMap<>();
+	private static final ConcurrentMap<String, ConcurrentMap<String, ContentInfo>> mRemoteContentByShard = new ConcurrentHashMap<>();
 
 	private @Nullable WorldManagementListener mListener = null;
 	private @Nullable WorldGenerator mGenerator = null;
@@ -53,10 +67,7 @@ public class WorldManagementPlugin extends JavaPlugin {
 		pluginManager.registerEvents(worldManagementListener, this);
 
 		MonumentaWorldManagementAPI.refreshCachedAvailableWorlds();
-
-		if (pluginManager.isPluginEnabled("MonumentaNetworkRelay")) {
-			pluginManager.registerEvents(new NetworkRelayIntegration(), this);
-		}
+		pluginManager.registerEvents(new NetworkRelayIntegration(), this);
 	}
 
 	protected void loadConfig() {
@@ -92,19 +103,19 @@ public class WorldManagementPlugin extends JavaPlugin {
 		}
 
 		ConfigurationSection instancingConfig = config.getConfigurationSection("instancing");
-		mShardInfoMap.clear();
+		mContentInfoMap.clear();
 		if (instancingConfig == null) {
 			printConfig("instancing", null);
 		} else {
 			printConfigHeader("instancing");
-			for (String shardName : instancingConfig.getKeys(false)) {
-				ConfigurationSection shardConfig = instancingConfig.getConfigurationSection(shardName);
-				if (shardConfig == null) {
-					printConfig("  " + shardName, null);
+			for (String contentName : instancingConfig.getKeys(false)) {
+				ConfigurationSection contentConfig = instancingConfig.getConfigurationSection(contentName);
+				if (contentConfig == null) {
+					printConfig("  " + contentName, null);
 				} else {
-					printConfigHeader("  " + shardName);
-					ShardInfo shardInfo = new ShardInfo(this, shardConfig);
-					mShardInfoMap.put(shardName, shardInfo);
+					printConfigHeader("  " + contentName);
+					ContentInfo contentInfo = new ContentInfo(this, contentName, contentConfig);
+					mContentInfoMap.put(contentName, contentInfo);
 				}
 			}
 		}
@@ -128,11 +139,13 @@ public class WorldManagementPlugin extends JavaPlugin {
 		printConfig("notify-world-permission", mNotifyWorldPermission);
 
 		reload();
+		NetworkRelayIntegration.broadcastContentRequest();
 	}
 
 	public void reload() {
 		getListener().reloadConfig();
 		getWorldGenerator().reloadConfig();
+		NetworkRelayIntegration.broadcastContentChange();
 	}
 
 	protected void printConfigHeader(String configKey) {
@@ -155,35 +168,81 @@ public class WorldManagementPlugin extends JavaPlugin {
 		return mAllowInstanceAutocreation;
 	}
 
-	public static @Nullable ShardInfo getShardInfo(Player player) {
-		// TODO: For now, just use the first shard name.
+	public static Map<String, ContentInfo> getContentInfo() {
+		return Collections.unmodifiableMap(mContentInfoMap);
+	}
+
+	public static @Nullable ContentInfo getContentInfo(Player player) {
+		// TODO: For now, just use the first content name.
 		// Eventually need some sorcery to let a player select a different entry
-		ShardInfo info = null;
-		for (ShardInfo shardInfo : mShardInfoMap.values()) {
-			info = shardInfo;
+		ContentInfo info = null;
+		for (ContentInfo contentInfo : mContentInfoMap.values()) {
+			info = contentInfo;
 			break;
 		}
 		if (info == null) {
-			MMLog.debug("No shard info found.");
+			MMLog.debug("No content info found.");
 			return null;
 		}
 		return info;
 	}
 
-	public static @Nullable ShardInfo getShardInfo(String shardName) {
-		return mShardInfoMap.get(shardName);
+	public static @Nullable ContentInfo getContentInfo(String contentName) {
+		return mContentInfoMap.get(contentName);
+	}
+
+	protected static void registerRemoteContent(String shard, JsonObject content) {
+		Gson gson = new Gson();
+		for (Map.Entry<String, JsonElement> entry : content.entrySet()) {
+			String contentName = entry.getKey();
+			ContentInfo contentInfo;
+			try {
+				contentInfo = gson.fromJson(entry.getValue(), ContentInfo.class);
+			} catch (JsonSyntaxException ignored) {
+				continue;
+			}
+
+			mRemoteContentByShard
+				.computeIfAbsent(shard, k -> new ConcurrentHashMap<>())
+				.put(contentName, contentInfo);
+			mRemoteContentByContent
+				.computeIfAbsent(contentName, k -> new ConcurrentHashMap<>())
+				.put(shard, contentInfo);
+		}
+	}
+
+	protected static void unregisterRemoteShard(String shard) {
+		Set<String> contentSet = mRemoteContentByShard.remove(shard).keySet();
+		for (String content : contentSet) {
+			ConcurrentMap<String, ContentInfo> remoteContentForContent = mRemoteContentByContent.get(content);
+			if (remoteContentForContent != null) {
+				remoteContentForContent.remove(shard);
+				// Don't bother removing the empty map; this being async, something else
+				// may register an entry, or the shard may come back up
+			}
+		}
+	}
+
+	protected void showShardsSupportingContent(Audience audience) {
+		mRemoteContentByContent.forEach((String content, Map<String, ContentInfo> remoteShardContent) -> {
+			audience.sendMessage(
+				Component.empty()
+					.append(Component.text(content + ": ", NamedTextColor.DARK_BLUE, TextDecoration.BOLD))
+					.append(Component.text(String.join(", ", remoteShardContent.keySet()), NamedTextColor.BLUE))
+			);
+		});
 	}
 
 	public static Map<String, Integer> getPregeneratedInstanceLimits() {
 		// TODO Expose an unmodifiable map so the world generator can handle this part
 		Map<String, Integer> templatePregenLimits = new HashMap<>();
-		for (ShardInfo shardInfo : mShardInfoMap.values()) {
-			int shardPregenLimit = shardInfo.getPregeneratedInstances();
-			if (shardPregenLimit > 0) {
-				for (String template : shardInfo.getVariantTemplates()) {
+		for (ContentInfo contentInfo : mContentInfoMap.values()) {
+			int contentPregenLimit = contentInfo.getPregeneratedInstances();
+			if (contentPregenLimit > 0) {
+				for (String template : contentInfo.getVariantTemplates()) {
 					Integer oldLimit = templatePregenLimits.get(template);
-					if (oldLimit == null || oldLimit < shardPregenLimit) {
-						templatePregenLimits.put(template, shardPregenLimit);
+					if (oldLimit == null || oldLimit < contentPregenLimit) {
+						templatePregenLimits.put(template, contentPregenLimit);
 					}
 				}
 			}

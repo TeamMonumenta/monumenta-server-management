@@ -69,3 +69,7 @@ By default, Paper's `log4j2.xml` filters messages below `INFO` on the console `A
 ```
 
 The root logger's own `level="info"` still suppresses DEBUG/TRACE from all other plugins by default — only loggers you have explicitly lowered will produce extra output.
+
+## monumenta-zones
+
+Spatial zone manager with O(log(n)) lookup performance. Dependency for both ScriptedQuests and MonumentaStructureManagement.
