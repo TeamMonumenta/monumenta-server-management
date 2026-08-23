@@ -12,18 +12,10 @@ repositories {
 	mavenLocal()
 }
 
-dependencies {
-	compileOnly(libs.monumenta.common)
-	compileOnly(libs.log4j.core)
-	compileOnly(libs.commandapi)
-	compileOnly(libs.nbtapi)
-	compileOnly(project(":network-relay"))
-	compileOnly(project(":redis-sync:redissync"))
-}
-
 monumenta {
 	id("MonumentaWorldManagement")
 	name("MonumentaWorldManagement")
+	pluginProject("worldmanagement")
 	paper(
 		"com.playmonumenta.worlds.paper.WorldManagementPlugin",
 		BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
@@ -33,5 +25,9 @@ monumenta {
 		//  it is always available to plugins, but it can't be listed as a hard dependency or loading will fail
 		softDepends = listOf("NBTAPI")
 	)
+
+	versionAdapterApi("adapter_api", paper = "1.20.4")
+	versionAdapterUnsupported("adapter_unsupported")
+	versionAdapter("adapter_v1_20_R3", "1.20.4")
 	gitPrefix("world-management/")
 }

@@ -21,4 +21,10 @@ include(":redis-sync:redissync")
 project(":redis-sync:redissync-example").projectDir = file("redis-sync/example")
 project(":redis-sync:redissync").projectDir = file("redis-sync/plugin")
 
+include("world-management:adapter_api")
+include("world-management:adapter_unsupported")
+include("world-management:adapter_v1_20_R3")
+include(":world-management:worldmanagement")
+project(":world-management:worldmanagement").projectDir = file("world-management/plugin")
+
 includeBuild("gradle-plugin")
