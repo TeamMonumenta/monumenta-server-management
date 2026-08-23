@@ -12,6 +12,9 @@ repositories {
 	mavenLocal()
 }
 
+val mixinapi = libs.mixinapi
+val nbtapi = libs.nbtapi
+
 dependencies {
 	compileOnly(libs.monumenta.common)
 	compileOnly(libs.log4j.core)
@@ -33,5 +36,11 @@ monumenta {
 		//  it is always available to plugins, but it can't be listed as a hard dependency or loading will fail
 		softDepends = listOf("NBTAPI")
 	)
+	versionAdapterApi("adapter_api", paper = "1.20.4")
+	versionAdapter("adapter_v1_20_R3", "1.20.4") {
+		dependencies {
+			compileOnly(mixinapi)
+		}
+	}
 	gitPrefix("world-management/")
 }

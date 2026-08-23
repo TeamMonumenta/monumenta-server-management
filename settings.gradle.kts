@@ -14,6 +14,9 @@ include("redis-sync")
 include("structure-management")
 include("world-management")
 
+include("world-management:adapter_api")
+include("world-management:adapter_v1_20_R3")
+
 include("redis-sync:adapter_api")
 include("redis-sync:adapter_v1_20_R3")
 include(":redis-sync:redissync-example")

@@ -19,7 +19,7 @@ fawe = "2.9.1"
 protocollib = "5.0.0"
 gradle-config = "3.+"
 sq = "7.5"
-nbtapi = "2.15.2"
+nbtapi = "2.16.0"
 
 [libraries]
 minimessage = { module = "net.kyori:adventure-text-minimessage", version.ref = "minimessage" }
