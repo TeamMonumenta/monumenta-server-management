@@ -28,10 +28,10 @@ monumenta {
 		"com.playmonumenta.worlds.paper.WorldManagementPlugin",
 		BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
 		"1.20",
-		depends = listOf("CommandAPI", "MonumentaCommon", "MonumentaRedisSync"),
+		depends = listOf("CommandAPI", "MonumentaCommon", "MonumentaNetworkRelay", "MonumentaRedisSync"),
 		// TODO: NBTAPI is actually a hard dependency. But because of the way Monumenta shades it into the mixins project,
 		//  it is always available to plugins, but it can't be listed as a hard dependency or loading will fail
-		softDepends = listOf("MonumentaNetworkRelay", "NBTAPI")
+		softDepends = listOf("NBTAPI")
 	)
 	gitPrefix("world-management/")
 }
