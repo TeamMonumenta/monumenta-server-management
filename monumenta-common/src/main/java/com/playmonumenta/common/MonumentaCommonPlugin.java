@@ -1,7 +1,7 @@
 package com.playmonumenta.common;
 
+import com.playmonumenta.common.commands.GetDateCommand;
 import com.playmonumenta.common.commands.RefreshTimeCommand;
-import com.playmonumenta.common.commands.TimeQueryCommand;
 import com.playmonumenta.common.commands.TimeWarpCommand;
 import com.playmonumenta.common.managers.TimeWarpManager;
 import com.playmonumenta.common.utils.DateUtils;
@@ -56,7 +56,7 @@ public class MonumentaCommonPlugin extends JavaPlugin {
 		// Time registration
 		TimeWarpManager.load();
 		TimeWarpCommand.register();
-		TimeQueryCommand.register();
+		GetDateCommand.register();
 		RefreshTimeCommand.register();
 		DateUtils.refreshTime();
 	}

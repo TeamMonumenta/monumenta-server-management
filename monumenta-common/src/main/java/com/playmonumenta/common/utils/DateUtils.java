@@ -17,7 +17,7 @@ import org.bukkit.command.CommandSender;
 
 public class DateUtils {
 	// Offset server time to UTC-17 to change when the new day arrives.
-	// getDaysSinceEpoch() uses its own perceived epoch,
+	// getDailyVersion() uses its own perceived epoch,
 	// so it should sync up nicely with changes in getDayOfWeek().
 	public static String CONFIG_NAME = "utc_offset.json";
 	public static final String TIMEZONE_OFFSET_PATH = "timezone_seconds_offset";
@@ -46,24 +46,29 @@ public class DateUtils {
 		refreshTimeEvent.callEvent();
 	}
 
+	/** UTC time, unaffected by time warp. */
 	public static LocalDateTime trueUtcDateTime() {
 		return LocalDateTime.now(ZoneId.of("UTC"));
 	}
 
+	/** UTC time, adjusted by time warp. */
 	public static LocalDateTime utcDateTime() {
 		return trueUtcDateTime().plusSeconds(TimeWarpManager.get());
 	}
 
+	/** Local time, unaffected by time warp. */
 	public static LocalDateTime trueLocalDateTime() {
 		return LocalDateTime.now(TIMEZONE);
 	}
 
+	/** Local time, adjusted by time warp.
+	 * This is the most useful form of time and should be used in almost all code that deals with real time. */
 	public static LocalDateTime localDateTime() {
 		return trueLocalDateTime().plusSeconds(TimeWarpManager.get());
 	}
 
 	public static LocalDateTime localDateTime(long dailyVersion) {
-		long dayOffset = dailyVersion - getDaysSinceEpoch(TRUE_EPOCH);
+		long dayOffset = dailyVersion - getDailyVersion(TRUE_EPOCH);
 		return TRUE_EPOCH.plusDays(dayOffset);
 	}
 
@@ -72,7 +77,7 @@ public class DateUtils {
 	}
 
 	public static LocalDateTime startOfNextDay() {
-		return localDateTime(getDaysSinceEpoch() + 1);
+		return localDateTime(getDailyVersion() + 1);
 	}
 
 	public static LocalDateTime startOfNextWeek() {
@@ -91,7 +96,7 @@ public class DateUtils {
 		return LocalDateTime.now(TIMEZONE).getDayOfMonth();
 	}
 
-	// 1 is Sunday, 7 is Saturday
+	/** Day of the week, starting at 1 on Sunday, ending at 7 on Saturday. */
 	public static int getDayOfWeek() {
 		return getDayOfWeek(localDateTime());
 	}
@@ -102,26 +107,7 @@ public class DateUtils {
 	}
 
 	/**
-	 * Also known as <code>DailyVersion</code>.
-	 * In our specified timezone, how many days we perceive it is since our 1 Jan 1970.
-	 * Different timezones have different dates for the same point in time,
-	 * so this simple comparison will yield different numbers of days for them.
-	 */
-	public static long getDaysSinceEpoch() {
-		return getDaysSinceEpoch(localDateTime());
-	}
-
-	/**
-	 * In our specified timezone, how many days we perceive it is since our 1 Jan 1970.
-	 * Different timezones have different dates for the same point in time,
-	 * so this simple comparison will yield different numbers of days for them.
-	 */
-	public static long getDaysSinceEpoch(LocalDateTime localDateTime) {
-		return localDateTime.toLocalDate().toEpochDay();
-	}
-
-	/**
-	 * Gets the time since the <bold>UTC Epoch.</bold>
+	 * Gets the time since the <b>UTC Epoch.</b>
 	 *
 	 * @return Number of time units that have passed, rounded down
 	 */
@@ -130,7 +116,7 @@ public class DateUtils {
 	}
 
 	/**
-	 * Gets the time since the <bold>UTC Epoch.</bold>
+	 * Gets the time since the <b>UTC Epoch.</b>
 	 *
 	 * @param localDateTime Reference end time to count towards
 	 * @return Number of time units that have passed, rounded down
@@ -199,12 +185,40 @@ public class DateUtils {
 		return localDateTime.getNano() / 1000000;
 	}
 
+	/**
+	 * In our specified timezone, how many days we perceive it is since our 1 Jan 1970.
+	 * Different timezones have different dates for the same point in time,
+	 * so this simple comparison will yield different numbers of days for them.
+	 */
+	public static long getDailyVersion() {
+		return getDailyVersion(localDateTime());
+	}
+
+	/**
+	 * In our specified timezone, how many days we perceive it is since our 1 Jan 1970.
+	 * Different timezones have different dates for the same point in time,
+	 * so this simple comparison will yield different numbers of days for them.
+	 */
+	public static long getDailyVersion(LocalDateTime localDateTime) {
+		return localDateTime.toLocalDate().toEpochDay();
+	}
+
+	/**
+	 * In our specified timezone, how many weeks we perceive it is since our 1 Jan 1970.
+	 * Different timezones have different dates for the same point in time,
+	 * so this simple comparison will yield different numbers of days for them.
+	 */
 	public static long getWeeklyVersion() {
 		return getWeeklyVersion(localDateTime());
 	}
 
+	/**
+	 * In our specified timezone, how many weeks we perceive it is since our 1 Jan 1970.
+	 * Different timezones have different dates for the same point in time,
+	 * so this simple comparison will yield different numbers of days for them.
+	 */
 	public static long getWeeklyVersion(LocalDateTime localDateTime) {
-		return getWeeklyVersion(getDaysSinceEpoch(localDateTime));
+		return getWeeklyVersion(getDailyVersion(localDateTime));
 	}
 
 	public static long getWeeklyVersion(long dailyVersion) {
@@ -232,7 +246,7 @@ public class DateUtils {
 	}
 
 	public static long getWeeklyVersionStartDate(LocalDateTime localDateTime) {
-		return getDaysSinceEpoch(localDateTime) - getDaysIntoWeeklyVersion(localDateTime) + 1;
+		return getDailyVersion(localDateTime) - getDaysIntoWeeklyVersion(localDateTime) + 1;
 	}
 
 	public static LocalDateTime getWeeklyVersionLocalStartDate() {
@@ -318,7 +332,7 @@ public class DateUtils {
 			.append(Component.text(localDateTime.toString(), NamedTextColor.GOLD))
 			.append(Component.text(":")));
 		sender.sendMessage(Component.text("DailyVersion: ", NamedTextColor.AQUA)
-			.append(Component.text(DateUtils.getDaysSinceEpoch(localDateTime), NamedTextColor.GOLD)));
+			.append(Component.text(DateUtils.getDailyVersion(localDateTime), NamedTextColor.GOLD)));
 		sender.sendMessage(Component.text("WeeklyVersion: ", NamedTextColor.AQUA)
 			.append(Component.text(DateUtils.getWeeklyVersion(localDateTime), NamedTextColor.GOLD)));
 		sender.sendMessage(Component.text("DaysIntoWeeklyVersion: ", NamedTextColor.AQUA)

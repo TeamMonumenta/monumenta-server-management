@@ -27,7 +27,7 @@ import org.bukkit.command.CommandSender;
 
 public class TimeWarpCommand {
 	public static final String COMMAND = "timewarp";
-	public static final CommandPermission PERMISSION = CommandPermission.fromString("monumenta.timewarp");
+	public static final CommandPermission PERMISSION = CommandPermission.fromString("monumentacommon.timewarp");
 
 	public static void register() {
 		List<Argument<?>> arguments = new ArrayList<>();

@@ -7,7 +7,7 @@ import dev.jorel.commandapi.CommandPermission;
 
 public class RefreshTimeCommand {
 	public static final String COMMAND = "refreshtime";
-	public static final CommandPermission PERMISSION = CommandPermission.fromString("monumenta.refreshtime");
+	public static final CommandPermission PERMISSION = CommandPermission.fromString("monumentacommon.refreshtime");
 
 	public static void register() {
 		new CommandAPICommand(COMMAND)
