@@ -8,7 +8,9 @@ import org.jetbrains.annotations.NotNull;
 public class RefreshTimeEvent extends Event {
 	private static final HandlerList handlers = new HandlerList();
 
-	public RefreshTimeEvent() {}
+	public RefreshTimeEvent() {
+
+	}
 
 	@Override
 	public @NotNull HandlerList getHandlers() {
