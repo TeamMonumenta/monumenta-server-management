@@ -122,7 +122,7 @@ public class DateUtils {
 	 * @return Number of time units that have passed, rounded down
 	 */
 	public static long getTimeSinceUTCEpoch(ChronoUnit chronoUnit) {
-		return getTimeSinceUTCEpoch(LocalDateTime.now(), chronoUnit);
+		return getTimeSinceUTCEpoch(LocalDateTime.now(ZoneOffset.UTC), chronoUnit);
 	}
 
 	/**
