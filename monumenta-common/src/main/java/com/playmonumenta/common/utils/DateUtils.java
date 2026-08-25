@@ -4,17 +4,16 @@ import com.google.gson.JsonObject;
 import com.playmonumenta.common.MonumentaCommonPlugin;
 import com.playmonumenta.common.event.RefreshTimeEvent;
 import com.playmonumenta.common.managers.TimeWarpManager;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.Bukkit;
-import org.bukkit.command.CommandSender;
-
 import java.io.File;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 
 public class DateUtils {
 	// Offset server time to UTC-17 to change when the new day arrives.
@@ -102,23 +101,28 @@ public class DateUtils {
 		return Math.floorMod(localDateTime.getDayOfWeek().getValue(), 7) + 1;
 	}
 
-	/** Also known as <code>DailyVersion</code>.
+	/**
+	 * Also known as <code>DailyVersion</code>.
 	 * In our specified timezone, how many days we perceive it is since our 1 Jan 1970.
 	 * Different timezones have different dates for the same point in time,
-	 * so this simple comparison will yield different numbers of days for them. */
+	 * so this simple comparison will yield different numbers of days for them.
+	 */
 	public static long getDaysSinceEpoch() {
 		return getDaysSinceEpoch(localDateTime());
 	}
 
-	/** In our specified timezone, how many days we perceive it is since our 1 Jan 1970.
+	/**
+	 * In our specified timezone, how many days we perceive it is since our 1 Jan 1970.
 	 * Different timezones have different dates for the same point in time,
-	 * so this simple comparison will yield different numbers of days for them. */
+	 * so this simple comparison will yield different numbers of days for them.
+	 */
 	public static long getDaysSinceEpoch(LocalDateTime localDateTime) {
 		return localDateTime.toLocalDate().toEpochDay();
 	}
 
 	/**
 	 * Gets the time since the <bold>UTC Epoch.</bold>
+	 *
 	 * @return Number of time units that have passed, rounded down
 	 */
 	public static long getTimeSinceUTCEpoch(ChronoUnit chronoUnit) {
@@ -127,6 +131,7 @@ public class DateUtils {
 
 	/**
 	 * Gets the time since the <bold>UTC Epoch.</bold>
+	 *
 	 * @param localDateTime Reference end time to count towards
 	 * @return Number of time units that have passed, rounded down
 	 */
@@ -295,7 +300,10 @@ public class DateUtils {
 
 
 	// Ported directly from DateVersionCommand
-	/** Prints information about the date and daily version. */
+
+	/**
+	 * Prints information about the date and daily version.
+	 */
 	public static void debugDate(CommandSender sender, LocalDateTime localDateTime) {
 		sender.sendMessage(Component.text("Date version debug:", NamedTextColor.AQUA, TextDecoration.BOLD));
 		sender.sendMessage(Component.text("Current Tick: ", NamedTextColor.AQUA)
