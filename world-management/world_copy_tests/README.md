@@ -1,60 +1,150 @@
 # WorldCopier Test Fixtures
 
 Eight fixture worlds for testing `WorldCopier.copyWorldRegenUuids`. Fixtures
-W2-W8 are regenerable via `python3 generate.py inputs/`; W1 is an optional
+W2-W8 are regenerable via `.venv/bin/python generate.py inputs/`; W1 is an optional
 slot for a real world (see below).
 
 ## Usage
 
-There are two end-to-end entrypoints, one per copier implementation:
+### Environment setup
+
+One-time setup, done from the repository root unless stated otherwise.
+
+**1. Check out the submodules.** Everything here runs against `monumenta-automation`, its
+nested `quarry` submodule, and quarry's own nested `brigadier.py` submodule
+(`quarry.types.nbt` imports `brigadier.string_reader` from it):
+```bash
+git submodule update --init --recursive
+```
+`monumenta-automation/.gitmodules` and `quarry/.gitmodules` both use SSH URLs
+(`git@github.com:...`). Without a GitHub SSH key the nested clones fail; rewrite them to
+HTTPS first:
+```bash
+git config --global url."https://github.com/".insteadOf git@github.com:
+```
+
+**2. Make sure quarry is new enough.** Two things here depend on quarry changes that are not yet
+on `master`: `generate.py` builds W6 with `RegionFile.save_chunk(compression_type=...)`, and every
+fixture depends on quarry writing the Anvil chunk length field correctly (see "The quarry Anvil
+length field" below). Too old a quarry fails with
+`TypeError: RegionFile.save_chunk() got an unexpected keyword argument 'compression_type'`, or
+passes generation and then fails W6 in the Java stage with an `EOFException`.
+
+Three pins have to land in order: quarry's `compress` branch, then a `monumenta-automation` bump
+of its quarry submodule, then a bump of the `monumenta-automation` pin in this repo. Until all
+three are merged, point the checkouts at the right revisions by hand:
+```bash
+cd monumenta-automation && git checkout quarry-anvil-length-fix
+cd quarry && git checkout compress
+git submodule update --init --recursive
+```
+Re-run this after any `git submodule update` that resets either one. Once the three pins have
+landed, a plain `git submodule update --init --recursive` is enough and this step goes away.
+
+**3. Create the venv and install dependencies.** The automation libs target `pypy3`
+(`copy_world.py` is shebanged `#!/usr/bin/env pypy3`), so build the venv from `pypy3`. On
+Debian/Ubuntu that needs the `pypy3` and `pypy3-venv` packages:
+```bash
+cd world-management/world_copy_tests
+pypy3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+**4. Run everything through `.venv/bin/python`.** `_runner.py` launches every child process
+(`generate.py`, `copy_world.py`, `validate.py`) with `sys.executable`, so the interpreter
+that starts an entrypoint is the one the whole flow uses; `copy_world.py`'s shebang is
+deliberately bypassed. Running with the system `python3` fails on the missing dependencies.
+
+### End-to-end entrypoints
+
+There are three end-to-end entrypoints:
 
 `run_python_test.py` - Python `copy_world.py`
-`run_java_test.py` - Java `WorldCopier` (via Dockerized Paper server)
+`run_java_test.py` - Java `WorldCopier` (via a throwaway Paper server)
+`run_load_test.py` - Java `WorldCopier`, then loads the results on a real server
 
-Both run the same `generate -> copy -> validate` flow (shared in `_runner.py`).
+The first two run the same `generate -> copy -> validate` flow (shared in `_runner.py`),
+validating the copy by re-reading its NBT with quarry. The third answers a different
+question: whether Minecraft itself can load what the copier produced.
 
 ### Python
 Run the full Python end-to-end test (generate, copy every fixture with
 `copy_world.py`, validate):
 ```bash
 cd world-management/world_copy_tests
-python3 run_python_test.py
+.venv/bin/python run_python_test.py
 ```
 
 ### Java
 Run the full Java end-to-end test (generate, copy every fixture with the real
 Java `WorldCopier`, validate). The copy runs unattended inside a throwaway Paper
-server in Docker: the world-management plugin, when `MONUMENTA_WORLD_COPY_TEST`
-is set, copies the fixtures in its `onLoad` hook (see `WorldCopyTestHarness`)
-and exits before any world loads. Requires `docker` and a JDK (for the gradle
-jar build):
+server: the world-management plugin, when `MONUMENTA_WORLD_COPY_TEST` is set,
+copies the fixtures in its `onLoad` hook (see `WorldCopyTestHarness`) and exits
+before any world loads. Paper and its plugin jars are downloaded and cached in
+`.paper-cache/`, and the server itself runs in a temporary directory that is
+deleted unless the run fails. Requires a JDK (for both the gradle build and the
+server):
 ```bash
-python3 run_java_test.py
+.venv/bin/python run_java_test.py
 ```
 Flags: `--no-build` skips rebuilding the plugin jars (reuse the last gradle output);
-`--rebuild` rebuilds the Docker image (needed when anything under `docker/` changes);
-`--verbose` raises the container log level to TRACE.
+`--refresh` re-downloads the cached Paper and plugin jars; `--keep` retains the
+temporary server directory (and its `server.log`) after a successful run;
+`--verbose` raises the server log level to TRACE.
+
+This used to run in Docker. See `DOCKER.md` for what that looked like and what it
+would take to bring it back.
+
+### Load verification
+
+`validate.py` checks the copier's output by parsing it with quarry and asserting NBT-level
+properties. That cannot catch a world that is structurally valid NBT but that a real server
+refuses to load, which is exactly the failure mode an earlier version of this code had.
+
+`run_load_test.py` closes that gap. It copies the fixtures with the Java copier, then starts a
+Paper server carrying nothing but a small purpose-built plugin (`verifier/`, compiled with plain
+`javac`, not part of the gradle build). For both the input world and the output world it
+enumerates every chunk present in `region/*.mca`, force-loads each one through Bukkit, and counts
+the entities and block entities the server actually sees. Input and output must agree exactly.
+
+```bash
+.venv/bin/python run_load_test.py
+```
+
+Comparing input against output, rather than against fixed expected numbers, is what makes the
+result interpretable: a real world legitimately produces chunk-load warnings (light data,
+heightmap size), and seeing the identical count on both sides is what distinguishes a property of
+the source world from damage done by the copier.
+
+Only `01_real_world` gets meaningful coverage here. The synthetic fixtures are reported as SKIP:
+their stub `level.dat` has no `WorldGenSettings`, so a real server cannot open them at all, and
+even with that fixed their chunks have no block sections, so vanilla discards every block entity
+(`Skipping BlockEntity with id minecraft:spawner`) and the comparison would assert 0 against 0.
+`UNLOADABLE_FIXTURES` in `run_load_test.py` records this, and `--all-fixtures` re-runs the
+experiment for anyone who wants to recheck the assumption. Do not add entries to that list to
+silence a genuine failure.
 
 ### Running individual stages
 
 Generate inputs (idempotent, regenerates from source):
 ```bash
-python3 generate.py inputs/
+.venv/bin/python generate.py inputs/
 ```
 
 Run the Python reference copy for a single world:
 ```bash
-python3 ../../monumenta-automation/utility_code/copy_world.py inputs/<name> outputs/<name>
+.venv/bin/python ../../monumenta-automation/utility_code/copy_world.py inputs/<name> outputs/<name>
 ```
 
 Validate outputs against inputs:
 ```bash
-python3 validate.py inputs/ outputs/
+.venv/bin/python validate.py [--python-reference] inputs/ outputs/
 ```
 
 ## Modifying the Java `WorldCopier`
 
-Debugging: the container streams the Paper log. The harness prints
+Debugging: the runner streams the Paper log to stdout and to `server.log` in the
+temporary server directory, which is kept on failure. The harness prints
 `[world-copy-test] PASS/FAIL <fixture>`, and a failing copy prints a full Java stack trace
 pinpointing the `WorldCopier` line. `WorldCopier` also emits `MMLog.trace` diagnostics at the
 chunk level for deeper inspection; pass `--verbose` to see them.
@@ -64,11 +154,17 @@ chunk level for deeper inspection; pass `--verbose` to see them.
 | File | Role |
 |---|---|
 | `world-management/src/.../paper/WorldCopier.java` | The copier implementation |
+| `world-management/src/.../paper/RegionFileRewriter.java` | Walks a region/ or entities/ folder, regenerating UUIDs chunk by chunk |
+| `world-management/adapter_api/.../WorldStorageAdapter.java` | Version-agnostic world storage boundary: chunk coordinates and NBT only |
+| `world-management/adapter_v1_20_R3/.../WorldStorageAdapter_v1_20_R3.java` | 1.20.4 implementation, on the server's own `RegionFile` and `NbtIo` |
 | `world-management/src/.../paper/WorldCopyTestHarness.java` | Test entrypoint: copies every fixture in `onLoad` when `MONUMENTA_WORLD_COPY_TEST` is set, then exits |
 | `world-management/src/.../paper/WorldManagementPlugin.java` | `onLoad` calls the harness when the env var is set, before normal startup |
-| `run_java_test.py` / `_runner.py` | Orchestration: generate -> build jars -> docker run -> validate |
-| `docker/` | Throwaway Paper image (pinned Paper / CommandAPI / NBT-API versions) |
-| `validate.py` | Asserts copy correctness; shared by the Python and Java entrypoints |
+| `run_java_test.py` / `_runner.py` | Orchestration: generate -> build jars -> run Paper -> validate |
+| `server_files/` | `server.properties` and `log4j2.xml` copied into the throwaway server |
+| `DOCKER.md` | How this was previously containerized, if it ever needs to be again |
+| `validate.py` | Asserts copy correctness at the NBT level; shared by the Python and Java entrypoints |
+| `run_load_test.py` / `verifier/` | Loads copied worlds on a real Paper server and compares what it sees against the input |
+| `_server.py` | Shared jar caching, Paper download, and throwaway-server plumbing |
 
 ## Development
 
@@ -83,21 +179,54 @@ pyright
 
 `validate.py` is designed to pass against both the Java `WorldCopier` and the Python
 `copy_world.py` reference tool. The notes below describe how those two implementations happen to
-behave as of 2026-06-18. They are breadcrumbs for anyone debugging the copiers, *not* a contract:
+behave as of 2026-08-24. They are breadcrumbs for anyone debugging the copiers, *not* a contract:
 the validators are written to tolerate either behavior and must **not** start depending on any of
 them. If an implementation changes, update these notes rather than tightening the tests.
 
-- **Empty entity chunks**: Java drops entity chunks whose `Entities` list is empty; Python
-  rewrites them as present-but-empty chunks. Validators accept a chunk that is absent or
-  present-but-empty.
+- **Empty entity chunks**: Java leaves entity chunks whose `Entities` list is empty exactly as
+  they were, because it only rewrites chunks whose UUIDs changed; Python rewrites them as
+  present-but-empty chunks. Validators accept a chunk that is absent or present-but-empty.
 - **Compression type of verbatim chunks**: Java preserves the original compression type for
   chunks it copies without modification; Python rewrites all chunks as type 2 (zlib). The
   W6 validator only asserts compression type for modified (UUID-bearing) chunks.
-- **Force-external small chunks**: Both copiers re-serialize chunks and let small ones collapse
-  back inline, so a chunk forced external via the `force_external` flag (but small enough to fit
-  inline) ends up inline in the output `.mca`. Only genuinely oversized chunks (data > 255
-  sectors) stay external. The W7 validator only requires the genuinely oversized chunk to remain
-  external; it does not assert anything about small force-external chunks.
+- **Top-level copy whitelist**: only the Java copier has one. `copy_world.py` writes
+  `level.dat` plus the `region/`/`entities/` chunk data and nothing else, so it never copies
+  `monumenta/`. Unlike the items below this is a capability gap rather than an incidental
+  difference, so the W2 validator gates it on the `--python-reference` flag
+  (`run_python_test.py` passes it; the Java stage still asserts the whitelist in full) rather
+  than tolerating a missing `monumenta/` unconditionally.
+- **Force-external small chunks**: Python re-serializes every chunk, so a chunk forced external
+  via the `force_external` flag (but small enough to fit inline) collapses back inline. Java only
+  rewrites chunks whose UUIDs changed, so such a chunk stays external unless it also carried a
+  UUID. Only genuinely oversized chunks (data > 255 sectors) stay external either way. The W7
+  validator requires the genuinely oversized chunk to remain external and permits, but does not
+  require, a `.mcc` for the unmodified force-external chunk.
+
+## The quarry Anvil length field
+
+The Anvil per-chunk length field counts the compression-type byte plus the payload, and Minecraft
+reads exactly `length - 1` payload bytes (`RegionFile.getChunkDataInputStream`). quarry's
+`RegionFile.save_chunk` used to store just the payload length, one byte short, and its reader
+compensated for its own writer. quarry round-tripped with itself perfectly while producing files a
+real server misread by a byte: invisible for zlib and gzip, where the NBT payload is fully decoded
+before the missing byte is ever needed, and fatal for uncompressed chunks, which lose the last byte
+of their NBT.
+
+This is fixed in quarry as of the `compress` branch. `save_chunk` writes the spec length, and
+`load_chunk` hands zlib and gzip everything left in the reserved sectors rather than slicing to the
+declared length, so it still reads the one-byte-short files that every previously copied world
+contains. That backward compatibility is load-bearing: `copy_world.py` also writes through quarry,
+so every world Monumenta's automation has ever produced carries the short field.
+
+Two consequences worth remembering:
+
+- The fixtures are byte-accurate Anvil straight out of `generate.py`, with no post-processing. If a
+  future quarry regresses this, W6 fails immediately, because its uncompressed chunks are the case
+  that actually breaks.
+- Before the fix, this repo's Java copier carried a "truncation tolerant" inflate loop with a
+  comment claiming real Anvil writers under-report chunk lengths. They do not. That loop was
+  compensating for quarry, and in doing so it hid the fact that the fixtures were not valid Anvil
+  files at all, so no test built on them said anything about a real server. It is gone.
 
 ## Fixtures
 

@@ -22,7 +22,7 @@ def main() -> None:
     _runner.clean_outputs()
     for name in _runner.fixture_names():
         copy_world(name)
-    _runner.validate()
+    _runner.validate(python_reference=True)
     print("\nPython world-copy end-to-end test passed.")
 
 

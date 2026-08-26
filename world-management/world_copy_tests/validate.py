@@ -20,6 +20,14 @@ class SkipFixture(Exception):
     """Raised by a validator when its fixture is absent/empty and should be skipped, not failed."""
 
 
+# Set by --python-reference. The Python reference copier (copy_world.py) writes only
+# level.dat plus the region/entities chunk data; it has no top-level copy whitelist and
+# so never copies monumenta/. That is a real capability gap, not an incidental difference,
+# so it is gated behind a flag instead of being tolerated unconditionally: the Java stage
+# still asserts the whitelist in full.
+PYTHON_REFERENCE = False
+
+
 def _open_region(path: str) -> nbt.RegionFile:
     return nbt.RegionFile(path, read_only=True)
 
@@ -221,13 +229,16 @@ def validate_02_baseline(in_path: str, out_path: str) -> None:
         assert not os.path.exists(os.path.join(out_path, name)), \
             f"W2: non-whitelisted entry '{name}' must not appear in output"
 
-    # monumenta/ is on the copy whitelist and must be copied verbatim by both copiers.
+    # monumenta/ is on the Java copier's whitelist and must be copied verbatim. The Python
+    # reference copier has no whitelist and omits it entirely (see PYTHON_REFERENCE above).
     rel = ("monumenta", "marker.txt")
     f_in = os.path.join(in_path, *rel)
     f_out = os.path.join(out_path, *rel)
-    assert os.path.exists(f_out), "W2: monumenta/ must be copied to output"
-    with open(f_in, "rb") as fi, open(f_out, "rb") as fo:
-        assert fi.read() == fo.read(), f"W2: {os.path.join(*rel)} not byte-identical"
+    if not PYTHON_REFERENCE:
+        assert os.path.exists(f_out), "W2: monumenta/ must be copied to output"
+    if os.path.exists(f_out):
+        with open(f_in, "rb") as fi, open(f_out, "rb") as fo:
+            assert fi.read() == fo.read(), f"W2: {os.path.join(*rel)} not byte-identical"
 
     assert _load_level_dat_name(out_path) == "02_baseline", \
         "W2: output LevelName must be '02_baseline'"
@@ -487,11 +498,17 @@ def validate_07_external_mcc(in_path: str, out_path: str) -> None:
     assert nbt_structural_equal(strip_uuid_family(in_body), strip_uuid_family(out_body)), \
         "W7: entities/r.0.0 chunk(0,0) NBT differs after stripping UUIDs"
 
-    # Only the genuinely oversized chunk should remain as .mcc; force-external small chunks become inline
-    expected_mccs = {os.path.join(out_path, "region", "c.2.0.mcc")}
+    # The genuinely oversized chunk must stay external. A force-external chunk small enough to fit
+    # inline may go either way: a copier that re-serializes every chunk collapses it back inline,
+    # while one that leaves unmodified chunks alone keeps it external. Chunk (1,0) carries a UUID, so
+    # every copier rewrites it and it must end up inline with its .mcc cleaned up.
+    required_mccs = {os.path.join(out_path, "region", "c.2.0.mcc")}
+    optional_mccs = {os.path.join(out_path, "region", "c.0.0.mcc")}
     actual_mccs = set(glob.glob(os.path.join(out_path, "region", "*.mcc")))
-    assert actual_mccs == expected_mccs, \
-        f"W7: unexpected .mcc files in region/: {actual_mccs ^ expected_mccs}"
+    assert required_mccs <= actual_mccs, \
+        f"W7: missing .mcc files in region/: {required_mccs - actual_mccs}"
+    assert actual_mccs <= required_mccs | optional_mccs, \
+        f"W7: unexpected .mcc files in region/: {actual_mccs - required_mccs - optional_mccs}"
 
 
 # ---------------------------------------------------------------------------
@@ -572,10 +589,13 @@ FIXTURES = [
 
 
 def main() -> None:
-    if len(sys.argv) < 3:
-        print(f"Usage: {sys.argv[0]} <inputs_dir> <outputs_dir>")
+    global PYTHON_REFERENCE  # pylint: disable=global-statement
+    args = [a for a in sys.argv[1:] if a != "--python-reference"]
+    PYTHON_REFERENCE = "--python-reference" in sys.argv[1:]
+    if len(args) < 2:
+        print(f"Usage: {sys.argv[0]} [--python-reference] <inputs_dir> <outputs_dir>")
         sys.exit(1)
-    inputs_dir, outputs_dir = sys.argv[1], sys.argv[2]
+    inputs_dir, outputs_dir = args[0], args[1]
     passed = failed = skipped = 0
     for name, fn in FIXTURES:
         in_path = os.path.join(inputs_dir, name)

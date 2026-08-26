@@ -3,7 +3,6 @@ package com.playmonumenta.worlds.paper;
 import com.playmonumenta.worlds.common.MMLog;
 import com.playmonumenta.worlds.common.utils.FileUtils;
 import com.playmonumenta.worlds.paper.RegionFileRewriter.RegionKind;
-import de.tr7zw.nbtapi.NBT;
 import de.tr7zw.nbtapi.iface.ReadWriteNBT;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -110,9 +109,9 @@ public final class WorldCopier {
 	}
 
 	private static void copyLevelDat(Path src, Path dst, String destWorldName) throws IOException {
-		ReadWriteNBT nbt = NBT.readFile(src.toFile());
+		ReadWriteNBT nbt = WorldStorageAdapters.get().readNbtFile(src);
 		nbt.getOrCreateCompound("Data").setString("LevelName", destWorldName);
-		NBT.writeFile(dst.toFile(), nbt);
+		WorldStorageAdapters.get().writeNbtFile(dst, nbt);
 	}
 
 	/**

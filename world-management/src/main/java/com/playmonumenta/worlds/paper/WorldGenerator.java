@@ -166,11 +166,6 @@ public class WorldGenerator {
 		return (float) completed / (float) limit;
 	}
 
-	public int pregeneratedInstances(String templateName) {
-		TemplateState state = mTemplates.get(templateName);
-		return state == null ? 0 : state.mFresh.size();
-	}
-
 	public static boolean worldExists(String name) {
 		File target = new File(name);
 		return target.isDirectory() && new File(target, "level.dat").isFile();

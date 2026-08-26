@@ -47,6 +47,7 @@ public class WorldManagementPlugin extends JavaPlugin {
 	@Override
 	public void onLoad() {
 		MMLog.init(getName());
+		WorldStorageAdapters.load();
 		if (WorldCopyTestHarness.isEnabled()) {
 			WorldCopyTestHarness.runAndExit(); // never returns
 		}

@@ -1,2 +1,4 @@
 outputs
 inputs
+.venv
+verifier/build
