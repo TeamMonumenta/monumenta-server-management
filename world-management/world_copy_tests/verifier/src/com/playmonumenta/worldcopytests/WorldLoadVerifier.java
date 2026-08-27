@@ -14,11 +14,11 @@ import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.plugin.java.JavaPlugin;
 
-/**
+/*
  * Throwaway plugin for run_load_test.py: loads each world named in MONUMENTA_WORLD_LOAD_VERIFY
  * through Minecraft's own world loader and chunk deserializer, then reports what came back.
  *
- * <p>Not part of the gradle build; run_load_test.py compiles it with plain javac.
+ * Not part of the gradle build; run_load_test.py compiles it with plain javac.
  */
 public class WorldLoadVerifier extends JavaPlugin {
 	private static final String WORLDS_ENV = "MONUMENTA_WORLD_LOAD_VERIFY";
@@ -87,7 +87,7 @@ public class WorldLoadVerifier extends JavaPlugin {
 			+ " blockEntities=" + blockEntities);
 	}
 
-	/** Chunk coordinates of every chunk with a nonzero location-table entry in region/. */
+	// Chunk coordinates of every chunk with a nonzero location-table entry in region/.
 	private static List<int[]> presentChunks(File regionDir) throws IOException {
 		List<int[]> chunks = new ArrayList<>();
 		File[] files = regionDir.listFiles((dir, name) -> name.startsWith("r.") && name.endsWith(".mca"));

@@ -2,7 +2,7 @@
 
 Two entrypoints drive these fixtures end-to-end:
   - run_python_test.py: exercises the Python reference copier (copy_world.py).
-  - run_java_test.py:    exercises the Java WorldCopier (Dockerized Paper server).
+  - run_java_test.py:    exercises the Java WorldCopier (throwaway Paper server).
 Both reuse the generate -> copy -> validate flow assembled here.
 
 Interpreter: every child process is launched with sys.executable, so the whole

@@ -2,6 +2,7 @@ package com.playmonumenta.worlds.paper;
 
 import com.playmonumenta.worlds.adapters.RegionAccess;
 import com.playmonumenta.worlds.common.MMLog;
+import de.tr7zw.nbtapi.NBTType;
 import de.tr7zw.nbtapi.iface.ReadWriteNBT;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -15,10 +16,10 @@ import java.util.regex.Pattern;
 /*
  * Copies a region/ or entities/ folder, regenerating nested entity UUIDs.
  *
- * The folder is first copied byte for byte, then chunks are edited in place in the copy. That means
- * the template is never opened for writing, and a chunk whose UUIDs did not change keeps its original
- * bytes and compression rather than being decoded and re-encoded. Only one chunk is held in memory at
- * a time.
+ * The folder is copied byte for byte first, then chunks are edited in place in the copy. The
+ * template is therefore never opened for writing, and a chunk whose UUIDs did not change keeps its
+ * original bytes, compression type and external-.mcc placement rather than being re-encoded. Only
+ * one chunk is decompressed at a time.
  */
 public final class RegionFileRewriter {
 	private static final int REGION_WIDTH = 32;
@@ -26,9 +27,10 @@ public final class RegionFileRewriter {
 	// Captures the region coordinates, which give the chunk coordinates of the chunks it holds.
 	private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca");
 
-	// Which kind of NBT a region file holds, and therefore where its entity UUIDs live.
+	// Which kind of NBT a region file holds, and therefore where its entity UUIDs live. The two
+	// folders use identical file names and container formats, so only the source folder says which.
 	public enum RegionKind {
-		// entities/*.mca: a flat Entities list.
+		// entities/*.mca: a flat Entities list. Since 1.17 mobs live here, not in region/.
 		ENTITIES,
 		// region/*.mca: terrain plus block_entities.
 		REGION
@@ -37,9 +39,11 @@ public final class RegionFileRewriter {
 	private RegionFileRewriter() {
 	}
 
-	/** Copies every file in srcDir to dstDir, then regenerates entity UUIDs in the copied region files. */
+	// Copies every file in srcDir to dstDir, then regenerates entity UUIDs in the copied region files.
 	public static void rewriteDir(Path srcDir, Path dstDir, RegionKind kind) throws IOException {
 		Files.createDirectories(dstDir);
+		// Everything is copied, not just *.mca: a chunk too big to store inline lives in a sibling
+		// c.<x>.<z>.mcc file that is part of its region file's contents.
 		List<Path> regionFiles = new ArrayList<>();
 		try (DirectoryStream<Path> entries = Files.newDirectoryStream(srcDir)) {
 			for (Path entry : entries) {
@@ -53,7 +57,7 @@ public final class RegionFileRewriter {
 				}
 			}
 		}
-		// Rewriting adds and removes .mcc files in dstDir, so the listing above must be complete first.
+		// Second pass: rewriting adds and removes .mcc files in dstDir, so the copy must finish first.
 		for (Path regionFile : regionFiles) {
 			rewriteFile(regionFile, kind);
 		}
@@ -77,7 +81,7 @@ public final class RegionFileRewriter {
 				if (chunk == null) {
 					continue;
 				}
-				if (regenChunk(chunk, kind)) {
+				if (regenChunk(chunk, kind, file, chunkX, chunkZ)) {
 					region.writeChunk(chunkX, chunkZ, chunk);
 					rewritten++;
 				} else {
@@ -90,9 +94,20 @@ public final class RegionFileRewriter {
 	}
 
 	// Regenerates UUIDs in a parsed chunk according to its region kind; returns whether anything changed.
-	private static boolean regenChunk(ReadWriteNBT chunk, RegionKind kind) {
+	private static boolean regenChunk(ReadWriteNBT chunk, RegionKind kind, Path file, int chunkX, int chunkZ)
+		throws IOException {
+		// Pre-1.18 chunks nest everything under "Level", which none of the paths below reach into, so
+		// the chunk would be copied with its UUIDs intact and collide with the template. Minecraft
+		// only upgrades a chunk when it loads it, so an untouched template can still be in this form.
+		if (chunk.hasTag("Level")) {
+			throw new IOException("Chunk (" + chunkX + "," + chunkZ + ") in " + file
+				+ " uses the pre-1.18 'Level' layout; load the template on a modern server to"
+				+ " upgrade it before copying");
+		}
 		String listKey = kind == RegionKind.ENTITIES ? "Entities" : "block_entities";
-		if (!chunk.hasTag(listKey)) {
+		// getCompoundList creates or replaces an absent or wrong-typed tag, editing the chunk we are
+		// only inspecting.
+		if (!chunk.hasTag(listKey) || chunk.getType(listKey) != NBTType.NBTTagList) {
 			return false;
 		}
 		boolean modified = false;

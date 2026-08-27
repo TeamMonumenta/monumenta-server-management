@@ -16,7 +16,7 @@ public final class WorldStorageAdapters {
 	private WorldStorageAdapters() {
 	}
 
-	/** Resolves the adapter for the running server version. Throws if this version is unsupported. */
+	// Resolves the adapter for the running server version. Throws if this version is unsupported.
 	public static void load() {
 		String packageName = Bukkit.getServer().getClass().getPackage().getName();
 		String version = packageName.substring(packageName.lastIndexOf('.') + 1);
@@ -26,7 +26,7 @@ public final class WorldStorageAdapters {
 		} catch (ReflectiveOperationException | ClassCastException ex) {
 			throw new IllegalStateException("No world storage adapter for server version " + version, ex);
 		}
-		// World copies run off the main thread; NBT-API's reflection setup is not safe to trigger there.
+		// NBT-API's first-use reflection setup is not thread safe, and world copies run async.
 		NBT.preloadApi();
 		MMLog.info("Loaded world storage adapter for " + version);
 	}

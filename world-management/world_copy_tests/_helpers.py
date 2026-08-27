@@ -6,8 +6,10 @@ import sys
 import uuid
 from typing import Any
 
-# Constants for the genuinely-oversized chunk in W6
+# Constants for the genuinely-oversized chunk in W7 (07_external_mcc). The padding is random so zlib
+# cannot compress it away, since the point is to exceed the 255-sector inline limit.
 _BIG_CHUNK_SEED = 42
+EXTERNAL_CHUNK_FLAG = 0x80  # Anvil compression-type high bit: payload lives in a .mcc file
 BIG_CHUNK_PADDING_SIZE = 1_100_000  # bytes; enough to exceed 255 sectors when zlib-compressed
 
 _AUTO = os.path.join(os.path.dirname(__file__), "../../monumenta-automation/utility_code")
@@ -183,6 +185,9 @@ def collect_all_uuids(world_path: str) -> set[tuple[int, ...]]:
     Only UUIDs on a compound that also carries an `id` (i.e. an entity) are collected. This
     excludes UUIDs the copier intentionally leaves stable, such as item `AttributeModifiers[].UUID`,
     which are not entity identities and do not cause cross-world collisions.
+
+    An unreadable region file raises: the assertion built on this is that the input and output UUID
+    sets are disjoint, so skipping a file would report a corrupted output as a pass.
     """
     result: set[tuple[int, ...]] = set()
     # Only region/ and entities/ hold entity-identity UUIDs and are the only dirs the copier
@@ -196,15 +201,14 @@ def collect_all_uuids(world_path: str) -> set[tuple[int, ...]]:
             if not fname.endswith(".mca"):
                 continue
             fpath = os.path.join(sub_dir, fname)
+            rf = nbt.RegionFile(fpath, read_only=True)
             try:
-                rf = nbt.RegionFile(fpath, read_only=True)
                 for cx, cz in rf.list_chunks():
                     chunk = rf.load_chunk(cx, cz)
                     if chunk is not None:
                         _collect_uuids_tag(chunk.body, result)
+            finally:
                 rf.close()
-            except Exception:  # pylint: disable=broad-exception-caught
-                pass  # unreadable region files are skipped; this is a best-effort scan
     return result
 
 
@@ -221,25 +225,39 @@ def _collect_uuids_tag(tag: Any, result: set[tuple[int, ...]]) -> None:
             _collect_uuids_tag(e, result)
 
 
-def read_chunk_compression_type(region_path: str, local_cx: int, local_cz: int) -> int:
-    """Read the compression type byte from a raw region file for a local chunk coordinate."""
+def _read_chunk_frame(region_path: str, local_cx: int, local_cz: int) -> tuple[int, int] | None:
+    """Read a chunk's (declared length, raw compression-type byte), or None if it is absent.
+
+    Raw meaning the external flag is still set; callers decide what to do with it.
+    """
     with open(region_path, "rb") as f:
         f.seek(4 * (32 * local_cz + local_cx))
         entry = struct.unpack(">I", f.read(4))[0]
         offset = entry >> 8
         if offset == 0:
-            raise KeyError(f"No chunk at local ({local_cx}, {local_cz})")
-        f.seek(4096 * offset + 4)  # skip 4-byte length
-        return struct.unpack("B", f.read(1))[0]
+            return None
+        f.seek(4096 * offset)
+        length, raw_type = struct.unpack(">IB", f.read(5))
+        return length, raw_type
+
+
+def read_chunk_compression_type(region_path: str, local_cx: int, local_cz: int) -> int:
+    """Compression type of a chunk: 1=gzip, 2=zlib, 3=uncompressed.
+
+    The external flag is masked off, so an oversized chunk reports the format its .mcc payload is
+    stored in. Use is_external_chunk for placement.
+    """
+    frame = _read_chunk_frame(region_path, local_cx, local_cz)
+    if frame is None:
+        raise KeyError(f"No chunk at local ({local_cx}, {local_cz})")
+    return frame[1] & ~EXTERNAL_CHUNK_FLAG
 
 
 def is_external_chunk(region_path: str, local_cx: int, local_cz: int) -> bool:
-    with open(region_path, "rb") as f:
-        f.seek(4 * (32 * local_cz + local_cx))
-        entry = struct.unpack(">I", f.read(4))[0]
-        offset = entry >> 8
-        if offset == 0:
-            return False
-        f.seek(4096 * offset)
-        size_and_type = struct.unpack(">IB", f.read(5))
-        return size_and_type == (1, 130)
+    """Whether a chunk's payload lives in a sibling .mcc file.
+
+    Keyed on the compression-type high bit, as Minecraft does; matching an exact stub frame would
+    only recognize one writer's output and silently report False for the rest.
+    """
+    frame = _read_chunk_frame(region_path, local_cx, local_cz)
+    return frame is not None and bool(frame[1] & EXTERNAL_CHUNK_FLAG)

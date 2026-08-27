@@ -23,23 +23,17 @@ HTTPS first:
 git config --global url."https://github.com/".insteadOf git@github.com:
 ```
 
-**2. Make sure quarry is new enough.** Two things here depend on quarry changes that are not yet
-on `master`: `generate.py` builds W6 with `RegionFile.save_chunk(compression_type=...)`, and every
-fixture depends on quarry writing the Anvil chunk length field correctly (see "The quarry Anvil
-length field" below). Too old a quarry fails with
-`TypeError: RegionFile.save_chunk() got an unexpected keyword argument 'compression_type'`, or
-passes generation and then fails W6 in the Java stage with an `EOFException`.
+**2. Two quarry capabilities are required.** The pins already point at a quarry that has both, so
+`git submodule update --init --recursive` is enough; these are the failure modes if a pin ever moves
+backwards.
 
-Three pins have to land in order: quarry's `compress` branch, then a `monumenta-automation` bump
-of its quarry submodule, then a bump of the `monumenta-automation` pin in this repo. Until all
-three are merged, point the checkouts at the right revisions by hand:
-```bash
-cd monumenta-automation && git checkout quarry-anvil-length-fix
-cd quarry && git checkout compress
-git submodule update --init --recursive
-```
-Re-run this after any `git submodule update` that resets either one. Once the three pins have
-landed, a plain `git submodule update --init --recursive` is enough and this step goes away.
+- `RegionFile.save_chunk(compression_type=...)`, used by W6. Missing it fails generation with
+  `TypeError: RegionFile.save_chunk() got an unexpected keyword argument 'compression_type'`.
+- A correct Anvil chunk length field (see "The quarry Anvil length field" below). Missing it
+  generates plausible-looking fixtures that fail W6 in the Java stage with an `EOFException`.
+
+quarry is a nested submodule of `monumenta-automation`, so a quarry fix reaches this repo only after
+both pins are bumped, and checking out a branch by hand is undone by the next `git submodule update`.
 
 **3. Create the venv and install dependencies.** The automation libs target `pypy3`
 (`copy_world.py` is shebanged `#!/usr/bin/env pypy3`), so build the venv from `pypy3`. On
@@ -92,8 +86,8 @@ Flags: `--no-build` skips rebuilding the plugin jars (reuse the last gradle outp
 temporary server directory (and its `server.log`) after a successful run;
 `--verbose` raises the server log level to TRACE.
 
-This used to run in Docker. See `DOCKER.md` for what that looked like and what it
-would take to bring it back.
+`JAVA_TEST.md` documents what each run does step by step, why the plugin jars have
+to be the shaded ones, and the pinned Paper/CommandAPI/NBT-API versions.
 
 ### Load verification
 
@@ -155,13 +149,15 @@ chunk level for deeper inspection; pass `--verbose` to see them.
 |---|---|
 | `world-management/src/.../paper/WorldCopier.java` | The copier implementation |
 | `world-management/src/.../paper/RegionFileRewriter.java` | Walks a region/ or entities/ folder, regenerating UUIDs chunk by chunk |
+| `world-management/src/.../paper/EntityUuidRegenerator.java` | The typed NBT walk deciding which UUIDs are entity identities and get replaced |
+| `world-management/src/.../paper/WorldStorageAdapters.java` | Picks the adapter matching the running server version |
 | `world-management/adapter_api/.../WorldStorageAdapter.java` | Version-agnostic world storage boundary: chunk coordinates and NBT only |
 | `world-management/adapter_v1_20_R3/.../WorldStorageAdapter_v1_20_R3.java` | 1.20.4 implementation, on the server's own `RegionFile` and `NbtIo` |
 | `world-management/src/.../paper/WorldCopyTestHarness.java` | Test entrypoint: copies every fixture in `onLoad` when `MONUMENTA_WORLD_COPY_TEST` is set, then exits |
 | `world-management/src/.../paper/WorldManagementPlugin.java` | `onLoad` calls the harness when the env var is set, before normal startup |
 | `run_java_test.py` / `_runner.py` | Orchestration: generate -> build jars -> run Paper -> validate |
 | `server_files/` | `server.properties` and `log4j2.xml` copied into the throwaway server |
-| `DOCKER.md` | How this was previously containerized, if it ever needs to be again |
+| `JAVA_TEST.md` | Per-run mechanics of the Java stage: jar requirements and pinned versions |
 | `validate.py` | Asserts copy correctness at the NBT level; shared by the Python and Java entrypoints |
 | `run_load_test.py` / `verifier/` | Loads copied worlds on a real Paper server and compares what it sees against the input |
 | `_server.py` | Shared jar caching, Paper download, and throwaway-server plumbing |
@@ -223,10 +219,13 @@ Two consequences worth remembering:
 - The fixtures are byte-accurate Anvil straight out of `generate.py`, with no post-processing. If a
   future quarry regresses this, W6 fails immediately, because its uncompressed chunks are the case
   that actually breaks.
-- Before the fix, this repo's Java copier carried a "truncation tolerant" inflate loop with a
-  comment claiming real Anvil writers under-report chunk lengths. They do not. That loop was
-  compensating for quarry, and in doing so it hid the fact that the fixtures were not valid Anvil
-  files at all, so no test built on them said anything about a real server. It is gone.
+- Real Anvil writers do not under-report chunk lengths. An earlier Java copier carried a
+  "truncation tolerant" inflate loop on that premise; it was compensating for quarry, and it hid the
+  fact that the fixtures were not valid Anvil at all. Do not reintroduce it: if a chunk will not
+  inflate at its declared length, the file is wrong and the copier should say so.
+- The other framing value worth checking is the location header's sector count (its low 8 bits). An
+  external (`.mcc`) chunk occupies exactly one sector regardless of payload size; storing the
+  payload's count strands sectors, and at exactly 256 truncates to 0 so the chunk reads as absent.
 
 ## Fixtures
 
@@ -321,7 +320,7 @@ format.
 |   `-- r.0.0.mca
 |       `-- chunk (0,0):
 |           |-- block_entity[0]: spawner
-|           |   |-- SpawnData.entity = { id: zombie }                      # no UUID -- must remain UUID-free
+|           |   |-- SpawnData.entity = { id: zombie }                      # no UUID; must remain UUID-free
 |           |   `-- SpawnPotentials[0].data.entity = skeleton+UUID         # must be regenerated
 |           |-- block_entity[1]: beehive
 |           |   `-- bees[0].entity_data = bee+UUID                         # 1.20.4 spec format; must be regenerated

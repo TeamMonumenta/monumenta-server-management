@@ -118,7 +118,7 @@ def generate_02_baseline(base_dir: str) -> None:
 
     os.makedirs(os.path.join(d, "poi"))
 
-    # Unknown dir that should be verbatim-copied
+    # Non-whitelisted dir, so the copier drops it.
     os.makedirs(os.path.join(d, "datapacks", "vanilla"))
     with open(os.path.join(d, "datapacks", "vanilla", "pack.mcmeta"), "w", encoding="utf-8") as f:
         json.dump({"pack": {"description": "", "pack_format": 15}}, f)

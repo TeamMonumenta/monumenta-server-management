@@ -14,24 +14,24 @@ import java.util.Set;
  * Copies a Minecraft world folder in-process while regenerating every entity UUID, so the copy can
  * be loaded alongside its template without UUID collisions. Neither world is loaded by Bukkit.
  *
- * Only a whitelist of top-level entries is copied (see COPIED_DIRS plus level.dat); everything else
- * (server-managed scratch state, per-world runtime data, datapacks, ...) is dropped.
- * Region/entity chunks are streamed one at a time (RegionFileRewriter);
- * monumenta/ is copied as raw bytes. Assumes the modern (1.17+) single-dimension layout;
- * nested/multi-dimension templates fail loudly.
+ * Only level.dat, region/, entities/ and monumenta/ cross over; anything else is dropped with a
+ * warning, including entries a future Minecraft version may add. The rest of a world folder is the
+ * server's private record of *this* world (session.lock, uid.dat) or state it rebuilds on demand
+ * (poi/, data/), neither of which a copy may inherit.
+ *
+ * Region and entity chunks are streamed one at a time (RegionFileRewriter); monumenta/ is copied as
+ * raw bytes. Assumes the modern single-dimension layout; other layouts fail loudly.
  */
 public final class WorldCopier {
-	// Top-level directories copied into the destination; any other top-level entry (and any file
-	// other than level.dat) is dropped. Mirrors the Python reference tool's whitelist.
-	private static final Set<String> COPIED_DIRS = Set.of("region", "entities", "monumenta");
+	// Copied verbatim; region/ and entities/ are handled separately because their chunks are
+	// rewritten. Any other top-level directory, and any file other than level.dat, is dropped.
+	private static final Set<String> RAW_COPIED_DIRS = Set.of("monumenta");
 
 	private WorldCopier() {
 	}
 
-	/**
-	 * Copies source to dest, regenerating all entity UUIDs and setting level.dat LevelName
-	 * to the destination folder name.
-	 */
+	// Copies source to dest, regenerating all entity UUIDs and setting level.dat LevelName
+	// to the destination folder name.
 	public static void copyWorldRegenUuids(Path source, Path dest) throws IOException {
 		MMLog.trace("WorldCopier: copyWorldRegenUuids source=" + source + " dest=" + dest);
 		// Reject unsupported (multi-dimension/nested) layouts before copying anything - fail fast
@@ -53,7 +53,7 @@ public final class WorldCopier {
 							RegionFileRewriter.rewriteDir(entry, target, RegionKind.ENTITIES);
 						} else if (name.equals("region")) {
 							RegionFileRewriter.rewriteDir(entry, target, RegionKind.REGION);
-						} else if (COPIED_DIRS.contains(name)) {
+						} else if (RAW_COPIED_DIRS.contains(name)) {
 							copyTreeRaw(entry, target);
 						} else {
 							MMLog.warning("WorldCopier: skipping non-whitelisted directory " + entry);
@@ -78,8 +78,9 @@ public final class WorldCopier {
 		}
 	}
 
-	// Walks the source tree (directories only, no file reads) and rejects any entities/region folder
-	// below the top level. The single supported layout has exactly one top-level entities/ and region/.
+	// Rejects any entities/ or region/ folder below the top level, which means a bundled dimension
+	// the copier does not walk - its chunks would be copied with their UUIDs intact. Directories
+	// only, no file reads, and it runs before anything is written.
 	private static void validateSingleDimension(Path source) throws IOException {
 		try (DirectoryStream<Path> entries = Files.newDirectoryStream(source)) {
 			for (Path entry : entries) {
@@ -108,15 +109,15 @@ public final class WorldCopier {
 		}
 	}
 
+	// Bukkit keys a loaded world by LevelName, so a copy keeping the template's name would collide
+	// with the template and with every sibling instance.
 	private static void copyLevelDat(Path src, Path dst, String destWorldName) throws IOException {
 		ReadWriteNBT nbt = WorldStorageAdapters.get().readNbtFile(src);
 		nbt.getOrCreateCompound("Data").setString("LevelName", destWorldName);
 		WorldStorageAdapters.get().writeNbtFile(dst, nbt);
 	}
 
-	/**
-	 * Recursively copies a subtree as raw bytes.
-	 */
+	// Recursively copies a subtree as raw bytes. Fails if the destination already exists.
 	private static void copyTreeRaw(Path srcDir, Path dstDir) throws IOException {
 		Files.createDirectories(dstDir);
 		try (DirectoryStream<Path> entries = Files.newDirectoryStream(srcDir)) {

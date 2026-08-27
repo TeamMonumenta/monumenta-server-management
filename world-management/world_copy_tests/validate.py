@@ -588,6 +588,25 @@ FIXTURES = [
 ]
 
 
+def _check_fixture_coverage(inputs_dir: str) -> list[str]:
+    """Return complaints about fixtures present on disk but not in FIXTURES, or vice versa.
+
+    FIXTURES is hand-written because each fixture has its own validator, so a fixture added to
+    generate.py can otherwise be copied and never checked.
+    """
+    on_disk = {
+        name for name in os.listdir(inputs_dir)
+        if os.path.isdir(os.path.join(inputs_dir, name))
+    }
+    listed = {name for name, _ in FIXTURES}
+    return (
+        [f"fixture '{name}' exists in {inputs_dir} but has no validator in FIXTURES"
+         for name in sorted(on_disk - listed)]
+        + [f"FIXTURES lists '{name}', which generate.py did not produce"
+           for name in sorted(listed - on_disk)]
+    )
+
+
 def main() -> None:
     global PYTHON_REFERENCE  # pylint: disable=global-statement
     args = [a for a in sys.argv[1:] if a != "--python-reference"]
@@ -597,6 +616,9 @@ def main() -> None:
         sys.exit(1)
     inputs_dir, outputs_dir = args[0], args[1]
     passed = failed = skipped = 0
+    for complaint in _check_fixture_coverage(inputs_dir):
+        print(f"  FAIL  {complaint}")
+        failed += 1
     for name, fn in FIXTURES:
         in_path = os.path.join(inputs_dir, name)
         out_path = os.path.join(outputs_dir, name)

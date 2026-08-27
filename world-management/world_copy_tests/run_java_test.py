@@ -5,9 +5,8 @@ Builds the required plugin jars, runs the fixtures through WorldCopier inside a 
 Paper server (started with MONUMENTA_WORLD_COPY_TEST set, which makes WorldCopyTestHarness copy
 every fixture in onLoad and halt the JVM), then validates the outputs with validate.py.
 
-No container runtime is involved: the server jars are downloaded once into .paper-cache/ and each
-run assembles a disposable server directory under the system temp dir (see _server.py). See
-DOCKER.md for the Docker-based arrangement this replaced.
+The server jars are downloaded once into .paper-cache/ and each run assembles a disposable server
+directory under the system temp dir (see _server.py). JAVA_TEST.md covers this in more detail.
 
 run_load_test.py reuses the copy stage here, then loads the results with a real world loader.
 """
@@ -130,14 +129,19 @@ def main() -> None:
     _runner.check_submodules()
     _runner.generate_inputs()
     _runner.clean_outputs()
-    copy_fixtures(args.no_build, args.refresh, args.keep, args.verbose)
+    copy_code = copy_fixtures(args.no_build, args.refresh, args.keep, args.verbose)
 
-    # Surface validate.py's per-fixture report without a Python traceback on server failure.
+    # Validate even when the copy failed: the per-fixture report says more than a bare exit code.
+    # The copy's exit code is folded back in below so a failure there is never reported as a pass.
     validate_cmd = [
         sys.executable, os.path.join(_runner.HERE, "validate.py"), _runner.INPUTS, _runner.OUTPUTS
     ]
     print("+ " + " ".join(validate_cmd), flush=True)
-    raise SystemExit(subprocess.run(validate_cmd, check=False, env=_runner.automation_env()).returncode)
+    validate_code = subprocess.run(
+        validate_cmd, check=False, env=_runner.automation_env()).returncode
+    if copy_code != 0:
+        print(f"\nThe copy stage failed (exit {copy_code}).", flush=True)
+    raise SystemExit(validate_code or copy_code)
 
 
 if __name__ == "__main__":

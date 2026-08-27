@@ -57,6 +57,11 @@ public class WorldGenerator {
 	private final Map<String, TemplateState> mTemplates = new LinkedHashMap<>();
 	private boolean mStopped = true;
 	private boolean mCopyInFlight = false;
+	// Bumped by every reloadConfig(). A copy captures this when it starts; a mismatch on completion
+	// means every TemplateState it referred to has since been discarded.
+	private int mGeneration = 0;
+	// Destination of the copy in flight, if any, so scanExistingSpares() does not delete it.
+	private @Nullable String mInFlightGeneratingName = null;
 
 	private WorldGenerator() {
 		INSTANCE = this;
@@ -71,6 +76,7 @@ public class WorldGenerator {
 
 	public void reloadConfig() {
 		cancelGeneration(true);
+		mGeneration++;
 		mTemplates.clear();
 
 		Map<String, Integer> templatePregenLimits = WorldManagementPlugin.getPregeneratedInstanceLimits();
@@ -122,6 +128,11 @@ public class WorldGenerator {
 				continue;
 			}
 			if (name.endsWith(GENERATING_SUFFIX)) {
+				// A copy started before this reload is still writing here; its result is discarded in
+				// onCopyComplete(), but deleting the folder now would corrupt the copy in progress.
+				if (name.equals(mInFlightGeneratingName)) {
+					continue;
+				}
 				MMLog.info("Deleting failed generating world " + name);
 				deleteWorldFolder(new File(root, name));
 				continue;
@@ -171,10 +182,8 @@ public class WorldGenerator {
 		return target.isDirectory() && new File(target, "level.dat").isFile();
 	}
 
-	/**
-	 * Renames a ready spare into place as worldName. Prefers a fresh spare; falls back to outdated.
-	 * Throws immediately if none is available - callers are on the main thread and must not block.
-	 */
+	// Renames a ready spare into place as worldName. Prefers a fresh spare; falls back to outdated.
+	// Throws immediately if none is available - callers are on the main thread and must not block.
 	public void getWorldInstance(String worldName, String templateName) throws Exception {
 		MMLog.debug("Preparing world " + worldName);
 		if (worldExists(worldName)) {
@@ -187,11 +196,11 @@ public class WorldGenerator {
 			throw new Exception("No such template world " + templateName);
 		}
 
-		boolean outdated = false;
+		// Claim a spare by removing it from its pool, so a later call cannot hand out the same folder.
 		Integer index = pollAny(state.mFresh);
-		if (index == null) {
+		boolean outdated = index == null;
+		if (outdated) {
 			index = pollAny(state.mOutdated);
-			outdated = true;
 		}
 		if (index == null) {
 			// Kick generation so a spare is ready next time, but don't block waiting for it.
@@ -199,7 +208,7 @@ public class WorldGenerator {
 			throw new Exception("No pregenerated worlds are currently available");
 		}
 
-		String pregenName = PREGEN_PREFIX + templateName + index;
+		String pregenName = pregenName(state, index);
 		if (outdated) {
 			MMLog.warning("Using outdated pregenerated world " + pregenName + " due to lack of updated instances");
 		}
@@ -209,6 +218,9 @@ public class WorldGenerator {
 		File target = new File(worldName);
 		if (!oldPath.renameTo(target)) {
 			if (worldExists(pregenName)) {
+				// renameTo() is all-or-nothing, so a spare still in place is still usable; put it back
+				// rather than leaking it until the next config reload. The other branches cannot.
+				(outdated ? state.mOutdated : state.mFresh).add(index);
 				MMLog.severe("Failed to rename " + pregenName + " to " + worldName + "; original directory still exists");
 			} else if (worldExists(worldName)) {
 				MMLog.severe("Failed to rename " + pregenName + " to " + worldName + "; destination directory exists but renameTo() reported failure");
@@ -221,10 +233,8 @@ public class WorldGenerator {
 		scheduleNext();
 	}
 
-	/**
-	 * Starts a background copy for the next missing spare, if any. At most one copy runs at a time;
-	 * the result is recorded on the main thread, which then calls this again to continue filling pools.
-	 */
+	// Starts a background copy for the next missing spare, if any. At most one copy runs at a time;
+	// the result is recorded on the main thread, which then calls this again to continue filling pools.
 	public void scheduleNext() {
 		// All state mutations happen on the main thread; if called async, re-schedule there.
 		if (!Bukkit.isPrimaryThread()) {
@@ -260,6 +270,8 @@ public class WorldGenerator {
 		mCopyInFlight = true;
 		final TemplateState state = target;
 		final int spareIndex = index;
+		final int generation = mGeneration;
+		mInFlightGeneratingName = pregenName(state, spareIndex) + GENERATING_SUFFIX;
 		Bukkit.getScheduler().runTaskAsynchronously(WorldManagementPlugin.getInstance(), () -> {
 			Exception failure = null;
 			try {
@@ -269,8 +281,12 @@ public class WorldGenerator {
 			}
 			final Exception finalFailure = failure;
 			Bukkit.getScheduler().runTask(WorldManagementPlugin.getInstance(),
-				() -> onCopyComplete(state, spareIndex, finalFailure));
+				() -> onCopyComplete(state, spareIndex, generation, finalFailure));
 		});
+	}
+
+	private static String pregenName(TemplateState state, int index) {
+		return PREGEN_PREFIX + state.mName + index;
 	}
 
 	// Lowest spare index in [0, limit) that is not already a fresh spare. May host an outdated spare.
@@ -290,7 +306,7 @@ public class WorldGenerator {
 			throw new Exception("Template world does not exist: " + state.mName);
 		}
 
-		String pregenName = PREGEN_PREFIX + state.mName + index;
+		String pregenName = pregenName(state, index);
 		MMLog.info("Starting pregeneration of " + pregenName
 			+ " (" + (state.mFresh.size() + 1) + "/" + state.mLimit
 			+ ", " + (int) (100 * progress()) + "% total)");
@@ -309,10 +325,17 @@ public class WorldGenerator {
 	}
 
 	// Records the outcome of a copy on the main thread and schedules the next one.
-	private void onCopyComplete(TemplateState state, int index, @Nullable Exception failure) {
+	private void onCopyComplete(TemplateState state, int index, int generation, @Nullable Exception failure) {
 		mCopyInFlight = false;
+		mInFlightGeneratingName = null;
 
-		if (failure != null) {
+		if (generation != mGeneration) {
+			// Config was reloaded mid-copy, so state has been discarded and recording into it would
+			// go nowhere. The finished folder is left untracked: the next copy into that slot
+			// overwrites it, or a later reload's scan classifies it. Costs one redundant copy.
+			MMLog.info("Discarding pregeneration result for " + pregenName(state, index)
+				+ " from before the last config reload");
+		} else if (failure != null) {
 			state.mConsecutiveFailures++;
 			MMLog.severe("Error pregenerating " + state.mName + " (failure count=" + state.mConsecutiveFailures + ")", failure);
 			if (state.reachedMaxFailures()) {
@@ -322,7 +345,7 @@ public class WorldGenerator {
 			state.mConsecutiveFailures = 0;
 			state.mOutdated.remove(index);
 			state.mFresh.add(index);
-			MMLog.info("Finished pregenerating " + PREGEN_PREFIX + state.mName + index
+			MMLog.info("Finished pregenerating " + pregenName(state, index)
 				+ " (" + state.mFresh.size() + "/" + state.mLimit
 				+ ", " + (int) (100 * progress()) + "% total)");
 		}
@@ -332,10 +355,8 @@ public class WorldGenerator {
 		}
 	}
 
-	/**
-	 * Stops (or resumes) scheduling new copies. Any in-flight copy finishes independently;
-	 * there is no long-lived task to cancel.
-	 */
+	// Stops (or resumes) scheduling new copies. Any in-flight copy finishes independently;
+	// there is no long-lived task to cancel.
 	public void cancelGeneration(boolean stopGenerating) {
 		mStopped = stopGenerating;
 	}

@@ -17,8 +17,9 @@ import org.jetbrains.annotations.Nullable;
 /*
  * World storage access for 1.20.4, implemented directly on the server's own Anvil classes.
  *
- * RegionFile is the same class the server uses to load and save chunks, so compression, sector
- * allocation and external .mcc handling are byte-for-byte what a running server would produce.
+ * RegionFile is the same class the server uses to load and save chunks, so sector allocation,
+ * compression and .mcc spilling are by construction what a running server expects.
+ *
  * NBT-API wraps the native CompoundTag in place rather than copying it, so a chunk is decompressed
  * once on read and compressed once on write with no intermediate re-encoding.
  */
@@ -50,7 +51,8 @@ public class WorldStorageAdapter_v1_20_R3 implements WorldStorageAdapter {
 		private final RegionFile mRegionFile;
 
 		private RegionAccessImpl(Path path) throws IOException {
-			// The containing directory is where oversized chunks spill to c.<x>.<z>.mcc.
+			// Args: the directory oversized chunks spill into as c.<x>.<z>.mcc, then dsync - left off
+			// because a copy a crash leaves half-written is discarded and redone, not recovered.
 			mRegionFile = new RegionFile(path, path.getParent(), false);
 		}
 
@@ -67,11 +69,6 @@ public class WorldStorageAdapter_v1_20_R3 implements WorldStorageAdapter {
 			try (DataOutputStream out = mRegionFile.getChunkDataOutputStream(new ChunkPos(chunkX, chunkZ))) {
 				NbtIo.write(unwrap(chunk), out);
 			}
-		}
-
-		@Override
-		public void removeChunk(int chunkX, int chunkZ) throws IOException {
-			mRegionFile.clear(new ChunkPos(chunkX, chunkZ));
 		}
 
 		@Override

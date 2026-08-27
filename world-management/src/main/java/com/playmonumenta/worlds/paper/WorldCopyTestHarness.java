@@ -32,7 +32,7 @@ public final class WorldCopyTestHarness {
 		return value != null && !value.isEmpty();
 	}
 
-	/** Copies every fixture, logs per-fixture results, and halts the JVM. Never returns. */
+	// Copies every fixture, logs per-fixture results, and halts the JVM. Never returns.
 	public static void runAndExit() {
 		int exitCode;
 		try {

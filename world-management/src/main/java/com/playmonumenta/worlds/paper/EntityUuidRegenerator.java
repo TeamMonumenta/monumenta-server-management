@@ -12,21 +12,25 @@ import java.util.UUID;
  *
  * Entity UUIDs live in two places: the flat entities/ region files (top-level Entities), and nested
  * inside block entities and items in the main region/ files (spawners, beehives, containers, ...).
- * Both are walked via a typed recursion whose edge tables mirror monumenta-automation's
- * _init_multipaths frozensets. A UUID is only regenerated when one is already present, so
- * spawn-template entities that legitimately lack a UUID are left untouched.
+ * Both are walked as a typed graph, because not every UUID is an entity identity: an item's
+ * tag.AttributeModifiers[].UUID must survive the copy unchanged. The edge tables below duplicate the
+ * _init_multipaths tables in monumenta-automation (minecraft/chunk_format/{entity,block_entity}.py,
+ * player_dat_format/item.py); NBT layout changes need the same edit on both sides.
+ *
+ * A UUID is only regenerated when one is already present: spawn templates (SpawnData, tag.EntityTag)
+ * legitimately have none, and Minecraft assigns one when the entity actually spawns.
  */
 public final class EntityUuidRegenerator {
-	// Node types in the typed UUID-recursion graph. Only ENTITY nodes carry a regennable UUID;
-	// BLOCK_ENTITY and ITEM nodes only route to children.
+	// ENTITY and BLOCK_ENTITY nodes may carry a regennable UUID; ITEM nodes never do and only route
+	// to children.
 	private enum NodeType {
 		ENTITY,
 		BLOCK_ENTITY,
 		ITEM
 	}
 
-	// Typed recursion edges. Path grammar: '.'-separated segments; a plain name resolves a compound
-	// child, a 'name[]' suffix iterates every element of a compound list.
+	// Path grammar: '.'-separated segments; a plain name resolves a compound child, a 'name[]' suffix
+	// iterates every element of a compound list.
 	private static final String[] ENTITY_TO_ENTITY = {
 		"Passengers[]",
 		"SpawnData", "SpawnData.entity",
@@ -59,15 +63,13 @@ public final class EntityUuidRegenerator {
 	// Monumenta scoreboard data stored on an entity, under the BukkitValues compound.
 	private static final String ENTITY_SCORES_KEY = "monumenta:entity_scores";
 
-	/** Regenerates UUIDs in a top-level entity (entities/ region) and everything it carries. */
+	// Regenerates UUIDs in a top-level entity (entities/ region) and everything it carries.
 	public static boolean regenEntity(ReadWriteNBT entity) {
 		return regenNode(entity, NodeType.ENTITY);
 	}
 
-	/**
-	 * Regenerates UUIDs nested inside a block entity (region/ block_entities).
-	 * Returns true if any UUID changed; callers use this to decide whether to re-serialize the chunk.
-	 */
+	// Regenerates UUIDs nested inside a block entity (region/ block_entities). Returns true if any
+	// UUID changed; callers use this to decide whether to re-serialize the chunk.
 	public static boolean regenBlockEntity(ReadWriteNBT blockEntity) {
 		return regenNode(blockEntity, NodeType.BLOCK_ENTITY);
 	}
@@ -83,6 +85,9 @@ public final class EntityUuidRegenerator {
 				changed |= recurse(nbt, ENTITY_TO_ITEM, NodeType.ITEM);
 				break;
 			case BLOCK_ENTITY:
+				// No vanilla block entity carries an identity UUID today, but one that grew one would
+				// collide with the template exactly as an entity would.
+				changed |= regenUuidIfPresent(nbt);
 				changed |= clearWorldUuid(nbt);
 				changed |= recurse(nbt, BLOCK_ENTITY_TO_ENTITY, NodeType.ENTITY);
 				changed |= recurse(nbt, BLOCK_ENTITY_TO_ITEM, NodeType.ITEM);
@@ -155,8 +160,9 @@ public final class EntityUuidRegenerator {
 		return true;
 	}
 
-	// Drops the Bukkit world-identity UUID so the copy is not tied to its template's world. Cleared
-	// unconditionally (not gated on an entity UUID being present), matching the Python reference tool.
+	// Drops WorldUUIDMost/Least, Bukkit's record of which world an entity belongs to. Cleared rather
+	// than replaced because Bukkit rewrites it from the world the entity is loaded into, so the
+	// correct value is not knowable here.
 	private static boolean clearWorldUuid(ReadWriteNBT nbt) {
 		boolean changed = false;
 		if (nbt.hasTag("WorldUUIDMost")) {
@@ -170,8 +176,9 @@ public final class EntityUuidRegenerator {
 		return changed;
 	}
 
-	// Strips Monumenta entity scoreboard data (BukkitValues."monumenta:entity_scores") so the copy
-	// starts with no stale scores, matching the Python reference tool's clear_score_data behavior.
+	// Strips Monumenta entity scoreboard data (BukkitValues."monumenta:entity_scores"): scores are
+	// per-playthrough progress and an instance must start clean. Only this one key is removed, since
+	// BukkitValues is shared with other plugins.
 	private static boolean clearEntityScores(ReadWriteNBT entity) {
 		if (!entity.hasTag("BukkitValues") || entity.getType("BukkitValues") != NBTType.NBTTagCompound) {
 			return false;
