@@ -44,7 +44,6 @@ public class GetDateCommand {
 			case "Minute" -> DateUtils.getMinute();
 			case "Second" -> DateUtils.getSecond();
 			case "Ms" -> DateUtils.getMs();
-
 			case "WeeklyVersion" -> (int) DateUtils.getWeeklyVersion();
 			case "DailyVersion" -> (int) DateUtils.getDailyVersion();
 			case "DaysSinceUTCEpoch" -> (int) DateUtils.getTimeSinceUTCEpoch(ChronoUnit.DAYS);

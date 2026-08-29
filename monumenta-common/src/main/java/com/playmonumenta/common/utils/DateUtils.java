@@ -107,12 +107,12 @@ public class DateUtils {
 	}
 
 	/**
-	 * Gets the time since the <b>UTC Epoch.</b>
+	 * Gets the time since the <b>UTC Epoch.</b>, affected by time warp.
 	 *
 	 * @return Number of time units that have passed, rounded down
 	 */
 	public static long getTimeSinceUTCEpoch(ChronoUnit chronoUnit) {
-		return getTimeSinceUTCEpoch(LocalDateTime.now(ZoneOffset.UTC), chronoUnit);
+		return getTimeSinceUTCEpoch(utcDateTime(), chronoUnit);
 	}
 
 	/**
