@@ -219,11 +219,11 @@ public class TimeWarpCommand {
 		if (warpSeconds < 0) {
 			message = Component.text("The server is currently ", NamedTextColor.DARK_AQUA, TextDecoration.ITALIC)
 				.append(Component.text(-warpSeconds, NamedTextColor.AQUA))
-				.append(Component.text(" in the past.", NamedTextColor.DARK_AQUA, TextDecoration.ITALIC));
+				.append(Component.text(" seconds in the past.", NamedTextColor.DARK_AQUA, TextDecoration.ITALIC));
 		} else if (warpSeconds > 0) {
 			message = Component.text("The server is currently ", NamedTextColor.DARK_AQUA, TextDecoration.ITALIC)
 				.append(Component.text(warpSeconds, NamedTextColor.AQUA))
-				.append(Component.text(" in the future.", NamedTextColor.DARK_AQUA, TextDecoration.ITALIC));
+				.append(Component.text(" seconds in the future.", NamedTextColor.DARK_AQUA, TextDecoration.ITALIC));
 		} else {
 			message = Component.text("The server has ", NamedTextColor.DARK_AQUA, TextDecoration.ITALIC)
 				.append(Component.text("no time warp", NamedTextColor.AQUA))

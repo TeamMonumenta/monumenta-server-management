@@ -54,7 +54,6 @@ public class MonumentaCommonPlugin extends JavaPlugin {
 		ShowZones.register(this);
 
 		// Time registration
-		TimeWarpManager.load();
 		TimeWarpCommand.register();
 		GetDateCommand.register();
 		RefreshTimeCommand.register();
@@ -73,6 +72,8 @@ public class MonumentaCommonPlugin extends JavaPlugin {
 
 		mZoneManager = ZoneManager.getInstance();
 		mZoneManager.doReload(true);
+
+		TimeWarpManager.load();
 
 		/* Load the config 1 tick later to let other plugins load */
 		new BukkitRunnable() {
