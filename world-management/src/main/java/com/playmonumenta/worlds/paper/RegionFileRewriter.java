@@ -8,8 +8,6 @@ import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,52 +42,54 @@ public final class RegionFileRewriter {
 		Files.createDirectories(dstDir);
 		// Everything is copied, not just *.mca: a chunk too big to store inline lives in a sibling
 		// c.<x>.<z>.mcc file that is part of its region file's contents.
-		List<Path> regionFiles = new ArrayList<>();
 		try (DirectoryStream<Path> entries = Files.newDirectoryStream(srcDir)) {
 			for (Path entry : entries) {
 				if (Files.isDirectory(entry)) {
 					throw new IOException("Unexpected subdirectory in " + kind + " folder: " + entry);
 				}
+				if (entry.getFileName().endsWith(".mcc")) {
+					// Skip oversized chunk files; those will be recreated as required
+					continue;
+				}
 				Path target = dstDir.resolve(entry.getFileName().toString());
 				Files.copy(entry, target);
 				if (REGION_FILE.matcher(entry.getFileName().toString()).matches()) {
-					regionFiles.add(target);
+					copyAndRegenRegionFile(entry, target, kind);
 				}
 			}
 		}
-		// Second pass: rewriting adds and removes .mcc files in dstDir, so the copy must finish first.
-		for (Path regionFile : regionFiles) {
-			rewriteFile(regionFile, kind);
-		}
 	}
 
-	private static void rewriteFile(Path file, RegionKind kind) throws IOException {
-		Matcher matcher = REGION_FILE.matcher(file.getFileName().toString());
+	private static void copyAndRegenRegionFile(Path fromFile, Path toFile, RegionKind kind) throws IOException {
+		Matcher matcher = REGION_FILE.matcher(fromFile.getFileName().toString());
 		if (!matcher.matches()) {
-			throw new IOException("Region file name does not encode coordinates: " + file);
+			throw new IOException("Region file name does not encode coordinates: " + toFile);
 		}
 		int regionX = Integer.parseInt(matcher.group(1));
 		int regionZ = Integer.parseInt(matcher.group(2));
 
 		int rewritten = 0;
 		int untouched = 0;
-		try (RegionAccess region = WorldStorageAdapters.get().openRegion(file)) {
+		try (
+			RegionAccess fromRegion = WorldStorageAdapters.get().openRegion(fromFile);
+			RegionAccess toRegion = WorldStorageAdapters.get().openRegion(toFile)
+		) {
 			for (int i = 0; i < CHUNK_COUNT; i++) {
 				int chunkX = regionX * REGION_WIDTH + (i % REGION_WIDTH);
 				int chunkZ = regionZ * REGION_WIDTH + (i / REGION_WIDTH);
-				ReadWriteNBT chunk = region.readChunk(chunkX, chunkZ);
-				if (chunk == null) {
+				ReadWriteNBT fromChunk = fromRegion.readChunk(chunkX, chunkZ);
+				if (fromChunk == null) {
 					continue;
 				}
-				if (regenChunk(chunk, kind, file, chunkX, chunkZ)) {
-					region.writeChunk(chunkX, chunkZ, chunk);
+				if (regenChunk(fromChunk, kind, toFile, chunkX, chunkZ)) {
+					toRegion.writeChunk(chunkX, chunkZ, fromChunk);
 					rewritten++;
 				} else {
 					untouched++;
 				}
 			}
 		}
-		MMLog.trace("WorldCopier: region " + file.getFileName() + " rewritten=" + rewritten
+		MMLog.trace("WorldCopier: region " + toFile.getFileName() + " rewritten=" + rewritten
 			+ " untouched=" + untouched);
 	}
 
