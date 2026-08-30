@@ -731,6 +731,14 @@ public class MonumentaRedisSyncAPI {
 		return String.format("%s:playerdata:%s:scores", CommonConfig.getServerDomain(), uuid.toString());
 	}
 
+	public static String getRedisStatsPath(Player player) {
+		return getRedisStatsPath(player.getUniqueId());
+	}
+
+	public static String getRedisStatsPath(UUID uuid) {
+		return String.format("%s:playerdata:%s:stats", CommonConfig.getServerDomain(), uuid.toString());
+	}
+
 	public static String getStashPath() {
 		return String.format("%s:stash", CommonConfig.getServerDomain());
 	}

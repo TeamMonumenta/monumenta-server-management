@@ -4,6 +4,8 @@ import com.destroystokyo.paper.event.player.PlayerAdvancementDataLoadEvent;
 import com.destroystokyo.paper.event.player.PlayerAdvancementDataSaveEvent;
 import com.destroystokyo.paper.event.player.PlayerDataLoadEvent;
 import com.destroystokyo.paper.event.player.PlayerDataSaveEvent;
+import com.destroystokyo.paper.event.player.ServerStatsDataLoadEvent;
+import com.destroystokyo.paper.event.player.ServerStatsDataSaveEvent;
 import com.destroystokyo.paper.profile.PlayerProfile;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -207,7 +209,11 @@ public class DataEventListener implements Listener {
 	}
 
 	protected static boolean isPlayerTransferring(Player player) {
-		return INSTANCE.mTransferringPlayers.contains(player.getUniqueId());
+		return isPlayerTransferring(player.getUniqueId());
+	}
+
+	protected static boolean isPlayerTransferring(UUID playerId) {
+		return INSTANCE.mTransferringPlayers.contains(playerId);
 	}
 
 	protected static void waitForPlayerToSaveThenSync(Player player, Runnable callback) {
@@ -252,25 +258,29 @@ public class DataEventListener implements Listener {
 	}
 
 	private void blockingWaitForPlayerToSave(Player player) {
-		List<CompletableFuture<?>> futures = mPendingSaves.remove(player.getUniqueId());
+		blockingWaitForPlayerToSave(player.getUniqueId(), player.getName());
+	}
+
+	private void blockingWaitForPlayerToSave(UUID playerId, String playerName) {
+		List<CompletableFuture<?>> futures = mPendingSaves.remove(playerId);
 
 		if (futures == null || futures.isEmpty()) {
 			return;
 		}
 
-		MMLog.debug("Blocking wait for pending save for player=" + player.getName());
+		MMLog.debug("Blocking wait for pending save for player=" + playerName);
 
 		try {
 			@SuppressWarnings("unchecked")
 			CompletableFuture<?>[] futureArr = futures.toArray(new CompletableFuture[0]);
 			CompletableFuture.allOf(futureArr).get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
 		} catch (TimeoutException ex) {
-			MMLog.severe("Got timeout waiting to commit transactions for player '" + player.getName() + "'. This is very bad!", ex);
+			MMLog.severe("Got timeout waiting to commit transactions for player '" + playerName + "'. This is very bad!", ex);
 		} catch (InterruptedException | ExecutionException ex) {
-			MMLog.severe("Failed waiting to commit transactions for player '" + player.getName() + "'", ex);
+			MMLog.severe("Failed waiting to commit transactions for player '" + playerName + "'", ex);
 		}
 
-		MMLog.debug("Pending save completed for player=" + player.getName());
+		MMLog.debug("Pending save completed for player=" + playerName);
 	}
 
 	/* ******************* Data Save/Load Event Handlers ******************* */
@@ -737,6 +747,91 @@ public class DataEventListener implements Listener {
 
 		/* Don't block - store the pending futures for completion later */
 		mPendingSaves.put(player.getUniqueId(), futures);
+	}
+
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void serverStatsDataLoadEvent(ServerStatsDataLoadEvent event) {
+		if (BukkitConfigAPI.getSavingDisabled()) {
+			/* No data saved, no data loaded */
+			return;
+		}
+
+		// The player object might not be available. Attempt to get their name anyway.
+		UUID playerId = event.getPlayerId();
+		String playerNameNullable = MonumentaRedisSyncAPI.cachedUuidToName(playerId);
+		String playerName = playerNameNullable == null ? playerId.toString() : playerNameNullable;
+
+		long startTime = System.currentTimeMillis();
+		MMLog.debug("Started loading stats data for player=" + playerName);
+
+		/* Wait until player has finished saving if they just logged out and back in */
+		blockingWaitForPlayerToSave(playerId, playerName);
+
+		RedisFuture<String> statsFuture;
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			statsFuture = conn.lindex(MonumentaRedisSyncAPI.getRedisStatsPath(playerId), 0);
+		}
+
+		try {
+			/* Stats */
+			final String statsData = statsFuture.get();
+			MMLog.trace(() -> "Stats data loaded for player=" + playerName);
+			MMLog.trace(() -> "Stats data:" + statsData);
+			if (statsData != null) {
+				event.setJsonData(statsData);
+			} else {
+				MMLog.warning("No stats data for player '" + playerName + "' - if they are not new, this is a serious error!");
+			}
+
+			MMLog.debug(() -> "Processing ServerStatsDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
+		} catch (InterruptedException | ExecutionException ex) {
+			MMLog.severe("Failed to get stats data for player '" + playerName + "'. This is very bad!", ex);
+		}
+	}
+
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void serverStatsDataSaveEvent(ServerStatsDataSaveEvent event) {
+		/* Always cancel saving the player file to disk with this plugin present */
+		event.setCancelled(true);
+
+		if (BukkitConfigAPI.getSavingDisabled()) {
+			/* No data saved, no data loaded */
+			return;
+		}
+
+		// The player object might not be available. Attempt to get their name anyway.
+		UUID playerId = event.getPlayerId();
+		String playerName = MonumentaRedisSyncAPI.cachedUuidToName(playerId);
+		String playerNameNonNull = playerName == null ? playerId.toString() : playerName;
+
+		if (isPlayerTransferring(playerId)) {
+			MMLog.debug("Ignoring ServerStatsDataLoadEvent for player:" + playerNameNonNull);
+			return;
+		}
+
+		List<CompletableFuture<?>> futures = mPendingSaves.remove(playerId);
+		if (futures == null) {
+			futures = new ArrayList<>();
+		} else {
+			futures.removeIf(Future::isDone);
+		}
+
+		/* Execute the stats as a multi() batch */
+		/* Stats */
+		MMLog.debug("Saving stats data for player=" + playerName);
+		MMLog.trace(() -> "Data:" + event.getJsonData());
+		String statsPath = MonumentaRedisSyncAPI.getRedisStatsPath(playerId);
+		String statsJsonData = event.getJsonData();
+		futures.add(RedisAPI.multi(commands -> {
+			commands.lpush(statsPath, statsJsonData);
+			commands.ltrim(statsPath, 0, BukkitConfigAPI.getHistoryAmount());
+		}).exceptionally(ex -> {
+			MMLog.severe("Stats saving for player=" + playerName + " failed", ex);
+			return null;
+		}));
+
+		/* Don't block - store the pending futures for completion later */
+		mPendingSaves.put(playerId, futures);
 	}
 
 	/* ******************* Transferring Restriction Event Handlers ******************* */
