@@ -323,27 +323,27 @@ public class DateUtils {
 		sender.sendMessage(Component.text("Current Tick: ", NamedTextColor.AQUA)
 			.append(Component.text(Bukkit.getCurrentTick(), NamedTextColor.GOLD)));
 		sender.sendMessage(Component.text("Now UntilNextDay: ", NamedTextColor.AQUA)
-			.append(Component.text(DateUtils.untilNewDay(), NamedTextColor.GOLD)));
+			.append(Component.text(untilNewDay(), NamedTextColor.GOLD)));
 		sender.sendMessage(Component.text("Now UntilNextWeek: ", NamedTextColor.AQUA)
-			.append(Component.text(DateUtils.untilNewWeek(), NamedTextColor.GOLD)));
+			.append(Component.text(untilNewWeek(), NamedTextColor.GOLD)));
 		sender.sendMessage(Component.empty());
 
 		sender.sendMessage(Component.text("For ", NamedTextColor.AQUA)
 			.append(Component.text(localDateTime.toString(), NamedTextColor.GOLD))
 			.append(Component.text(":")));
 		sender.sendMessage(Component.text("DailyVersion: ", NamedTextColor.AQUA)
-			.append(Component.text(DateUtils.getDailyVersion(localDateTime), NamedTextColor.GOLD)));
+			.append(Component.text(getDailyVersion(localDateTime), NamedTextColor.GOLD)));
 		sender.sendMessage(Component.text("WeeklyVersion: ", NamedTextColor.AQUA)
-			.append(Component.text(DateUtils.getWeeklyVersion(localDateTime), NamedTextColor.GOLD)));
+			.append(Component.text(getWeeklyVersion(localDateTime), NamedTextColor.GOLD)));
 		sender.sendMessage(Component.text("DaysIntoWeeklyVersion: ", NamedTextColor.AQUA)
-			.append(Component.text(DateUtils.getDaysIntoWeeklyVersion(localDateTime), NamedTextColor.GOLD)));
+			.append(Component.text(getDaysIntoWeeklyVersion(localDateTime), NamedTextColor.GOLD)));
 		sender.sendMessage(Component.text("DaysLeftInWeeklyVersion: ", NamedTextColor.AQUA)
-			.append(Component.text(DateUtils.getDaysLeftInWeeklyVersion(localDateTime), NamedTextColor.GOLD)));
+			.append(Component.text(getDaysLeftInWeeklyVersion(localDateTime), NamedTextColor.GOLD)));
 		sender.sendMessage(Component.text("WeeklyVersionStartDate: ", NamedTextColor.AQUA)
-			.append(Component.text(DateUtils.getWeeklyVersionStartDate(localDateTime), NamedTextColor.GOLD)));
+			.append(Component.text(getWeeklyVersionStartDate(localDateTime), NamedTextColor.GOLD)));
 		sender.sendMessage(Component.text("WeeklyVersionEndDate: ", NamedTextColor.AQUA)
-			.append(Component.text(DateUtils.getWeeklyVersionEndDate(localDateTime), NamedTextColor.GOLD)));
+			.append(Component.text(getWeeklyVersionEndDate(localDateTime), NamedTextColor.GOLD)));
 		sender.sendMessage(Component.text("NextWeeklyVersionStartDate: ", NamedTextColor.AQUA)
-			.append(Component.text(DateUtils.getNextWeeklyVersionStartDate(localDateTime), NamedTextColor.GOLD)));
+			.append(Component.text(getNextWeeklyVersionStartDate(localDateTime), NamedTextColor.GOLD)));
 	}
 }

@@ -7,8 +7,8 @@ import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import dev.jorel.commandapi.arguments.TextArgument;
 import java.time.temporal.ChronoUnit;
-import javax.annotation.Nullable;
 import org.bukkit.command.CommandSender;
+import org.jetbrains.annotations.Nullable;
 
 public class GetDateCommand {
 	private static final ArgumentSuggestions<CommandSender> SUGGESTIONS_FIELDS = ArgumentSuggestions.strings(
