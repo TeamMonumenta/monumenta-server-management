@@ -2,6 +2,7 @@ package com.playmonumenta.worlds.paper;
 
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.worlds.common.MMLog;
+import com.playmonumenta.worlds.common.utils.FileUtils;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -258,21 +259,32 @@ public class MonumentaWorldManagementAPI {
 		}
 
 		Bukkit.getScheduler().runTaskAsynchronously(WorldManagementPlugin.getInstance(), () -> {
+			// Copy into a temp folder and rename into place so the world never appears at its final name
+			// while still being written, and so a failed copy leaves nothing behind.
+			File tempWorld = new File(newWorldName + ".generating");
 			try {
-				// Copy and wait for completion
-				Process process = Runtime.getRuntime().exec(WorldManagementPlugin.getCopyWorldCommandWithArgs(fromWorldName, newWorldName));
-				int exitVal = process.waitFor();
+				// Copy and regenerate entity UUIDs in-process
+				WorldCopier.copyWorldRegenUuids(new File(fromWorldName).toPath(), tempWorld.toPath());
 
-				if (exitVal != 0) {
-					throw new Exception("Failed to copy world '" + fromWorldName + "' to '" + newWorldName + "': " + exitVal);
+				File finalWorld = new File(newWorldName);
+				if (!tempWorld.renameTo(finalWorld)) {
+					throw new IOException("Failed to move copied world '" + tempWorld + "' to '" + finalWorld + "'");
 				}
 
 				getAvailableWorlds(); // Update the cache
 
 				Bukkit.getScheduler().runTask(WorldManagementPlugin.getInstance(), () -> future.complete(null));
 			} catch (Exception ex) {
-				future.completeExceptionally(ex);
+				if (tempWorld.exists()) {
+					try {
+						FileUtils.deleteRecursively(tempWorld.toPath());
+					} catch (IOException cleanupEx) {
+						MMLog.severe("Failed to clean up partial world copy '" + tempWorld + "'", cleanupEx);
+					}
+				}
 				MMLog.severe("Failed to copy world", ex);
+				// Complete on the main thread so whenComplete() callbacks (which touch Bukkit) never run async.
+				Bukkit.getScheduler().runTask(WorldManagementPlugin.getInstance(), () -> future.completeExceptionally(ex));
 			}
 		});
 
@@ -334,8 +346,9 @@ public class MonumentaWorldManagementAPI {
 
 				Bukkit.getScheduler().runTask(WorldManagementPlugin.getInstance(), () -> future.complete(null));
 			} catch (Exception ex) {
-				future.completeExceptionally(ex);
 				MMLog.severe("Failed to delete world", ex);
+				// Complete on the main thread so whenComplete() callbacks (which touch Bukkit) never run async.
+				Bukkit.getScheduler().runTask(WorldManagementPlugin.getInstance(), () -> future.completeExceptionally(ex));
 			}
 		});
 

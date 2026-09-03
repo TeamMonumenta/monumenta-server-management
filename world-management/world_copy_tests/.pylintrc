@@ -1,0 +1,32 @@
+[MASTER]
+ignore=.venv,.pytest_cache
+jobs=0
+persistent=yes
+py-version=3.10
+
+[MESSAGES CONTROL]
+disable=
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    import-outside-toplevel,
+    too-many-arguments,
+    too-many-branches,
+    too-many-instance-attributes,
+    too-many-lines,
+    too-many-locals,
+    too-many-positional-arguments,
+    too-many-statements,
+    too-few-public-methods,
+    too-many-public-methods,
+    line-too-long,
+    wrong-import-position,
+    duplicate-code,
+
+[REPORTS]
+score=yes
+output-format=text
+reports=no
+
+[IMPORTS]
+known-third-party=quarry

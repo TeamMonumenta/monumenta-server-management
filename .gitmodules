@@ -1,0 +1,3 @@
+[submodule "monumenta-automation"]
+	path = monumenta-automation
+	url = https://github.com/TeamMonumenta/monumenta-automation.git
