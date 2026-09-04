@@ -1,6 +1,5 @@
 package com.playmonumenta.redissync.event;
 
-import java.util.UUID;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
