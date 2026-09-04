@@ -692,11 +692,11 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static String getRedisPerShardDataWorldKey(World world) {
-		return getRedisPerShardDataWorldKey(world.getUID(), world.getName());
+		return getRedisPerShardDataWorldKey(world.getName());
 	}
 
-	public static String getRedisPerShardDataWorldKey(UUID worldUUID, String worldName) {
-		return worldUUID.toString() + ":" + worldName;
+	public static String getRedisPerShardDataWorldKey(String worldName) {
+		return "worlddata:" + worldName;
 	}
 
 	public static String getRedisPluginDataPath(Player player) {
