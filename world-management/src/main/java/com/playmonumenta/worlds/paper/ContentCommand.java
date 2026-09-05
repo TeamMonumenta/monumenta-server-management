@@ -77,17 +77,16 @@ public class ContentCommand {
 			List<String> suggestions = new ArrayList<>();
 
 			if (scanner.current == null) {
+				// next field can be any option OR a number for previous field, suggest unused options anyway
 				suggestions.addAll(scanner.unused.stream().map(s -> s.toString().toLowerCase(Locale.ROOT)).toList());
-			}
-			if (scanner.current == ContentOption.ONARRIVAL) {
+			} else if (scanner.current == ContentOption.ONARRIVAL) {
 				// function suggestion logic
 				suggestions.addAll(List.of("function:test", "test:function"));
 			}
 
 			String prefix = input.substring(0, input.lastIndexOf(" ") + 1);
 			return suggestions.stream()
-				.map(s -> prefix + s)
-				.filter(s -> s.startsWith(input))
+				.map(s -> prefix + s) // suggestions start from beginning of greedy string, must append typed prefix to all suggestions
 				.toArray(String[]::new);
 		});
 	}
@@ -108,6 +107,7 @@ public class ContentCommand {
 				scanner.corrupted = true;
 				break;
 			}
+			// check if option already used
 			if (!scanner.unused.remove(option)) {
 				scanner.corrupted = true;
 				break;
@@ -117,6 +117,7 @@ public class ContentCommand {
 					scanner.current = option;
 					break;
 				}
+				// set onArrival field
 				NamespacedKey key = NamespacedKey.fromString(tokens[i++]);
 				if (key == null) {
 					scanner.corrupted = true;
@@ -126,6 +127,7 @@ public class ContentCommand {
 			} else {
 				int count = 0;
 				double[] values = new double[5];
+				// count ahead number of doubles
 				while (count < 5 && i < tokens.length) {
 					try {
 						values[count] = Double.parseDouble(tokens[i]);
@@ -137,6 +139,7 @@ public class ContentCommand {
 				}
 
 				if (count == 5) {
+					// location + rotation = 5 numbers
 					Vector3d location = new Vector3d(values[0], values[1], values[2]);
 					Vector2d rotation = new Vector2d(values[3], values[4]);
 					ContentLocation contentLocation = new ContentLocation(location, rotation);
@@ -146,6 +149,7 @@ public class ContentCommand {
 						scanner.arriveAt = contentLocation;
 					}
 				} else if (count == 3) {
+					// location only = 3 numbers
 					Vector3d location = new Vector3d(values[0], values[1], values[2]);
 					ContentLocation contentLocation = new ContentLocation(location, null);
 					if (option == ContentOption.RETURNTO) {
@@ -154,6 +158,7 @@ public class ContentCommand {
 						scanner.arriveAt = contentLocation;
 					}
 				} else {
+					// set current to avoid suggesting anything
 					scanner.current = option;
 					scanner.corrupted = true;
 					break;
