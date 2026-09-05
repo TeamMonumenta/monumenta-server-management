@@ -100,6 +100,7 @@ public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 		}
 		copyBool(obj, nbt, "FallFlying");
 		copyFloat(obj, nbt, "FallDistance");
+		copyFloat(obj, nbt, "FallDistance");
 		copyBool(obj, nbt, "OnGround");
 		copyInt(obj, nbt, "Dimension");
 		copyStr(obj, nbt, "world");

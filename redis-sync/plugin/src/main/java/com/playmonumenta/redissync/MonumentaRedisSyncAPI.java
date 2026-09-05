@@ -667,6 +667,68 @@ public class MonumentaRedisSyncAPI {
 		});
 	}
 
+	public static void setPlayerWorldAndLocationOnShard(Player player, String shard, String worldName, Vector loc, double yaw, double pitch) {
+		// TODO do we care about this
+		if (BukkitConfigAPI.getSavingDisabled()) {
+			/* No data saved, no data loaded */
+			return;
+		}
+
+		String shardDataPath = MonumentaRedisSyncAPI.getRedisPerShardDataPath(player);
+		RedisFuture<Map<String, String>> shardDataFuture;
+		try (RedisAPI.BorrowedCommands<String, String> commands = RedisAPI.borrow()) {
+			shardDataFuture = commands.hgetall(shardDataPath);
+		}
+		shardDataFuture.toCompletableFuture().whenComplete((shardData, ex) -> {
+			if (ex != null) {
+				if (shardData == null || shardData.isEmpty()) {
+					//TODO player has not been to the shard we are trying to modify before - what do we do now?
+				} else {
+					final JsonObject worldShardDataJson;
+					/* Look up in the shard data first the "world" part - data from this world about where the player should be */
+					String worldKey = MonumentaRedisSyncAPI.getRedisPerShardDataWorldKey(worldName);
+					String worldShardData = shardData.get(worldKey);
+					if (worldShardData == null || worldShardData.isEmpty()) {
+						// TODO world shard data is empty - is this the right thing to do?
+						MMLog.trace("No world shard data for player '" + player.getName() + "', using default");
+						worldShardDataJson = new JsonObject();
+					} else {
+						MMLog.trace("Found world shard data for player '" + player.getName() + "': '" + worldShardData + "'");
+						worldShardDataJson = new Gson().fromJson(worldShardData, JsonObject.class);
+					}
+
+					//TODO theoretically this could be generified to inject any relevant data in here. Not sure why we'd want that though
+
+					JsonArray pos = new JsonArray();
+					pos.add(loc.getX());
+					pos.add(loc.getY());
+					pos.add(loc.getZ());
+					worldShardDataJson.add("Pos", pos);
+
+					JsonArray rotation = new JsonArray();
+					rotation.add(yaw);
+					rotation.add(pitch);
+					worldShardDataJson.add("Rotation", rotation);
+
+					JsonObject newShardData = new JsonObject();
+					newShardData.addProperty("World", player.getWorld().getName());
+					String overallShardDataStr = new Gson().toJson(newShardData);
+
+					// TODO This does actually save the data right?
+					RedisAPI.multi(commands -> {
+						commands.hset(shardDataPath, worldKey, worldShardDataJson.getAsString());
+						commands.hset(shardDataPath, shard, overallShardDataStr);
+					}).exceptionally(e -> {
+						MMLog.severe("Failed to save player data for player=" + player.getName(), e);
+						return null;
+					});
+				}
+			} else {
+				//TODO handle exception
+			}
+		});
+	}
+
 	public static String getRedisDataPath(Player player) {
 		return getRedisDataPath(player.getUniqueId());
 	}
@@ -692,11 +754,11 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static String getRedisPerShardDataWorldKey(World world) {
-		return getRedisPerShardDataWorldKey(world.getUID(), world.getName());
+		return getRedisPerShardDataWorldKey(world.getName());
 	}
 
-	public static String getRedisPerShardDataWorldKey(UUID worldUUID, String worldName) {
-		return worldUUID.toString() + ":" + worldName;
+	public static String getRedisPerShardDataWorldKey(String worldName) {
+		return "worlddata:" + worldName;
 	}
 
 	public static String getRedisPluginDataPath(Player player) {

@@ -463,7 +463,6 @@ public class DataEventListener implements Listener {
 			Map<String, String> shardData = shardDataFuture.get();
 			/* Look up in the shard data first the "overall" part - which world this player was on last time they were on this shard */
 			World playerWorld = null; // If null at the end of this block, will use default world
-			UUID lastSavedWorldUUID = null; // The saved world UUID from shard data. Might be different from the playerWorld if save data indicated one world, but it is not loaded so fell back to the default
 			String lastSavedWorldName = null; // The saved world name from shard data. Might be different from the playerWorld if save data indicated one world, but it is not loaded so fell back to the default
 			if (shardData == null) {
 				/* Maintain a local cache of shard data while the player is logged in here */
@@ -489,26 +488,14 @@ public class DataEventListener implements Listener {
 				} else {
 					JsonObject shardDataJson = mGson.fromJson(overallShardData, JsonObject.class);
 
-					if (shardDataJson.has("WorldUUID")) {
-						try {
-							lastSavedWorldUUID = UUID.fromString(shardDataJson.get("WorldUUID").getAsString());
-							World world = Bukkit.getWorld(lastSavedWorldUUID);
+					if (shardDataJson.has("World")) {
+						lastSavedWorldName = shardDataJson.get("World").getAsString();
+
+						if (lastSavedWorldName != null) {
+							World world = Bukkit.getWorld(lastSavedWorldName);
 							if (world != null) {
 								playerWorld = world;
 							}
-						} catch (Exception ex) {
-							MMLog.severe("Got sharddata WorldUUID='" + shardDataJson.get("WorldUUID").getAsString() + "' which is invalid", ex);
-						}
-					}
-
-					if (shardDataJson.has("World")) {
-						lastSavedWorldName = shardDataJson.get("World").getAsString();
-					}
-
-					if (playerWorld == null && lastSavedWorldName != null) {
-						World world = Bukkit.getWorld(lastSavedWorldName);
-						if (world != null) {
-							playerWorld = world;
 						}
 					}
 				}
@@ -521,32 +508,32 @@ public class DataEventListener implements Listener {
 			/* After this point playerWorld is always non-null and a valid loaded world */
 
 			// Throw an event that lets other plugins modify the join world.
-			MMLog.trace("Calling PlayerJoinSetWorldEvent for player '" + player.getName() + "' with world={" + playerWorld.getUID() + ": " + playerWorld.getName() + "}, lastSavedWorld={" + lastSavedWorldUUID + ": " + lastSavedWorldName + "}");
-			PlayerJoinSetWorldEvent worldEvent = new PlayerJoinSetWorldEvent(player, playerWorld, lastSavedWorldUUID, lastSavedWorldName);
+			MMLog.trace("Calling PlayerJoinSetWorldEvent for player '" + player.getName() + "' with world={" + playerWorld.getUID() + ": " + playerWorld.getName() + "}, lastSavedWorld={" + lastSavedWorldName + "}");
+			PlayerJoinSetWorldEvent worldEvent = new PlayerJoinSetWorldEvent(player, playerWorld, lastSavedWorldName);
 			Bukkit.getPluginManager().callEvent(worldEvent);
 
 			playerWorld = worldEvent.getWorld();
 			MMLog.trace("After PlayerJoinSetWorldEvent for player '" + player.getName() + "' got world={" + playerWorld.getUID() + ": " + playerWorld.getName() + "}");
 
-			final JsonObject shardDataJson;
+			final JsonObject worldShardDataJson;
 			if (shardData == null || shardData.isEmpty()) {
 				MMLog.trace("No shard data for player '" + player.getName() + "'");
-				shardDataJson = new JsonObject();
+				worldShardDataJson = new JsonObject();
 			} else {
 				/* Look up in the shard data first the "world" part - data from this world about where the player should be */
 				String worldShardData = shardData.get(MonumentaRedisSyncAPI.getRedisPerShardDataWorldKey(playerWorld));
 				if (worldShardData == null || worldShardData.isEmpty()) {
 					MMLog.trace("No world shard data for player '" + player.getName() + "', using default");
-					shardDataJson = new JsonObject();
+					worldShardDataJson = new JsonObject();
 				} else {
 					MMLog.trace("Found world shard data for player '" + player.getName() + "': '" + worldShardData + "'");
-					shardDataJson = mGson.fromJson(worldShardData, JsonObject.class);
+					worldShardDataJson = mGson.fromJson(worldShardData, JsonObject.class);
 				}
 			}
 
 			/* At this point shardDataJson is a JSON object, possibly empty or containing this world's last saved data elements */
 
-			if (!shardDataJson.has("Pos")) {
+			if (!worldShardDataJson.has("Pos")) {
 				// No position data, put player at world spawn
 				Location spawn = playerWorld.getSpawnLocation();
 
@@ -554,21 +541,21 @@ public class DataEventListener implements Listener {
 				pos.add(spawn.getX());
 				pos.add(spawn.getY());
 				pos.add(spawn.getZ());
-				shardDataJson.add("Pos", pos);
+				worldShardDataJson.add("Pos", pos);
 
 				JsonArray rotation = new JsonArray();
 				rotation.add(spawn.getYaw());
 				rotation.add(spawn.getPitch());
-				shardDataJson.add("Rotation", rotation);
+				worldShardDataJson.add("Rotation", rotation);
 			}
 
-			shardDataJson.addProperty("world", playerWorld.getName());
-			shardDataJson.addProperty("WorldUUIDMost", playerWorld.getUID().getMostSignificantBits());
-			shardDataJson.addProperty("WorldUUIDLeast", playerWorld.getUID().getLeastSignificantBits());
+			worldShardDataJson.addProperty("world", playerWorld.getName());
+			worldShardDataJson.addProperty("WorldUUIDMost", playerWorld.getUID().getMostSignificantBits());
+			worldShardDataJson.addProperty("WorldUUIDLeast", playerWorld.getUID().getLeastSignificantBits());
 
 			/* At this point shardDataJson contains at minimum the world the player should be attached to and the location/rotation */
 
-			Object nbtTagCompound = mAdapter.retrieveSaveData(data, shardDataJson);
+			Object nbtTagCompound = mAdapter.retrieveSaveData(data, worldShardDataJson);
 			event.setData(nbtTagCompound);
 
 			MMLog.debug(() -> "Processing PlayerDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
@@ -691,7 +678,6 @@ public class DataEventListener implements Listener {
 
 			// Save the data for this shard indicating which world the player is currently on
 			JsonObject overallShardData = new JsonObject();
-			overallShardData.addProperty("WorldUUID", player.getWorld().getUID().toString());
 			overallShardData.addProperty("World", player.getWorld().getName());
 			String overallShardDataStr = mGson.toJson(overallShardData);
 			if (shardDataMap != null) {
