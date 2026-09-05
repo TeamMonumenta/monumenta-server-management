@@ -113,8 +113,9 @@ public class ContentCommand {
 				break;
 			}
 			if (option == ContentOption.ONARRIVAL) {
+				scanner.current = option;
 				if (i == tokens.length) {
-					scanner.current = option;
+					scanner.corrupted = true;
 					break;
 				}
 				// set onArrival field
