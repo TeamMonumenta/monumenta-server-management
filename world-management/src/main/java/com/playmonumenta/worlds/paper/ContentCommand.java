@@ -84,6 +84,10 @@ public class ContentCommand {
 				suggestions.addAll(List.of("function:test", "test:function"));
 			}
 
+			if (suggestions.isEmpty()) {
+				return new String[] {};
+			}
+
 			String prefix = input.substring(0, input.lastIndexOf(" ") + 1);
 			return suggestions.stream()
 				.map(s -> prefix + s) // suggestions start from beginning of greedy string, must append typed prefix to all suggestions
