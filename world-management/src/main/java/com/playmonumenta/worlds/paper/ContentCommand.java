@@ -59,15 +59,6 @@ public class ContentCommand {
 		}
 	}
 
-	private static class ContentScanner {
-		private @Nullable ContentLocation returnTo = null;
-		private @Nullable ContentLocation arriveAt = null;
-		private @Nullable NamespacedKey onArrival = null;
-		private @Nullable ContentOption current = null;
-		private boolean corrupted = false;
-		private final Set<ContentOption> unused = EnumSet.allOf(ContentOption.class);
-	}
-
 	private static @Nullable ContentOptionals parse(@Nullable String input) {
 		if (input == null) {
 			return null;
@@ -137,7 +128,9 @@ public class ContentCommand {
 				double[] values = new double[5];
 				while (count < 5 && i < tokens.length) {
 					try {
-						values[count++] = Double.parseDouble(tokens[i++]);
+						values[count] = Double.parseDouble(tokens[i]);
+						count++;
+						i++;
 					} catch (NumberFormatException e) {
 						break;
 					}
@@ -152,8 +145,6 @@ public class ContentCommand {
 					} else if (option == ContentOption.ARRIVEAT) {
 						scanner.arriveAt = contentLocation;
 					}
-				} else if (count == 3 && i == tokens.length) {
-					break;
 				} else if (count == 3) {
 					Vector3d location = new Vector3d(values[0], values[1], values[2]);
 					ContentLocation contentLocation = new ContentLocation(location, null);
@@ -162,9 +153,6 @@ public class ContentCommand {
 					} else if (option == ContentOption.ARRIVEAT) {
 						scanner.arriveAt = contentLocation;
 					}
-				} else if (i == tokens.length) {
-					scanner.current = option;
-					break;
 				} else {
 					scanner.corrupted = true;
 					break;
@@ -172,6 +160,15 @@ public class ContentCommand {
 			}
 		}
 		return scanner;
+	}
+
+	private static class ContentScanner {
+		private @Nullable ContentLocation returnTo = null;
+		private @Nullable ContentLocation arriveAt = null;
+		private @Nullable NamespacedKey onArrival = null;
+		private @Nullable ContentOption current = null;
+		private boolean corrupted = false;
+		private final Set<ContentOption> unused = EnumSet.allOf(ContentOption.class);
 	}
 
 	private record ContentOptionals(@Nullable ContentLocation returnTo, @Nullable ContentLocation arriveAt, @Nullable NamespacedKey onArrival) {}
