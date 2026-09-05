@@ -114,6 +114,7 @@ public class ContentCommand {
 			}
 			if (option == ContentOption.ONARRIVAL) {
 				scanner.current = option;
+				// missing function token
 				if (i == tokens.length) {
 					scanner.corrupted = true;
 					break;
@@ -144,6 +145,7 @@ public class ContentCommand {
 					Vector3d location = new Vector3d(values[0], values[1], values[2]);
 					Vector2d rotation = new Vector2d(values[3], values[4]);
 					ContentLocation contentLocation = new ContentLocation(location, rotation);
+					// set returnTo or arriveAt
 					if (option == ContentOption.RETURNTO) {
 						scanner.returnTo = contentLocation;
 					} else if (option == ContentOption.ARRIVEAT) {
@@ -153,13 +155,14 @@ public class ContentCommand {
 					// location only = 3 numbers
 					Vector3d location = new Vector3d(values[0], values[1], values[2]);
 					ContentLocation contentLocation = new ContentLocation(location, null);
+					// set returnTo or arriveAt
 					if (option == ContentOption.RETURNTO) {
 						scanner.returnTo = contentLocation;
 					} else if (option == ContentOption.ARRIVEAT) {
 						scanner.arriveAt = contentLocation;
 					}
 				} else {
-					// set current to avoid suggesting anything
+					// set current to avoid suggesting options
 					scanner.current = option;
 					scanner.corrupted = true;
 					break;
