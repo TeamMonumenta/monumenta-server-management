@@ -8,8 +8,10 @@ import dev.jorel.commandapi.arguments.GreedyStringArgument;
 import dev.jorel.commandapi.arguments.StringArgument;
 import dev.jorel.commandapi.executors.CommandArguments;
 import dev.jorel.commandapi.wrappers.NativeProxyCommandSender;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -31,8 +33,7 @@ public class ContentCommand {
 				new EntitySelectorArgument.ManyPlayers("others")
 			)
 			.withOptionalArguments(
-				new GreedyStringArgument("optionals")
-					.replaceSuggestions(ArgumentSuggestions.stringsAsync(ContentCommand::suggestions))
+				new GreedyStringArgument("optionals").replaceSuggestions(ArgumentSuggestions.stringsAsync(ContentCommand::suggestions))
 			)
 			.executesNative(ContentCommand::execute)
 			.register();
@@ -82,17 +83,21 @@ public class ContentCommand {
 		return CompletableFuture.supplyAsync(() -> {
 			String input = info.currentArg();
 			ContentScanner scanner = scan(input);
-			if (scanner.corrupted) {
-				return new String[] {};
-			}
+			List<String> suggestions = new ArrayList<>();
+
 			if (scanner.current == null) {
-				return scanner.unused.stream().map(e -> e.toString().toLowerCase(Locale.ROOT)).toArray(String[]::new);
+				suggestions.addAll(scanner.unused.stream().map(s -> s.toString().toLowerCase(Locale.ROOT)).toList());
 			}
 			if (scanner.current == ContentOption.ONARRIVAL) {
 				// function suggestion logic
-				return new String[] { "function" };
+				suggestions.addAll(List.of("function:test", "test:function"));
 			}
-			return new String[] {};
+
+			String prefix = input.substring(0, input.lastIndexOf(" ") + 1);
+			return suggestions.stream()
+				.map(s -> prefix + s)
+				.filter(s -> s.startsWith(input))
+				.toArray(String[]::new);
 		});
 	}
 
