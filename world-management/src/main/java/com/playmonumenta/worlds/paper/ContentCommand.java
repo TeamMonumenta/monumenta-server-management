@@ -59,10 +59,10 @@ public class ContentCommand {
 	}
 
 	private static class ContentScanner {
-		private ContentLocation returnTo = null;
-		private ContentLocation arriveAt = null;
-		private NamespacedKey onArrival = null;
-		private ContentOption current = null;
+		private @Nullable ContentLocation returnTo = null;
+		private @Nullable ContentLocation arriveAt = null;
+		private @Nullable NamespacedKey onArrival = null;
+		private @Nullable ContentOption current = null;
 		private boolean corrupted = false;
 		private final Set<ContentOption> unused = EnumSet.allOf(ContentOption.class);
 	}
