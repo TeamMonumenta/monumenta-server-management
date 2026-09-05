@@ -154,6 +154,7 @@ public class ContentCommand {
 						scanner.arriveAt = contentLocation;
 					}
 				} else {
+					scanner.current = option;
 					scanner.corrupted = true;
 					break;
 				}
