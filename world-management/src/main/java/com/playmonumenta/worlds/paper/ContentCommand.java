@@ -73,13 +73,14 @@ public class ContentCommand {
 	private static CompletableFuture<String[]> suggestions(SuggestionInfo<CommandSender> info) {
 		return CompletableFuture.supplyAsync(() -> {
 			String input = info.currentArg();
-			ContentScanner scanner = scan(input);
+			String prefix = input.substring(0, input.lastIndexOf(" ") + 1);
+			ContentScanner scanner = scan(prefix);
 			List<String> suggestions = new ArrayList<>();
 
-			if (scanner.current == null) {
-				// next field can be any option OR a number for previous field, suggest unused options anyway
+			if (scanner.expecting == null) {
+				// suggest all options
 				suggestions.addAll(scanner.unused.stream().map(s -> s.toString().toLowerCase(Locale.ROOT)).toList());
-			} else if (scanner.current == ContentOption.ONARRIVAL) {
+			} else if (scanner.expecting == ContentOption.ONARRIVAL) {
 				// function suggestion logic
 				suggestions.addAll(List.of("function:test", "test:function"));
 			}
@@ -88,7 +89,6 @@ public class ContentCommand {
 				return new String[] {};
 			}
 
-			String prefix = input.substring(0, input.lastIndexOf(" ") + 1);
 			return suggestions.stream()
 				.map(s -> prefix + s) // suggestions start from beginning of greedy string, must append typed prefix to all suggestions
 				.toArray(String[]::new);
@@ -104,6 +104,7 @@ public class ContentCommand {
 
 		int i = 0;
 		while (i < tokens.length) {
+			scanner.expecting = null;
 			ContentOption option;
 			try {
 				option = ContentOption.valueOf(tokens[i++].toUpperCase(Locale.ROOT));
@@ -117,9 +118,9 @@ public class ContentCommand {
 				break;
 			}
 			if (option == ContentOption.ONARRIVAL) {
-				scanner.current = option;
 				// missing function token
 				if (i == tokens.length) {
+					scanner.expecting = option;
 					scanner.corrupted = true;
 					break;
 				}
@@ -166,8 +167,7 @@ public class ContentCommand {
 						scanner.arriveAt = contentLocation;
 					}
 				} else {
-					// set current to avoid suggesting options
-					scanner.current = option;
+					scanner.expecting = option;
 					scanner.corrupted = true;
 					break;
 				}
@@ -180,7 +180,7 @@ public class ContentCommand {
 		private @Nullable ContentLocation returnTo = null;
 		private @Nullable ContentLocation arriveAt = null;
 		private @Nullable NamespacedKey onArrival = null;
-		private @Nullable ContentOption current = null;
+		private @Nullable ContentOption expecting = null;
 		private boolean corrupted = false;
 		private final Set<ContentOption> unused = EnumSet.allOf(ContentOption.class);
 	}
