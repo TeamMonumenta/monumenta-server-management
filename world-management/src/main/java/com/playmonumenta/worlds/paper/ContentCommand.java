@@ -68,10 +68,15 @@ public class ContentCommand {
 			return null;
 		}
 		ContentOptionalsState state = scan(input);
+
 		// input malformed or still expecting another required token
-		if (state.corrupted || (state.expecting != null && !state.optional)) {
-			throw CommandAPI.failWithString("");
+		int index = state.index + 4; // offset index: command + 3 required arguments = 4, improve this later
+		if (state.corrupted) {
+			throw CommandAPI.failWithString("malformed token at index " + index);
+		} else if (state.expecting != null && !state.optional) {
+			throw CommandAPI.failWithString("missing required token at index " + index);
 		}
+
 		return new ContentOptionals(state.returnTo, state.arriveAt, state.onArrival);
 	}
 
@@ -155,11 +160,12 @@ public class ContentCommand {
 					break;
 				}
 				// set onArrival
-				NamespacedKey key = NamespacedKey.fromString(tokens[state.index++]);
+				NamespacedKey key = NamespacedKey.fromString(tokens[state.index]);
 				if (key == null) {
 					state.corrupted = true;
 					break;
 				}
+				state.index++;
 				state.onArrival = key;
 			} else {
 				double[] values = new double[5];
