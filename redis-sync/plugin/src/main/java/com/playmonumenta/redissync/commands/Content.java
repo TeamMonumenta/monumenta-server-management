@@ -22,20 +22,16 @@ public class Content {
 				.withArguments(playerArg)
 				.executesPlayer((sender, args) -> {
 					String playerNameOrUUID = args.getByArgument(playerArg);
-					if (playerNameOrUUID == null) {
-						throw CommandAPI.failWithString("Argument must be a player name with correct capitalization or a UUID instead of null");
-					}
-					UUID uuid = MonumentaRedisSyncAPI.cachedNameToUuid(playerNameOrUUID);
+					UUID uuid = MonumentaRedisSyncAPI.cachedNameToUuid(Objects.requireNonNull(playerNameOrUUID));
 					if (uuid == null) {
 						try {
 							uuid = UUID.fromString(playerNameOrUUID);
 						} catch (Exception ex) {
-							throw CommandAPI.failWithString("Argument must be a player name with correct capitalization or a UUID");
+							throw CommandAPI.failWithString("Argument must be a player name or a UUID");
 						}
 					}
-					MonumentaRedisSyncAPI.getPlayerContentDataFromUUID(uuid).whenComplete((content, throwable) -> {
-						sender.sendMessage(Objects.requireNonNullElse(content, "Content not set"));
-					});
+					String content = MonumentaRedisSyncAPI.getPlayerContent(uuid);
+					sender.sendMessage(content.isBlank() ? "Content not set" : content);
 				}))
 			.withSubcommand(new CommandAPICommand("set")
 				.withArguments(playerArg)
@@ -43,10 +39,7 @@ public class Content {
 				.executesPlayer((sender, args) -> {
 					String playerNameOrUUID = args.getByArgument(playerArg);
 					String value = args.getByArgument(valueArg);
-					if (playerNameOrUUID == null) {
-						throw CommandAPI.failWithString("Argument must be a player name with correct capitalization or a UUID instead of null");
-					}
-					UUID uuid = MonumentaRedisSyncAPI.cachedNameToUuid(playerNameOrUUID);
+					UUID uuid = MonumentaRedisSyncAPI.cachedNameToUuid(Objects.requireNonNull(playerNameOrUUID));
 					if (uuid == null) {
 						try {
 							uuid = UUID.fromString(playerNameOrUUID);
@@ -54,8 +47,7 @@ public class Content {
 							throw CommandAPI.failWithString("Argument must be a player name with correct capitalization or a UUID");
 						}
 					}
-					MonumentaRedisSyncAPI.setPlayerContentDataFromUUID(uuid, value);
-
+					MonumentaRedisSyncAPI.setPlayerContent(uuid, value);
 				}))
 			.register();
 

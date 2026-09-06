@@ -37,6 +37,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -128,6 +130,7 @@ public class DataEventListener implements Listener {
 	private final Map<UUID, UUID> mTransferringPlayerShoulderEntities = new LinkedHashMap<>();
 
 	private final Map<UUID, List<CompletableFuture<?>>> mPendingSaves = new HashMap<>();
+	private final ConcurrentMap<UUID, String> mPlayerContent = new ConcurrentHashMap<>();
 	private final Map<UUID, JsonObject> mPluginData = new HashMap<>();
 	private final Set<UUID> mLoadingPlayers = new HashSet<>();
 	private final Set<UUID> mLoadFailedPlayers = new HashSet<>();
@@ -216,6 +219,14 @@ public class DataEventListener implements Listener {
 
 	protected static void waitForPlayerToSaveThenAsync(Player player, Runnable callback) {
 		INSTANCE.waitForPlayerToSaveInternal(player, callback, false);
+	}
+
+	protected static String getPlayerContent(UUID uuid) {
+		return INSTANCE.mPlayerContent.getOrDefault(uuid, "");
+	}
+
+	protected static void setPlayerContent(UUID uuid, String content) {
+		INSTANCE.mPlayerContent.put(uuid, content);
 	}
 
 	protected static @Nullable JsonObject getPlayerPluginData(UUID uuid) {
@@ -413,10 +424,12 @@ public class DataEventListener implements Listener {
 		try (RedisAPI.BorrowedCommands<String, byte[]> byteConn = RedisAPI.borrowStringBytes()) {
 			dataFuture = byteConn.lindex(MonumentaRedisSyncAPI.getRedisDataPath(player), 0);
 		}
+		RedisFuture<String> contentFuture;
 		RedisFuture<String> pluginDataFuture;
 		RedisFuture<String> scoreFuture;
 		RedisFuture<Map<String, String>> shardDataFuture;
 		try (RedisAPI.BorrowedCommands<String, String> commands = RedisAPI.borrow()) {
+			contentFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisContentPath(player), 0);
 			pluginDataFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisPluginDataPath(player), 0);
 			scoreFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisScoresPath(player), 0);
 			shardDataFuture = commands.hgetall(MonumentaRedisSyncAPI.getRedisPerShardDataPath(player));
@@ -432,6 +445,16 @@ public class DataEventListener implements Listener {
 			MMLog.trace("Player data loaded for player=" + player.getName());
 			MMLog.trace(() -> "Player data: " + b64encode(data));
 
+			/* Load content data */
+			String content = contentFuture.get();
+			if (content == null) {
+				MMLog.debug("Player '" + player.getName() + "' has no content data");
+			} else {
+				mPlayerContent.put(player.getUniqueId(), content);
+				MMLog.trace(() -> "Content data loaded for player=" + player.getName());
+				MMLog.trace(() -> "Content data: " + content);
+			}
+
 			/* Load plugin data */
 			String pluginData = pluginDataFuture.get();
 			if (pluginData == null) {
@@ -439,7 +462,7 @@ public class DataEventListener implements Listener {
 			} else {
 				mLoadingPlayers.add(player.getUniqueId());
 				mPluginData.put(player.getUniqueId(), mGson.fromJson(pluginData, JsonObject.class));
-				MMLog.trace("Plugin data loaded for player=" + player.getName());
+				MMLog.trace(() -> "Plugin data loaded for player=" + player.getName());
 				MMLog.trace(() -> "Plugin data: " + pluginData);
 			}
 
@@ -704,6 +727,11 @@ public class DataEventListener implements Listener {
 			String history = BukkitConfigAPI.getShardName() + "|" + System.currentTimeMillis() + "|" + player.getName();
 			MMLog.trace(() -> "history: " + history);
 
+			/* content */
+			String contentPath = MonumentaRedisSyncAPI.getRedisContentPath(player);
+			String content = mPlayerContent.getOrDefault(player.getUniqueId(), "");
+			MMLog.trace(() -> "content: " + content);
+
 			/* plugindata */
 			String pluginDataPath = MonumentaRedisSyncAPI.getRedisPluginDataPath(player);
 			mPluginData.put(player.getUniqueId(), pluginData); // Update cache
@@ -723,6 +751,8 @@ public class DataEventListener implements Listener {
 				commands.hset(shardDataPath, BukkitConfigAPI.getShardName(), overallShardDataStr);
 				commands.lpush(histPath, history);
 				commands.ltrim(histPath, 0, BukkitConfigAPI.getHistoryAmount());
+				commands.lpush(contentPath, content);
+				commands.ltrim(contentPath, 0, BukkitConfigAPI.getHistoryAmount());
 				commands.lpush(pluginDataPath, pluginDataStr);
 				commands.ltrim(pluginDataPath, 0, BukkitConfigAPI.getHistoryAmount());
 				commands.lpush(scorePath, scoreboardData);
@@ -782,6 +812,7 @@ public class DataEventListener implements Listener {
 			}
 
 			if (Bukkit.getPlayer(playerUUID) == null) {
+				mPlayerContent.remove(playerUUID);
 				mPluginData.remove(playerUUID);
 				mShardData.remove(playerUUID);
 			}

@@ -976,59 +976,47 @@ public class MonumentaRedisSyncAPI {
 		return PlayerWorldData.fromJson(worldShardData, world);
 	}
 
-
-	public @Nullable static CompletableFuture<String> getPlayerContentData(Player player) {
-		return getPlayerContentDataFromUUID(player.getUniqueId());
-	}
-
 	/**
-	 * Gets player current content type
-	 *
-	 * @param playerUUID Player UUID to get data for
-	 * @return CompletableFuture for a string corresponding to the content
-	 */
-
-	public static CompletableFuture<String> getPlayerContentDataFromUUID(UUID playerUUID) {
-		CompletableFuture<String> future;
-
-		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
-			future = conn.get(getRedisContentPath(playerUUID)).toCompletableFuture();
-			return future;
-		} catch (Exception e) {
-			MMLog.severe("Error getting player content", e);
-			return CompletableFuture.failedFuture(e);
-		}
-	}
-
-	/**
-	 * Sets player current content type
+	 * Gets player current content
 	 *
 	 * @param player Player to get data for
-	 * @param content String corresponding to the content
+	 * @return The player's content string, which is empty if not set
 	 */
-	public static void setPlayerContentData(Player player, String content) {
-		setPlayerContentDataFromUUID(player.getUniqueId(), content);
+	public static String getPlayerContent(Player player) {
+		return getPlayerContent(player.getUniqueId());
 	}
 
-	public static void setPlayerContentDataFromUUID(UUID playerUUID, String content) {
+	/**
+	 * Gets player current content
+	 *
+	 * @param playerUUID Player UUID to get data for
+	 * @return The player's content string, which is empty if not set
+	 */
+	public static String getPlayerContent(UUID playerUUID) {
+		return DataEventListener.getPlayerContent(playerUUID);
+	}
+
+	/**
+	 * Sets player current content
+	 *
+	 * @param player Player to set data for
+	 * @param content String corresponding to the content
+	 */
+	public static void setPlayerContent(Player player, String content) {
+		setPlayerContent(player.getUniqueId(), content);
+	}
+
+	/**
+	 * Sets player current content
+	 *
+	 * @param playerUUID Player UUID to set data for
+	 * @param content String corresponding to the content
+	 */
+	public static void setPlayerContent(UUID playerUUID, String content) {
 		PlayerContentEvent newEvent = new PlayerContentEvent(Bukkit.getPlayer(playerUUID), content);
 		Bukkit.getPluginManager().callEvent(newEvent);
 
-		CompletableFuture<String> future;
-
-		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
-			future = conn.set(getRedisContentPath(playerUUID), content).toCompletableFuture();
-		}
-
-		try {
-			future.whenComplete((result, throwable) -> {
-				if (throwable != null) {
-					MMLog.severe("Error setting player content", throwable);
-				}
-			});
-		} catch (Exception e) {
-			MMLog.severe("Error setting player content", e);
-		}
+		DataEventListener.setPlayerContent(playerUUID, content);
 	}
 
 
