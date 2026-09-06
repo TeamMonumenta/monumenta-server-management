@@ -16,8 +16,10 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2d;
@@ -64,8 +66,8 @@ public class ContentCommand {
 			return null;
 		}
 		ContentScannerState state = scan(input);
-		// input malformed or still expecting another token
-		if (state.corrupted || state.expecting != null) {
+		// input malformed or still expecting another required token
+		if (state.corrupted || (state.expecting != null && !state.optional)) {
 			return null;
 		}
 		return new ContentOptionals(state.returnTo, state.arriveAt, state.onArrival);
@@ -92,7 +94,21 @@ public class ContentCommand {
 				// function suggestion logic
 				suggestions.addAll(List.of("function:test", "test:function"));
 			} else if (state.expecting == ContentOption.RETURNTO || state.expecting == ContentOption.ARRIVEAT) {
-				//
+				// location/rotation suggestion logic
+				if (info.sender() instanceof Entity sender) {
+					Location location = sender.getLocation();
+					int suggestion = switch (state.count) {
+						case 0 -> location.getBlockX();
+						case 1 -> location.getBlockY();
+						case 2 -> location.getBlockZ();
+						case 3 -> Math.round(location.getYaw() / 45) * 45;
+						case 4 -> Math.round(location.getPitch() / 45) * 45;
+						default -> 0;
+					};
+					suggestions.add(String.valueOf(suggestion));
+				} else {
+					suggestions.add(String.valueOf(0));
+				}
 			}
 
 			if (suggestions.isEmpty()) {
@@ -157,6 +173,11 @@ public class ContentCommand {
 					}
 				}
 
+				if (state.count < 5) {
+					// expecting more doubles
+					state.expecting = option;
+				}
+
 				if (state.count >= 3) {
 					// future tokens can be either numbers or options
 					state.optional = true;
@@ -174,8 +195,6 @@ public class ContentCommand {
 						state.arriveAt = contentLocation;
 					}
 				} else {
-					// expecting more doubles
-					state.expecting = option;
 					break;
 				}
 			}
