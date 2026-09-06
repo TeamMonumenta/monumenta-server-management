@@ -27,8 +27,8 @@ import org.joml.Vector3d;
 
 public class ContentCommand {
 	public static void register() {
-		new CommandAPICommand("newcontent")
-			.withPermission("monumenta.command.newcontent")
+		new CommandAPICommand("content")
+			.withPermission("monumenta.command.content")
 			.withArguments(
 				new StringArgument("content"),
 				new EntitySelectorArgument.OnePlayer("player"),
