@@ -303,9 +303,6 @@ public class DataEventListener implements Listener {
 		long startTime = System.currentTimeMillis();
 		MMLog.debug("Started loading advancements data for player=" + player.getName());
 
-		/* Wait until player has finished saving if they just logged out and back in */
-		blockingWaitForPlayerToSave(player);
-
 		RedisFuture<String> advanceFuture;
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
 			advanceFuture = conn.lindex(MonumentaRedisSyncAPI.getRedisAdvancementsPath(player), 0);
@@ -404,9 +401,7 @@ public class DataEventListener implements Listener {
 
 		long startTime = System.currentTimeMillis();
 		MMLog.debug("Started loading data for player=" + player.getName());
-
-		/* Wait until player has finished saving if they just logged out and back in */
-		blockingWaitForPlayerToSave(player);
+		mLoadingPlayers.add(player.getUniqueId());
 
 		//TODO: Rework to using something like MonumentaRedisSyncAPI.transformPlayerData()
 		RedisFuture<byte[]> dataFuture;
@@ -437,7 +432,6 @@ public class DataEventListener implements Listener {
 			if (pluginData == null) {
 				MMLog.debug("Player '" + player.getName() + "' has no plugin data");
 			} else {
-				mLoadingPlayers.add(player.getUniqueId());
 				mPluginData.put(player.getUniqueId(), mGson.fromJson(pluginData, JsonObject.class));
 				MMLog.trace("Plugin data loaded for player=" + player.getName());
 				MMLog.trace(() -> "Plugin data: " + pluginData);
@@ -616,13 +610,18 @@ public class DataEventListener implements Listener {
 			return;
 		}
 
-		if (mLoadFailedPlayers.contains(event.getPlayer().getUniqueId())) {
-			mLoadFailedPlayers.remove(event.getPlayer().getUniqueId());
-			MMLog.warning("Skipping playerdata save for " + event.getPlayer().getUniqueId() + " because their playerdata failed to load");
+		Player player = event.getPlayer();
+		if (mLoadingPlayers.contains(player.getUniqueId())) {
+			MMLog.debug("Skipping playerdata save for player:" + player.getName() + " because their playerdata is still loading");
 			return;
 		}
 
-		Player player = event.getPlayer();
+		if (mLoadFailedPlayers.contains(player.getUniqueId())) {
+			mLoadFailedPlayers.remove(player.getUniqueId());
+			MMLog.warning("Skipping playerdata save for " + player.getUniqueId() + " because their playerdata failed to load");
+			return;
+		}
+
 		if (isPlayerTransferring(player)) {
 			MMLog.debug("Ignoring PlayerDataSaveEvent for player:" + player.getName());
 			return;
@@ -642,20 +641,16 @@ public class DataEventListener implements Listener {
 
 		/* Call a custom save event that gives other plugins a chance to add data */
 		/* This is skipped until the join event finishes to prevent losing data if a save happens while joining */
-		if (!mLoadingPlayers.contains(player.getUniqueId())) {
-			long startTime = System.currentTimeMillis();
-			PlayerSaveEvent newEvent = new PlayerSaveEvent(player);
-			Bukkit.getPluginManager().callEvent(newEvent);
+		long startTime = System.currentTimeMillis();
+		PlayerSaveEvent newEvent = new PlayerSaveEvent(player);
+		Bukkit.getPluginManager().callEvent(newEvent);
 
-			/* Merge any data from the save event to the player's locally cached plugin data */
-			Map<String, JsonObject> eventData = newEvent.getPluginData();
-			for (Map.Entry<String, JsonObject> ent : eventData.entrySet()) {
-				pluginData.add(ent.getKey(), ent.getValue());
-			}
-			MMLog.debug(() -> "Getting plugindata from other plugins took " + (System.currentTimeMillis() - startTime) + " milliseconds");
-		} else {
-			MMLog.debug(() -> "Skipped fetching plugindata from other plugins, as the player hasn't finished joining yet");
+		/* Merge any data from the save event to the player's locally cached plugin data */
+		Map<String, JsonObject> eventData = newEvent.getPluginData();
+		for (Map.Entry<String, JsonObject> ent : eventData.entrySet()) {
+			pluginData.add(ent.getKey(), ent.getValue());
 		}
+		MMLog.debug(() -> "Getting plugindata from other plugins took " + (System.currentTimeMillis() - startTime) + " milliseconds");
 
 		try {
 			/* Grab the return parameters if they were set when starting transfer. If they are null, that's fine too */
@@ -944,7 +939,7 @@ public class DataEventListener implements Listener {
 			return;
 		}
 		// if player is loaded, but they are also trying to connect, disconnect the one trying to connect to prevent duplicate uuid stupidity
-		if (Bukkit.getPlayer(uuid) != null || mLoadingPlayers.contains(uuid) || mShardData.containsKey(uuid)) {
+		if (Bukkit.getPlayer(uuid) != null || mLoadingPlayers.contains(uuid) || mShardData.containsKey(uuid) || mPendingSaves.containsKey(uuid)) {
 			MMLog.warning(() -> "A player uuid=" + uuid + " name=" + profile.getName() + " tried to login while loading/online! Preventing duplicate uuid stupidity");
 			event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, Component.translatable("multiplayer.disconnect.duplicate_login"));
 		}
