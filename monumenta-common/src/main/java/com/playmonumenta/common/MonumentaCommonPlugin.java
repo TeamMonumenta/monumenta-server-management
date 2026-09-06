@@ -1,5 +1,10 @@
 package com.playmonumenta.common;
 
+import com.playmonumenta.common.commands.GetDateCommand;
+import com.playmonumenta.common.commands.RefreshTimeCommand;
+import com.playmonumenta.common.commands.TimeWarpCommand;
+import com.playmonumenta.common.managers.TimeWarpManager;
+import com.playmonumenta.common.utils.DateUtils;
 import com.playmonumenta.common.zones.ZoneManager;
 import com.playmonumenta.common.zones.commands.DebugZones;
 import com.playmonumenta.common.zones.commands.ShowZones;
@@ -15,17 +20,44 @@ import org.jetbrains.annotations.Nullable;
 
 public class MonumentaCommonPlugin extends JavaPlugin {
 	private static @Nullable MonumentaCommonPlugin INSTANCE = null;
+	public static final boolean ENABLE_TIME_WARP;
 
 	public boolean mShowZonesDynmap = false;
 	public boolean mFallbackZoneLookup = false;
 
 	public @MonotonicNonNull ZoneManager mZoneManager;
 
+	static {
+		/*
+		 * Reads the environment variable MONUMENTA_ENABLE_TIME_WARP to determine if /timewarp is allowed
+		 * If environment variable is not set or 0, disabled. If set and nonzero, enabled.
+		 */
+		String envEnableTimeWarp = System.getenv("MONUMENTA_ENABLE_TIME_WARP");
+		if (envEnableTimeWarp == null || envEnableTimeWarp.isEmpty()) {
+			ENABLE_TIME_WARP = false;
+		} else {
+			boolean val;
+			try {
+				val = Integer.parseInt(envEnableTimeWarp) != 0;
+			} catch (Exception ex) {
+				val = false;
+			}
+			ENABLE_TIME_WARP = val;
+		}
+	}
+
 	@Override
 	public void onLoad() {
+		// Zone registration
 		DebugZones.register();
 		TestZone.register();
 		ShowZones.register(this);
+
+		// Time registration
+		TimeWarpCommand.register();
+		GetDateCommand.register();
+		RefreshTimeCommand.register();
+		DateUtils.refreshTime();
 	}
 
 	@Override
@@ -40,6 +72,8 @@ public class MonumentaCommonPlugin extends JavaPlugin {
 
 		mZoneManager = ZoneManager.getInstance();
 		mZoneManager.doReload(true);
+
+		TimeWarpManager.load();
 
 		/* Load the config 1 tick later to let other plugins load */
 		new BukkitRunnable() {
