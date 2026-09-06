@@ -53,7 +53,6 @@ public class WorldManagementPlugin extends JavaPlugin {
 		}
 		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
 		WorldCommands.register(this);
-		ContentCommand.register();
 	}
 
 	@Override

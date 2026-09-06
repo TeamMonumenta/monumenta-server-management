@@ -1,4 +1,4 @@
-package com.playmonumenta.worlds.paper;
+package com.playmonumenta.redissync.commands;
 
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPIBukkit;
