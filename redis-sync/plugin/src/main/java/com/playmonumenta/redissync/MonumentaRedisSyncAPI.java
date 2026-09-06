@@ -9,6 +9,7 @@ import com.google.gson.JsonObject;
 import com.playmonumenta.common.event.PlayerServerTransferEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
 import com.playmonumenta.redissync.event.PlayerContentChangeEvent;
+import com.playmonumenta.redissync.event.UpdateAvailableContentEvent;
 import com.playmonumenta.redissync.utils.MMLog;
 import com.playmonumenta.redissync.utils.Trie;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
@@ -167,6 +168,21 @@ public class MonumentaRedisSyncAPI {
 			future = conn.hgetall("uuid2name");
 		}
 		return future.thenApply((data) -> data.keySet().stream().map(UUID::fromString).collect(Collectors.toSet())).toCompletableFuture();
+	}
+
+	/**
+	 * Refreshes content provided by other plugins
+	 */
+	public static void refreshAvailableContent() {
+		new UpdateAvailableContentEvent().callEvent();
+	}
+
+	/**
+	 * Gets the set of known available content
+	 * @return All known available content
+	 */
+	public static Set<String> availableContent() {
+		return DataEventListener.getAvailableContent();
 	}
 
 	// Thread-safe: backed by ConcurrentHashMap, callable from any thread

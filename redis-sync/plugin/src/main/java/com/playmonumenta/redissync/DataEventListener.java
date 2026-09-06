@@ -14,6 +14,7 @@ import com.playmonumenta.redissync.adapters.VersionAdapter.ReturnParams;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
 import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
+import com.playmonumenta.redissync.event.UpdateAvailableContentEvent;
 import com.playmonumenta.redissync.utils.MMLog;
 import com.playmonumenta.redissync.utils.ScoreboardUtils;
 import io.lettuce.core.RedisFuture;
@@ -129,6 +130,7 @@ public class DataEventListener implements Listener {
 	/* Key = shoulder entity UUID (i.e. parrot), value = player */
 	private final Map<UUID, UUID> mTransferringPlayerShoulderEntities = new LinkedHashMap<>();
 
+	private Set<String> mAvailableContent = Set.of();
 	private final Map<UUID, List<CompletableFuture<?>>> mPendingSaves = new HashMap<>();
 	private final ConcurrentMap<UUID, String> mPlayerContent = new ConcurrentHashMap<>();
 	private final Map<UUID, JsonObject> mPluginData = new HashMap<>();
@@ -219,6 +221,10 @@ public class DataEventListener implements Listener {
 
 	protected static void waitForPlayerToSaveThenAsync(Player player, Runnable callback) {
 		INSTANCE.waitForPlayerToSaveInternal(player, callback, false);
+	}
+
+	protected static Set<String> getAvailableContent() {
+		return INSTANCE.mAvailableContent;
 	}
 
 	protected static String getPlayerContent(UUID uuid) {
@@ -979,6 +985,13 @@ public class DataEventListener implements Listener {
 			MMLog.warning(() -> "A player uuid=" + uuid + " name=" + profile.getName() + " tried to login while loading/online! Preventing duplicate uuid stupidity");
 			event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, Component.translatable("multiplayer.disconnect.duplicate_login"));
 		}
+	}
+
+	/* ********************* Misc Event Handlers ********************* */
+
+	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+	public void updateAvailableContentEvent(UpdateAvailableContentEvent event) {
+		mAvailableContent = event.getContent();
 	}
 
 	/* ******************* Private Utility Methods ******************* */
