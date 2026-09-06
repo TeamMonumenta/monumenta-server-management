@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -48,16 +49,18 @@ public class MonumentaRedisSyncAPI {
 		private Object mNbtTagCompoundData;
 		private String mAdvancements;
 		private String mScores;
+		private String mContent;
 		private String mPluginData;
 		private String mHistory;
 
 		public RedisPlayerData(UUID uuid, Object nbtTagCompoundData, String advancements,
-		                       String scores, String pluginData, String history) {
+		                       String scores, String pluginData, String content, String history) {
 			mUUID = uuid;
 			mNbtTagCompoundData = nbtTagCompoundData;
 			mAdvancements = advancements;
 			mScores = scores;
 			mPluginData = pluginData;
+			mContent = content;
 			mHistory = history;
 		}
 
@@ -79,6 +82,10 @@ public class MonumentaRedisSyncAPI {
 
 		public String getPluginData() {
 			return mPluginData;
+		}
+
+		public String getContent() {
+			return mContent;
 		}
 
 		public String getHistory() {
@@ -105,6 +112,10 @@ public class MonumentaRedisSyncAPI {
 			this.mPluginData = pluginData;
 		}
 
+		public void setContent(String content) {
+			this.mContent = content;
+		}
+
 		public void setHistory(String history) {
 			this.mHistory = history;
 		}
@@ -113,6 +124,7 @@ public class MonumentaRedisSyncAPI {
 	public static final int TIMEOUT_SECONDS = 10;
 	public static final ArgumentSuggestions<CommandSender> SUGGESTIONS_ALL_CACHED_PLAYER_NAMES = ArgumentSuggestions.strings((info) ->
 		getAllCachedPlayerNames().toArray(String[]::new));
+
 
 	private static final Trie<UUID> mNameToUuidTrie = new Trie<>();
 	private static final Map<String, UUID> mNameToUuid = new ConcurrentHashMap<>();
@@ -297,6 +309,7 @@ public class MonumentaRedisSyncAPI {
 				conn.lindex(getRedisAdvancementsPath(player), 0);
 				conn.lindex(getRedisScoresPath(player), 0);
 				conn.lindex(getRedisPluginDataPath(player), 0);
+				conn.lindex(getRedisContentPath(player), 0);
 				conn.lindex(getRedisHistoryPath(player), 0);
 			}).whenComplete((readResult, readEx) -> {
 				if (readEx != null) {
@@ -305,11 +318,12 @@ public class MonumentaRedisSyncAPI {
 					return;
 				}
 
-				byte[] data = (byte[]) readResult.get(0);
-				byte[] advance = (byte[]) readResult.get(1);
-				byte[] score = (byte[]) readResult.get(2);
-				byte[] plugin = (byte[]) readResult.get(3);
-				byte[] history = (byte[]) readResult.get(4);
+				byte[] data = readResult.get(0);
+				byte[] advance = readResult.get(1);
+				byte[] score = readResult.get(2);
+				byte[] plugin = readResult.get(3);
+				byte[] content = Objects.requireNonNullElse(readResult.get(4), new byte[]{});
+				byte[] history = readResult.get(5);
 
 				if (data == null || advance == null || score == null || plugin == null || history == null) {
 					MMLog.severe("Failed to retrieve player's data to stash for player '" + player.getName() + "'");
@@ -323,6 +337,7 @@ public class MonumentaRedisSyncAPI {
 					conn.hset(getStashPath(), saveName + "-advancements", advance);
 					conn.hset(getStashPath(), saveName + "-scores", score);
 					conn.hset(getStashPath(), saveName + "-plugins", plugin);
+					conn.hset(getStashPath(), saveName + "-content", content);
 					conn.hset(getStashPath(), saveName + "-history", history);
 				}).whenComplete((writeResult, writeEx) -> {
 					if (writeEx != null) {
@@ -358,6 +373,7 @@ public class MonumentaRedisSyncAPI {
 				conn.hget(getStashPath(), saveName + "-advancements");
 				conn.hget(getStashPath(), saveName + "-scores");
 				conn.hget(getStashPath(), saveName + "-plugins");
+				conn.hget(getStashPath(), saveName + "-content");
 				conn.hget(getStashPath(), saveName + "-history");
 			}).whenComplete((readResult, readEx) -> {
 				if (readEx != null) {
@@ -366,11 +382,12 @@ public class MonumentaRedisSyncAPI {
 					return;
 				}
 
-				byte[] data = (byte[]) readResult.get(0);
-				byte[] advance = (byte[]) readResult.get(1);
-				byte[] score = (byte[]) readResult.get(2);
-				byte[] plugin = (byte[]) readResult.get(3);
-				byte[] historyRaw = (byte[]) readResult.get(4);
+				byte[] data = readResult.get(0);
+				byte[] advance = readResult.get(1);
+				byte[] score = readResult.get(2);
+				byte[] plugin = readResult.get(3);
+				byte[] content = Objects.requireNonNullElse(readResult.get(4), new byte[]{});
+				byte[] historyRaw = readResult.get(5);
 
 				/* Make sure there's actually data */
 				if (data == null || advance == null || score == null || plugin == null || historyRaw == null) {
@@ -390,6 +407,7 @@ public class MonumentaRedisSyncAPI {
 					conn.lpush(getRedisAdvancementsPath(player), advance);
 					conn.lpush(getRedisScoresPath(player), score);
 					conn.lpush(getRedisPluginDataPath(player), plugin);
+					conn.lpush(getRedisContentPath(player), content);
 					conn.lpush(getRedisHistoryPath(player), historyOut);
 				}).whenComplete((writeResult, writeEx) -> {
 					if (writeEx != null) {
@@ -562,6 +580,7 @@ public class MonumentaRedisSyncAPI {
 				conn.lindex(getRedisAdvancementsPath(player), rollbackIndex);
 				conn.lindex(getRedisScoresPath(player), rollbackIndex);
 				conn.lindex(getRedisPluginDataPath(player), rollbackIndex);
+				conn.lindex(getRedisContentPath(player), rollbackIndex);
 				conn.lindex(getRedisHistoryPath(player), rollbackIndex);
 			}).whenComplete((readResult, readEx) -> {
 				if (readEx != null) {
@@ -570,11 +589,12 @@ public class MonumentaRedisSyncAPI {
 					return;
 				}
 
-				byte[] data = (byte[]) readResult.get(0);
-				byte[] advance = (byte[]) readResult.get(1);
-				byte[] score = (byte[]) readResult.get(2);
-				byte[] plugin = (byte[]) readResult.get(3);
-				byte[] historyRaw = (byte[]) readResult.get(4);
+				byte[] data = readResult.get(0);
+				byte[] advance = readResult.get(1);
+				byte[] score = readResult.get(2);
+				byte[] plugin = readResult.get(3);
+				byte[] content = Objects.requireNonNullElse(readResult.get(4), new byte[]{});
+				byte[] historyRaw = readResult.get(5);
 
 				/* Make sure there's actually data */
 				if (data == null || advance == null || score == null || plugin == null || historyRaw == null) {
@@ -590,6 +610,7 @@ public class MonumentaRedisSyncAPI {
 					conn.lpush(getRedisAdvancementsPath(player), advance);
 					conn.lpush(getRedisScoresPath(player), score);
 					conn.lpush(getRedisPluginDataPath(player), plugin);
+					conn.lpush(getRedisContentPath(player), content);
 					conn.lpush(getRedisHistoryPath(player), historyOut);
 				}).whenComplete((writeResult, writeEx) -> {
 					if (writeEx != null) {
@@ -625,6 +646,7 @@ public class MonumentaRedisSyncAPI {
 				conn.lindex(getRedisAdvancementsPath(loadFrom), index);
 				conn.lindex(getRedisScoresPath(loadFrom), index);
 				conn.lindex(getRedisPluginDataPath(loadFrom), index);
+				conn.lindex(getRedisContentPath(loadFrom), index);
 				conn.lindex(getRedisHistoryPath(loadFrom), index);
 			}).whenComplete((readResult, readEx) -> {
 				if (readEx != null) {
@@ -633,11 +655,12 @@ public class MonumentaRedisSyncAPI {
 					return;
 				}
 
-				byte[] data = (byte[]) readResult.get(0);
-				byte[] advance = (byte[]) readResult.get(1);
-				byte[] score = (byte[]) readResult.get(2);
-				byte[] plugin = (byte[]) readResult.get(3);
-				byte[] historyRaw = (byte[]) readResult.get(4);
+				byte[] data = readResult.get(0);
+				byte[] advance = readResult.get(1);
+				byte[] score = readResult.get(2);
+				byte[] plugin = readResult.get(3);
+				byte[] content = Objects.requireNonNullElse(readResult.get(4), new byte[]{});
+				byte[] historyRaw = readResult.get(5);
 
 				if (data == null || advance == null || score == null || plugin == null || historyRaw == null) {
 					loadTo.sendMessage(Component.text("Failed to retrieve player's data to load", NamedTextColor.RED));
@@ -653,6 +676,7 @@ public class MonumentaRedisSyncAPI {
 					conn.lpush(getRedisAdvancementsPath(loadTo), advance);
 					conn.lpush(getRedisScoresPath(loadTo), score);
 					conn.lpush(getRedisPluginDataPath(loadTo), plugin);
+					conn.lpush(getRedisContentPath(loadTo), content);
 					conn.lpush(getRedisHistoryPath(loadTo), historyOut);
 				}).whenComplete((writeResult, writeEx) -> {
 					if (writeEx != null) {
@@ -791,7 +815,7 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	/**
-	 * Saves all of player's data, including advancements, scores, plugin data, inventory, world location, etc.
+	 * Saves all of player's data, including advancements, scores, plugin data, content, inventory, world location, etc.
 	 * <p>
 	 * Also creates a rollback point like all full saves.
 	 * <p>
@@ -1023,7 +1047,7 @@ public class MonumentaRedisSyncAPI {
 	/** Future returns non-null if successfully loaded data, null on error */
 	@Nullable
 	private static RedisPlayerData transformPlayerData(MonumentaRedisSync mrs, UUID uuid,
-		byte[] data, byte[] advancementsBytes, byte[] scoresBytes, byte[] pluginDataBytes, byte[] historyBytes) {
+		byte[] data, byte[] advancementsBytes, byte[] scoresBytes, byte[] pluginDataBytes, byte[] contentBytes, byte[] historyBytes) {
 		if (data == null) {
 			MMLog.warning("Failed to retrieve player data; likely player didn't make it past the tutorial");
 			return null;
@@ -1033,6 +1057,7 @@ public class MonumentaRedisSyncAPI {
 			String advancements;
 			String scores;
 			String pluginData;
+			String content;
 			String history;
 
 			if (advancementsBytes == null) {
@@ -1056,6 +1081,13 @@ public class MonumentaRedisSyncAPI {
 				pluginData = new String(pluginDataBytes, StandardCharsets.UTF_8);
 			}
 
+			if (contentBytes == null) {
+				MMLog.warning("Player content was missing or corrupted and has been reset");
+				content = "";
+			} else {
+				content = new String(contentBytes, StandardCharsets.UTF_8);
+			}
+
 			if (historyBytes == null) {
 				MMLog.warning("Player history data was missing or corrupted and has been reset");
 				history = "UpdateAllPlayers|" + System.currentTimeMillis() + "|unknown";
@@ -1063,7 +1095,7 @@ public class MonumentaRedisSyncAPI {
 				history = new String(historyBytes, StandardCharsets.UTF_8);
 			}
 
-			return new RedisPlayerData(uuid, mrs.getVersionAdapter().retrieveSaveData(data, new JsonObject()), advancements, scores, pluginData, history);
+			return new RedisPlayerData(uuid, mrs.getVersionAdapter().retrieveSaveData(data, new JsonObject()), advancements, scores, pluginData, content, history);
 		} catch (Exception e) {
 			MMLog.severe("Failed to parse player data", e);
 			return null;
@@ -1082,9 +1114,10 @@ public class MonumentaRedisSyncAPI {
 			conn.lindex(getRedisAdvancementsPath(uuid), 0);
 			conn.lindex(getRedisScoresPath(uuid), 0);
 			conn.lindex(getRedisPluginDataPath(uuid), 0);
+			conn.lindex(getRedisContentPath(uuid), 0);
 			conn.lindex(getRedisHistoryPath(uuid), 0);
 		}).thenApply(result -> transformPlayerData(mrs, uuid,
-			result.get(0), result.get(1), result.get(2), result.get(3), result.get(4)));
+			result.get(0), result.get(1), result.get(2), result.get(3), result.get(4), result.get(5)));
 	}
 
 	/**
@@ -1138,10 +1171,11 @@ public class MonumentaRedisSyncAPI {
 			conn.lpush(getRedisAdvancementsPath(data.getUniqueId()), data.getAdvancements().getBytes(StandardCharsets.UTF_8));
 			conn.lpush(getRedisScoresPath(data.getUniqueId()), data.getScores().getBytes(StandardCharsets.UTF_8));
 			conn.lpush(getRedisPluginDataPath(data.getUniqueId()), data.getPluginData().getBytes(StandardCharsets.UTF_8));
+			conn.lpush(getRedisContentPath(data.getUniqueId()), data.getContent().getBytes(StandardCharsets.UTF_8));
 			conn.lpush(getRedisHistoryPath(data.getUniqueId()), data.getHistory().getBytes(StandardCharsets.UTF_8));
 		}).thenApply(result -> {
-			if (result.isEmpty() || result.size() != 5 || result.get(0) == null
-				|| result.get(1) == null || result.get(2) == null || result.get(3) == null || result.get(4) == null) {
+			if (result.isEmpty() || result.size() != 6 || result.get(0) == null|| result.get(1) == null
+				 || result.get(2) == null || result.get(3) == null || result.get(4) == null || result.get(5) == null) {
 				MMLog.severe("Failed to commit player data");
 				return false;
 			}
