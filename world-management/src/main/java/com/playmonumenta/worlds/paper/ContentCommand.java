@@ -63,31 +63,33 @@ public class ContentCommand {
 		if (input == null) {
 			return null;
 		}
-		ContentScanner scanner = scan(input);
+		ContentScannerState state = scan(input);
 		// input malformed or still expecting another token
-		if (scanner.corrupted || scanner.expecting != null) {
+		if (state.corrupted || state.current != null) {
 			return null;
 		}
-		return new ContentOptionals(scanner.returnTo, scanner.arriveAt, scanner.onArrival);
+		return new ContentOptionals(state.returnTo, state.arriveAt, state.onArrival);
 	}
 
 	private static CompletableFuture<String[]> suggestions(SuggestionInfo<CommandSender> info) {
 		return CompletableFuture.supplyAsync(() -> {
 			String input = info.currentArg();
 			String prefix = input.substring(0, input.lastIndexOf(" ") + 1);
-			ContentScanner scanner = scan(prefix);
+			ContentScannerState state = scan(prefix);
 			List<String> suggestions = new ArrayList<>();
 
 			// input malformed, stop suggestions
-			if (scanner.corrupted) {
+			if (state.corrupted) {
 				return new String[] {};
 			}
 
-			if (scanner.expecting == null) {
-				// suggest all options
-				suggestions.addAll(scanner.unused.stream().map(s -> s.toString().toLowerCase(Locale.ROOT)).toList());
-			} else if (scanner.expecting == ContentOption.ONARRIVAL) {
-				// function suggestion logic
+			// suggest all options if expecting option or if next field is optional
+			if (state.current == null || state.optional) {
+				suggestions.addAll(state.unused.stream().map(s -> s.toString().toLowerCase(Locale.ROOT)).toList());
+			}
+
+			// function suggestion logic
+			if (state.current == ContentOption.ONARRIVAL) {
 				suggestions.addAll(List.of("function:test", "test:function"));
 			}
 
@@ -101,85 +103,90 @@ public class ContentCommand {
 		});
 	}
 
-	private static ContentScanner scan(String input) {
-		ContentScanner scanner = new ContentScanner();
-		if (input.isEmpty()) {
-			return scanner;
-		}
+	private static ContentScannerState scan(String input) {
+		ContentScannerState state = new ContentScannerState();
 		String[] tokens = input.split("\\s+");
 
 		int i = 0;
 		while (i < tokens.length) {
-			scanner.expecting = null;
-			ContentOption option;
+			// reset current, count, and optional
+			state.reset();
 			try {
-				option = ContentOption.valueOf(tokens[i++].toUpperCase(Locale.ROOT));
+				state.current = ContentOption.valueOf(tokens[i].toUpperCase(Locale.ROOT));
+				i++;
 			} catch (IllegalArgumentException e) {
-				scanner.corrupted = true;
+				state.corrupted = true;
 				break;
 			}
 			// check if option already used
-			if (!scanner.unused.remove(option)) {
-				scanner.corrupted = true;
+			if (!state.unused.remove(state.current)) {
+				state.corrupted = true;
 				break;
 			}
-			if (option == ContentOption.ONARRIVAL) {
-				// missing function token
+			if (state.current == ContentOption.ONARRIVAL) {
+				// check ahead for 1 string
 				if (i == tokens.length) {
-					scanner.expecting = option;
 					break;
 				}
 				// set onArrival field
 				NamespacedKey key = NamespacedKey.fromString(tokens[i++]);
 				if (key == null) {
-					scanner.corrupted = true;
+					state.corrupted = true;
 					break;
 				}
-				scanner.onArrival = key;
+				state.onArrival = key;
 			} else {
-				int count = 0;
 				double[] values = new double[5];
-				// count ahead number of doubles
-				while (count < 5 && i < tokens.length) {
+				// check ahead up to 5 doubles
+				while (state.count < 5 && i < tokens.length) {
 					try {
-						values[count] = Double.parseDouble(tokens[i]);
-						count++;
+						values[state.count] = Double.parseDouble(tokens[i]);
+						state.count++;
 						i++;
 					} catch (NumberFormatException e) {
 						break;
 					}
 				}
 
-				if (count >= 3) {
+				if (state.count >= 3) {
+					// future tokens can be either numbers or options
+					state.optional = true;
 					Vector3d location = new Vector3d(values[0], values[1], values[2]);
 					Vector2d rotation = null;
 					// rotation if count is 4 or 5
-					if (count > 3) {
+					if (state.count > 3) {
 						rotation = new Vector2d(values[3], values[4]);
 					}
 					ContentLocation contentLocation = new ContentLocation(location, rotation);
 					// set returnTo or arriveAt
-					if (option == ContentOption.RETURNTO) {
-						scanner.returnTo = contentLocation;
-					} else if (option == ContentOption.ARRIVEAT) {
-						scanner.arriveAt = contentLocation;
+					if (state.current == ContentOption.RETURNTO) {
+						state.returnTo = contentLocation;
+					} else if (state.current == ContentOption.ARRIVEAT) {
+						state.arriveAt = contentLocation;
 					}
 				} else {
-					scanner.expecting = option;
 					break;
 				}
 			}
 		}
-		return scanner;
+		return state;
 	}
 
-	private static class ContentScanner {
+	private static class ContentScannerState {
+		private int count = 0;
+		private boolean corrupted = false;
+		private boolean optional = false;
+		private final Set<ContentOption> unused = EnumSet.allOf(ContentOption.class);
+		private @Nullable ContentOption current = null;
 		private @Nullable ContentLocation returnTo = null;
 		private @Nullable ContentLocation arriveAt = null;
 		private @Nullable NamespacedKey onArrival = null;
-		private @Nullable ContentOption expecting = null;
-		private boolean corrupted = false;
-		private final Set<ContentOption> unused = EnumSet.allOf(ContentOption.class);
+
+		private void reset() {
+			count = 0;
+			optional = false;
+			current = null;
+		}
 	}
 
 	private record ContentOptionals(@Nullable ContentLocation returnTo, @Nullable ContentLocation arriveAt, @Nullable NamespacedKey onArrival) {}
