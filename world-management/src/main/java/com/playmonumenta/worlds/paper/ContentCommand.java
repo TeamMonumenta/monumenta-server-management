@@ -35,7 +35,7 @@ public class ContentCommand {
 				new EntitySelectorArgument.ManyPlayers("others")
 			)
 			.withOptionalArguments(
-				new GreedyStringArgument("optionals").replaceSuggestions(ArgumentSuggestions.stringsAsync(ContentCommand::suggestions))
+				new GreedyStringArgument("optionals").replaceSuggestions(ArgumentSuggestions.stringsAsync(ContentCommand::optionalSuggestions))
 			)
 			.executesNative(ContentCommand::execute)
 			.register();
@@ -47,7 +47,7 @@ public class ContentCommand {
 		String content = Objects.requireNonNull(args.getUnchecked("content"));
 		Player player = Objects.requireNonNull(args.getUnchecked("player"));
 		Collection<Player> others = Objects.requireNonNull(args.getUnchecked("others"));
-		ContentOptionals optionals = parse(args.getUnchecked("optionals"));
+		ContentOptionals optionals = parseOptionals(args.getUnchecked("optionals"));
 
 		callee.sendPlainMessage("content: " + content);
 		callee.sendPlainMessage("player: " + player.getName());
@@ -61,11 +61,11 @@ public class ContentCommand {
 		}
 	}
 
-	private static @Nullable ContentOptionals parse(@Nullable String input) {
+	private static @Nullable ContentOptionals parseOptionals(@Nullable String input) {
 		if (input == null) {
 			return null;
 		}
-		ContentScannerState state = scan(input);
+		ContentOptionalsState state = scan(input);
 		// input malformed or still expecting another required token
 		if (state.corrupted || (state.expecting != null && !state.optional)) {
 			return null;
@@ -73,11 +73,11 @@ public class ContentCommand {
 		return new ContentOptionals(state.returnTo, state.arriveAt, state.onArrival);
 	}
 
-	private static CompletableFuture<String[]> suggestions(SuggestionInfo<CommandSender> info) {
+	private static CompletableFuture<String[]> optionalSuggestions(SuggestionInfo<CommandSender> info) {
 		return CompletableFuture.supplyAsync(() -> {
 			String input = info.currentArg();
 			String prefix = input.substring(0, input.lastIndexOf(" ") + 1);
-			ContentScannerState state = scan(prefix);
+			ContentOptionalsState state = scan(prefix);
 			List<String> suggestions = new ArrayList<>();
 
 			// input malformed, stop suggestions
@@ -121,8 +121,8 @@ public class ContentCommand {
 		});
 	}
 
-	private static ContentScannerState scan(String input) {
-		ContentScannerState state = new ContentScannerState();
+	private static ContentOptionalsState scan(String input) {
+		ContentOptionalsState state = new ContentOptionalsState();
 		if (input.isEmpty()) {
 			return state;
 		}
@@ -202,7 +202,7 @@ public class ContentCommand {
 		return state;
 	}
 
-	private static class ContentScannerState {
+	private static class ContentOptionalsState {
 		private int count = 0;
 		private boolean corrupted = false;
 		private boolean optional = false;
