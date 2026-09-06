@@ -1,6 +1,7 @@
 package com.playmonumenta.worlds.paper;
 
 import dev.jorel.commandapi.CommandAPI;
+import dev.jorel.commandapi.CommandAPIBukkit;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.SuggestionInfo;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
@@ -99,7 +100,7 @@ public class ContentCommand {
 
 			if (state.expecting == ContentOption.ONARRIVAL) {
 				// function suggestion logic
-				suggestions.addAll(List.of("function:test", "test:function"));
+				suggestions.addAll(CommandAPIBukkit.get().getFunctions().stream().map(NamespacedKey::asString).toList());
 			} else if (state.expecting == ContentOption.RETURNTO || state.expecting == ContentOption.ARRIVEAT) {
 				// location/rotation suggestion logic
 				if (info.sender() instanceof Entity sender) {
