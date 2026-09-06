@@ -1,11 +1,13 @@
 package com.playmonumenta.worlds.paper;
 
+import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.SuggestionInfo;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import dev.jorel.commandapi.arguments.EntitySelectorArgument;
 import dev.jorel.commandapi.arguments.GreedyStringArgument;
 import dev.jorel.commandapi.arguments.StringArgument;
+import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import dev.jorel.commandapi.executors.CommandArguments;
 import dev.jorel.commandapi.wrappers.NativeProxyCommandSender;
 import java.util.ArrayList;
@@ -41,7 +43,7 @@ public class ContentCommand {
 			.register();
 	}
 
-	private static void execute(NativeProxyCommandSender sender, CommandArguments args) {
+	private static void execute(NativeProxyCommandSender sender, CommandArguments args) throws WrapperCommandSyntaxException {
 		CommandSender callee = sender.getCallee();
 
 		String content = Objects.requireNonNull(args.getUnchecked("content"));
@@ -61,14 +63,14 @@ public class ContentCommand {
 		}
 	}
 
-	private static @Nullable ContentOptionals parseOptionals(@Nullable String input) {
+	private static @Nullable ContentOptionals parseOptionals(@Nullable String input) throws WrapperCommandSyntaxException {
 		if (input == null) {
 			return null;
 		}
 		ContentOptionalsState state = scan(input);
 		// input malformed or still expecting another required token
 		if (state.corrupted || (state.expecting != null && !state.optional)) {
-			return null;
+			throw CommandAPI.failWithString("");
 		}
 		return new ContentOptionals(state.returnTo, state.arriveAt, state.onArrival);
 	}
@@ -129,15 +131,14 @@ public class ContentCommand {
 
 		String[] tokens = input.split("\\s+");
 
-		int i = 0;
-		while (i < tokens.length) {
+		while (state.index < tokens.length) {
 			// reset current, count, and optional
 			state.reset();
 			// parse option
 			ContentOption option;
 			try {
-				option = ContentOption.valueOf(tokens[i].toUpperCase(Locale.ROOT));
-				i++;
+				option = ContentOption.valueOf(tokens[state.index].toUpperCase(Locale.ROOT));
+				state.index++;
 			} catch (IllegalArgumentException e) {
 				state.corrupted = true;
 				break;
@@ -149,12 +150,12 @@ public class ContentCommand {
 			}
 			if (option == ContentOption.ONARRIVAL) {
 				// expecting a string
-				if (i == tokens.length) {
+				if (state.index == tokens.length) {
 					state.expecting = option;
 					break;
 				}
 				// set onArrival
-				NamespacedKey key = NamespacedKey.fromString(tokens[i++]);
+				NamespacedKey key = NamespacedKey.fromString(tokens[state.index++]);
 				if (key == null) {
 					state.corrupted = true;
 					break;
@@ -163,11 +164,11 @@ public class ContentCommand {
 			} else {
 				double[] values = new double[5];
 				// expecting up to 5 doubles
-				while (state.count < 5 && i < tokens.length) {
+				while (state.count < 5 && state.index < tokens.length) {
 					try {
-						values[state.count] = Double.parseDouble(tokens[i]);
+						values[state.count] = Double.parseDouble(tokens[state.index]);
 						state.count++;
-						i++;
+						state.index++;
 					} catch (NumberFormatException e) {
 						break;
 					}
@@ -203,6 +204,7 @@ public class ContentCommand {
 	}
 
 	private static class ContentOptionalsState {
+		private int index = 0;
 		private int count = 0;
 		private boolean corrupted = false;
 		private boolean optional = false;
