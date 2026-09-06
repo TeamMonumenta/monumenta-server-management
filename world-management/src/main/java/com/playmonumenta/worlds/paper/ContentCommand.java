@@ -65,7 +65,7 @@ public class ContentCommand {
 		}
 		ContentScannerState state = scan(input);
 		// input malformed or still expecting another token
-		if (state.corrupted || state.current != null) {
+		if (state.corrupted || state.expecting != null) {
 			return null;
 		}
 		return new ContentOptionals(state.returnTo, state.arriveAt, state.onArrival);
@@ -84,12 +84,12 @@ public class ContentCommand {
 			}
 
 			// suggest all options if expecting option or if next field is optional
-			if (state.current == null || state.optional) {
+			if (state.expecting == null || state.optional) {
 				suggestions.addAll(state.unused.stream().map(s -> s.toString().toLowerCase(Locale.ROOT)).toList());
 			}
 
 			// function suggestion logic
-			if (state.current == ContentOption.ONARRIVAL) {
+			if (state.expecting == ContentOption.ONARRIVAL) {
 				suggestions.addAll(List.of("function:test", "test:function"));
 			}
 
@@ -105,27 +105,33 @@ public class ContentCommand {
 
 	private static ContentScannerState scan(String input) {
 		ContentScannerState state = new ContentScannerState();
+		if (input.isEmpty()) {
+			return state;
+		}
+
 		String[] tokens = input.split("\\s+");
 
 		int i = 0;
 		while (i < tokens.length) {
 			// reset current, count, and optional
 			state.reset();
+			ContentOption option;
 			try {
-				state.current = ContentOption.valueOf(tokens[i].toUpperCase(Locale.ROOT));
+				option = ContentOption.valueOf(tokens[i].toUpperCase(Locale.ROOT));
 				i++;
 			} catch (IllegalArgumentException e) {
 				state.corrupted = true;
 				break;
 			}
 			// check if option already used
-			if (!state.unused.remove(state.current)) {
+			if (!state.unused.remove(option)) {
 				state.corrupted = true;
 				break;
 			}
-			if (state.current == ContentOption.ONARRIVAL) {
+			if (option == ContentOption.ONARRIVAL) {
 				// check ahead for 1 string
 				if (i == tokens.length) {
+					state.expecting = option;
 					break;
 				}
 				// set onArrival field
@@ -159,12 +165,13 @@ public class ContentCommand {
 					}
 					ContentLocation contentLocation = new ContentLocation(location, rotation);
 					// set returnTo or arriveAt
-					if (state.current == ContentOption.RETURNTO) {
+					if (option == ContentOption.RETURNTO) {
 						state.returnTo = contentLocation;
-					} else if (state.current == ContentOption.ARRIVEAT) {
+					} else if (option == ContentOption.ARRIVEAT) {
 						state.arriveAt = contentLocation;
 					}
 				} else {
+					state.expecting = option;
 					break;
 				}
 			}
@@ -177,7 +184,7 @@ public class ContentCommand {
 		private boolean corrupted = false;
 		private boolean optional = false;
 		private final Set<ContentOption> unused = EnumSet.allOf(ContentOption.class);
-		private @Nullable ContentOption current = null;
+		private @Nullable ContentOption expecting = null;
 		private @Nullable ContentLocation returnTo = null;
 		private @Nullable ContentLocation arriveAt = null;
 		private @Nullable NamespacedKey onArrival = null;
@@ -185,7 +192,7 @@ public class ContentCommand {
 		private void reset() {
 			count = 0;
 			optional = false;
-			current = null;
+			expecting = null;
 		}
 	}
 
