@@ -143,7 +143,6 @@ public class ContentCommand {
 			ContentOption option;
 			try {
 				option = ContentOption.valueOf(tokens[state.index].toUpperCase(Locale.ROOT));
-				state.index++;
 			} catch (IllegalArgumentException e) {
 				state.corrupted = true;
 				break;
@@ -153,6 +152,7 @@ public class ContentCommand {
 				state.corrupted = true;
 				break;
 			}
+			state.index++;
 			if (option == ContentOption.ONARRIVAL) {
 				// expecting a string
 				if (state.index == tokens.length) {
