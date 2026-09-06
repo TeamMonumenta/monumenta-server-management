@@ -64,7 +64,8 @@ public class ContentCommand {
 			return null;
 		}
 		ContentScanner scanner = scan(input);
-		if (scanner.corrupted) {
+		// input malformed or still expecting another token
+		if (scanner.corrupted || scanner.expecting != null) {
 			return null;
 		}
 		return new ContentOptionals(scanner.returnTo, scanner.arriveAt, scanner.onArrival);
@@ -76,6 +77,11 @@ public class ContentCommand {
 			String prefix = input.substring(0, input.lastIndexOf(" ") + 1);
 			ContentScanner scanner = scan(prefix);
 			List<String> suggestions = new ArrayList<>();
+
+			// input malformed, stop suggestions
+			if (scanner.corrupted) {
+				return new String[] {};
+			}
 
 			if (scanner.expecting == null) {
 				// suggest all options
@@ -121,7 +127,6 @@ public class ContentCommand {
 				// missing function token
 				if (i == tokens.length) {
 					scanner.expecting = option;
-					scanner.corrupted = true;
 					break;
 				}
 				// set onArrival field
@@ -168,7 +173,6 @@ public class ContentCommand {
 					}
 				} else {
 					scanner.expecting = option;
-					scanner.corrupted = true;
 					break;
 				}
 			}
