@@ -15,7 +15,13 @@ public class GetDateCommand {
 		"Year", "Month", "DayOfMonth", "DayOfWeek", "IsPm",
 		"HourOfDay", "HourOfTwelve", "Minute", "Second", "Ms",
 		"WeeklyVersion", "DailyVersion",
-		"DaysSinceUTCEpoch", "HoursSinceUTCEpoch", "MinutesSinceUTCEpoch", "SecondsSinceUTCEpoch");
+		"DaysSinceUTCEpoch", "HoursSinceUTCEpoch", "MinutesSinceUTCEpoch", "SecondsSinceUTCEpoch",
+		"DaysSinceEpoch", "SecondsSinceEpoch"); // TODO: Update mechs to remove all of these.
+	// DaysSinceEpoch and SecondsSinceEpoch are holdovers from historical development.
+	// I am instating the new convention of DailyVersion / DaysSinceUTCEpoch to distinguish between time since local epoch and time since UTC epoch.
+	// There was previously significant ambiguity as DaysSinceEpoch referred to local epoch and SecondsSinceEpoch referred to UTC epoch.
+	// Unfortunately my WinSCP breaks when I try to use sed to replace all the instances so someone else will be handling that.
+	// (If you are reading this on master, that's you!)
 
 	public static void register() {
 		Argument<String> fieldArg = new TextArgument("field").replaceSuggestions(SUGGESTIONS_FIELDS);
@@ -45,11 +51,11 @@ public class GetDateCommand {
 			case "Second" -> DateUtils.getSecond();
 			case "Ms" -> DateUtils.getMs();
 			case "WeeklyVersion" -> (int) DateUtils.getWeeklyVersion();
-			case "DailyVersion" -> (int) DateUtils.getDailyVersion();
+			case "DailyVersion", "DaysSinceEpoch" -> (int) DateUtils.getDailyVersion();
 			case "DaysSinceUTCEpoch" -> (int) DateUtils.getTimeSinceUTCEpoch(ChronoUnit.DAYS);
 			case "HoursSinceUTCEpoch" -> (int) DateUtils.getTimeSinceUTCEpoch(ChronoUnit.HOURS);
 			case "MinutesSinceUTCEpoch" -> (int) DateUtils.getTimeSinceUTCEpoch(ChronoUnit.MINUTES);
-			case "SecondsSinceUTCEpoch" -> (int) DateUtils.getTimeSinceUTCEpoch(ChronoUnit.SECONDS);
+			case "SecondsSinceUTCEpoch", "SecondsSinceEpoch" -> (int) DateUtils.getTimeSinceUTCEpoch(ChronoUnit.SECONDS);
 			default -> -1;
 		};
 	}
