@@ -99,8 +99,9 @@ public class ContentCommand {
 			}
 
 			if (state.expecting == ContentOption.ONARRIVAL) {
-				// function suggestion logic
-				suggestions.addAll(CommandAPIBukkit.get().getFunctions().stream().map(NamespacedKey::asString).toList());
+				// function suggestion logic, probably should cache, unsure how expensive this is
+				List<String> functions = CommandAPIBukkit.get().getFunctions().stream().map(NamespacedKey::asString).toList();
+				suggestions.addAll(functions);
 			} else if (state.expecting == ContentOption.RETURNTO || state.expecting == ContentOption.ARRIVEAT) {
 				// location/rotation suggestion logic
 				if (info.sender() instanceof Entity sender) {
