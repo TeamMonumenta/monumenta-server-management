@@ -8,7 +8,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.playmonumenta.common.event.PlayerServerTransferEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
-import com.playmonumenta.redissync.event.PlayerContentEvent;
+import com.playmonumenta.redissync.event.PlayerContentChangeEvent;
 import com.playmonumenta.redissync.utils.MMLog;
 import com.playmonumenta.redissync.utils.Trie;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
@@ -1013,7 +1013,7 @@ public class MonumentaRedisSyncAPI {
 	 * @param content String corresponding to the content
 	 */
 	public static void setPlayerContent(UUID playerUUID, String content) {
-		PlayerContentEvent newEvent = new PlayerContentEvent(Bukkit.getPlayer(playerUUID), content);
+		PlayerContentChangeEvent newEvent = new PlayerContentChangeEvent(Bukkit.getPlayer(playerUUID), content);
 		Bukkit.getPluginManager().callEvent(newEvent);
 
 		DataEventListener.setPlayerContent(playerUUID, content);
