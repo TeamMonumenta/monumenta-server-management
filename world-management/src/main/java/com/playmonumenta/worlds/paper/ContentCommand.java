@@ -83,14 +83,16 @@ public class ContentCommand {
 				return new String[] {};
 			}
 
-			// suggest all options if expecting option or if next field is optional
+			// suggest all options if expecting option or if next token is optional
 			if (state.expecting == null || state.optional) {
 				suggestions.addAll(state.unused.stream().map(s -> s.toString().toLowerCase(Locale.ROOT)).toList());
 			}
 
-			// function suggestion logic
 			if (state.expecting == ContentOption.ONARRIVAL) {
+				// function suggestion logic
 				suggestions.addAll(List.of("function:test", "test:function"));
+			} else if (state.expecting == ContentOption.RETURNTO || state.expecting == ContentOption.ARRIVEAT) {
+				//
 			}
 
 			if (suggestions.isEmpty()) {
@@ -115,6 +117,7 @@ public class ContentCommand {
 		while (i < tokens.length) {
 			// reset current, count, and optional
 			state.reset();
+			// parse option
 			ContentOption option;
 			try {
 				option = ContentOption.valueOf(tokens[i].toUpperCase(Locale.ROOT));
@@ -129,12 +132,12 @@ public class ContentCommand {
 				break;
 			}
 			if (option == ContentOption.ONARRIVAL) {
-				// check ahead for 1 string
+				// expecting a string
 				if (i == tokens.length) {
 					state.expecting = option;
 					break;
 				}
-				// set onArrival field
+				// set onArrival
 				NamespacedKey key = NamespacedKey.fromString(tokens[i++]);
 				if (key == null) {
 					state.corrupted = true;
@@ -143,7 +146,7 @@ public class ContentCommand {
 				state.onArrival = key;
 			} else {
 				double[] values = new double[5];
-				// check ahead up to 5 doubles
+				// expecting up to 5 doubles
 				while (state.count < 5 && i < tokens.length) {
 					try {
 						values[state.count] = Double.parseDouble(tokens[i]);
@@ -171,6 +174,7 @@ public class ContentCommand {
 						state.arriveAt = contentLocation;
 					}
 				} else {
+					// expecting more doubles
 					state.expecting = option;
 					break;
 				}
