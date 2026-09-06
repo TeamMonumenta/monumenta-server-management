@@ -150,21 +150,14 @@ public class ContentCommand {
 					}
 				}
 
-				if (count == 5) {
-					// location + rotation = 5 numbers
+				if (count >= 3) {
 					Vector3d location = new Vector3d(values[0], values[1], values[2]);
-					Vector2d rotation = new Vector2d(values[3], values[4]);
-					ContentLocation contentLocation = new ContentLocation(location, rotation);
-					// set returnTo or arriveAt
-					if (option == ContentOption.RETURNTO) {
-						scanner.returnTo = contentLocation;
-					} else if (option == ContentOption.ARRIVEAT) {
-						scanner.arriveAt = contentLocation;
+					Vector2d rotation = null;
+					// rotation if count is 4 or 5
+					if (count > 3) {
+						rotation = new Vector2d(values[3], values[4]);
 					}
-				} else if (count == 3) {
-					// location only = 3 numbers
-					Vector3d location = new Vector3d(values[0], values[1], values[2]);
-					ContentLocation contentLocation = new ContentLocation(location, null);
+					ContentLocation contentLocation = new ContentLocation(location, rotation);
 					// set returnTo or arriveAt
 					if (option == ContentOption.RETURNTO) {
 						scanner.returnTo = contentLocation;
