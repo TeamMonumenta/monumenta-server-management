@@ -85,8 +85,8 @@ public class ContentCommand {
 		return CompletableFuture.supplyAsync(() -> {
 			String input = info.currentArg();
 			String prefix = input.substring(0, input.lastIndexOf(" ") + 1);
-			ContentOptionalsState state = scan(prefix);
 			List<String> suggestions = new ArrayList<>();
+			ContentOptionalsState state = scan(prefix);
 
 			// input malformed, stop suggestions
 			if (state.corrupted) {
@@ -135,11 +135,10 @@ public class ContentCommand {
 		if (input.isEmpty()) {
 			return state;
 		}
-
 		String[] tokens = input.split("\\s+");
 
 		while (state.index < tokens.length) {
-			// reset current, count, and optional
+			// reset count, optional, and expecting
 			state.reset();
 			// parse option
 			ContentOption option;
