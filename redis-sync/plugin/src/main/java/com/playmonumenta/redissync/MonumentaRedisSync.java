@@ -144,12 +144,14 @@ public class MonumentaRedisSync extends JavaPlugin {
 		}
 		shardName = config.getString("shard_name", shardName);
 
+		String shardCategory = config.getString("shard_category", shardName);
+
 		int historyAmount = config.getInt("history_amount", 20);
 		int ticksPerPlayerAutosave = config.getInt("ticks_per_player_autosave", 6060);
 		boolean savingDisabled = config.getBoolean("saving_disabled", false);
 		boolean scoreboardCleanupEnabled = config.getBoolean("scoreboard_cleanup_enabled", true);
 
-		new BukkitConfigAPI(getLogger(), redisHost, redisPort, serverDomain, shardName, historyAmount, ticksPerPlayerAutosave, savingDisabled, scoreboardCleanupEnabled);
+		new BukkitConfigAPI(getLogger(), redisHost, redisPort, serverDomain, shardName, shardCategory, historyAmount, ticksPerPlayerAutosave, savingDisabled, scoreboardCleanupEnabled);
 	}
 
 	/** @deprecated Use {@link MMLog} static methods instead. */

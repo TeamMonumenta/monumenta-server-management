@@ -674,7 +674,7 @@ public class MonumentaRedisSyncAPI {
 			return;
 		}
 
-		String shardDataPath = MonumentaRedisSyncAPI.getRedisPerShardDataPath(player);
+		String shardDataPath = getRedisPerShardDataPath(player);
 		RedisFuture<Map<String, String>> shardDataFuture;
 		try (RedisAPI.BorrowedCommands<String, String> commands = RedisAPI.borrow()) {
 			shardDataFuture = commands.hgetall(shardDataPath);
