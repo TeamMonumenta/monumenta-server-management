@@ -20,6 +20,7 @@ protocollib = "5.0.0"
 gradle-config = "3.+"
 sq = "7.5"
 nbtapi = "2.15.2"
+brigadier = "1.3.10"
 
 [libraries]
 minimessage = { module = "net.kyori:adventure-text-minimessage", version.ref = "minimessage" }
@@ -44,6 +45,7 @@ protocollib = { module = "com.comphenix.protocol:ProtocolLib", version.ref = "pr
 sq = { module = "com.playmonumenta:scripted-quests", version.ref = "sq" }
 monumenta-common = { module = "com.playmonumenta:monumenta-common", version.ref = "monumenta-common" }
 nbtapi = { module = "de.tr7zw:item-nbt-api-plugin", version.ref = "nbtapi" }
+brigadier = { module = "com.mojang:brigadier", version.ref = "brigadier" }
 
 [plugins]
 gradle-config = { id = "com.playmonumenta.gradle-config", version.ref = "gradle-config" }
