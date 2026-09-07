@@ -1,20 +1,19 @@
 package com.playmonumenta.redissync.commands;
 
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPIBukkit;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.SuggestionInfo;
-import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import dev.jorel.commandapi.arguments.EntitySelectorArgument;
 import dev.jorel.commandapi.arguments.GreedyStringArgument;
 import dev.jorel.commandapi.arguments.StringArgument;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import dev.jorel.commandapi.executors.CommandArguments;
 import dev.jorel.commandapi.wrappers.NativeProxyCommandSender;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -38,7 +37,7 @@ public class ContentCommand {
 				new EntitySelectorArgument.ManyPlayers("others")
 			)
 			.withOptionalArguments(
-				new GreedyStringArgument("optionals").replaceSuggestions(ArgumentSuggestions.stringsAsync(ContentCommand::optionalSuggestions))
+				new GreedyStringArgument("optionals").replaceSuggestions(ContentCommand::optionalSuggestions)
 			)
 			.executesNative(ContentCommand::execute)
 			.register();
@@ -81,53 +80,50 @@ public class ContentCommand {
 		return new ContentOptionals(state.returnTo, state.arriveAt, state.onArrival);
 	}
 
-	private static CompletableFuture<String[]> optionalSuggestions(SuggestionInfo<CommandSender> info) {
-		return CompletableFuture.supplyAsync(() -> {
-			String input = info.currentArg();
-			String prefix = input.substring(0, input.lastIndexOf(" ") + 1);
-			List<String> suggestions = new ArrayList<>();
-			ContentOptionalsState state = scan(prefix);
+	private static CompletableFuture<Suggestions> optionalSuggestions(SuggestionInfo<CommandSender> info, SuggestionsBuilder builder) {
+		String input = info.currentArg();
+		int offset = input.lastIndexOf(" ") + 1;
+		// offset start position of suggestions by previous fields
+		builder = builder.createOffset(builder.getStart() + offset);
+		String prefix = input.substring(0, offset);
+		ContentOptionalsState state = scan(prefix);
 
-			// input malformed, stop suggestions
-			if (state.corrupted) {
-				return new String[] {};
+		// input malformed, stop suggestions
+		if (state.corrupted) {
+			return builder.buildFuture();
+		}
+
+		// suggest all options if expecting option or if next token is optional
+		if (state.expecting == null || state.optional) {
+			state.unused.stream()
+				.map(s -> s.toString().toLowerCase(Locale.ROOT))
+				.forEach(builder::suggest);
+		}
+
+		if (state.expecting == ContentOption.ONARRIVAL) {
+			// function suggestion logic, probably should cache, unsure how expensive this is
+			CommandAPIBukkit.get().getFunctions().stream()
+				.map(NamespacedKey::asString)
+				.forEach(builder::suggest);
+		} else if (state.expecting == ContentOption.RETURNTO || state.expecting == ContentOption.ARRIVEAT) {
+			// location/rotation suggestion logic
+			if (info.sender() instanceof Entity sender) {
+				Location location = sender.getLocation();
+				int suggestion = switch (state.count) {
+					case 0 -> location.getBlockX();
+					case 1 -> location.getBlockY();
+					case 2 -> location.getBlockZ();
+					case 3 -> Math.round(location.getYaw() / 45) * 45;
+					case 4 -> Math.round(location.getPitch() / 45) * 45;
+					default -> 0;
+				};
+				builder.suggest(suggestion);
+			} else {
+				builder.suggest(0);
 			}
+		}
 
-			// suggest all options if expecting option or if next token is optional
-			if (state.expecting == null || state.optional) {
-				suggestions.addAll(state.unused.stream().map(s -> s.toString().toLowerCase(Locale.ROOT)).toList());
-			}
-
-			if (state.expecting == ContentOption.ONARRIVAL) {
-				// function suggestion logic, probably should cache, unsure how expensive this is
-				List<String> functions = CommandAPIBukkit.get().getFunctions().stream().map(NamespacedKey::asString).toList();
-				suggestions.addAll(functions);
-			} else if (state.expecting == ContentOption.RETURNTO || state.expecting == ContentOption.ARRIVEAT) {
-				// location/rotation suggestion logic
-				if (info.sender() instanceof Entity sender) {
-					Location location = sender.getLocation();
-					int suggestion = switch (state.count) {
-						case 0 -> location.getBlockX();
-						case 1 -> location.getBlockY();
-						case 2 -> location.getBlockZ();
-						case 3 -> Math.round(location.getYaw() / 45) * 45;
-						case 4 -> Math.round(location.getPitch() / 45) * 45;
-						default -> 0;
-					};
-					suggestions.add(String.valueOf(suggestion));
-				} else {
-					suggestions.add(String.valueOf(0));
-				}
-			}
-
-			if (suggestions.isEmpty()) {
-				return new String[] {};
-			}
-
-			return suggestions.stream()
-				.map(s -> prefix + s) // suggestions start from beginning of greedy string, must append typed prefix to all suggestions
-				.toArray(String[]::new);
-		});
+		return builder.buildFuture();
 	}
 
 	private static ContentOptionalsState scan(String input) {
