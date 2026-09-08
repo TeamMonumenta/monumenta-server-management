@@ -1068,7 +1068,7 @@ public class MonumentaRedisSyncAPI {
 	 * Saves the player's content; should be called by an implementing plugin
 	 *
 	 * @param playerUUID  Player UUID to save data for
-	 * @param contentData
+	 * @param contentData The content data to be saved for the player
 	 */
 	public static void savePlayerContent(UUID playerUUID, ContentData contentData) {
 		DataEventListener.setPlayerContentData(playerUUID, contentData);
