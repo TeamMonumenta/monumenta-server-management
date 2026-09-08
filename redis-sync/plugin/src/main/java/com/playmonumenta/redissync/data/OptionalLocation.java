@@ -1,7 +1,5 @@
 package com.playmonumenta.redissync.data;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import org.bukkit.Location;
@@ -43,45 +41,40 @@ public class OptionalLocation {
 		mRotation = new Vector2f(location.getYaw(), location.getPitch());
 	}
 
-	public static @Nullable OptionalLocation OptionalLocation(JsonObject object) {
-		Vector3d pos = new Vector3d();
-
-		if (object.get("pos") instanceof JsonArray posArray && posArray.size() == 3) {
-			for (int i = 0; i < 3; i++) {
-				JsonElement posElement = posArray.get(i);
-				if (posElement instanceof JsonPrimitive posPrim && posPrim.isNumber()) {
-					double coord = posPrim.getAsDouble();
-					switch (i) {
-						case 0: pos.x = coord;
-						case 1: pos.y = coord;
-						case 2: pos.z = coord;
-					}
-				} else {
-					return null;
-				}
-			}
-		} else {
+	public static @Nullable OptionalLocation fromJson(JsonObject object) {
+		Vector3d pos;
+		try {
+			pos = new Vector3d(
+				getCoordDouble(object, "x"),
+				getCoordDouble(object, "y"),
+				getCoordDouble(object, "z")
+			);
+		} catch (Exception ignored) {
 			return null;
 		}
 
-		if (object.get("rot") instanceof JsonArray rotArray && rotArray.size() == 2) {
-			Vector2f rot = new Vector2f();
-			for (int i = 0; i < 2; i++) {
-				JsonElement rotElement = posArray.get(i);
-				if (rotElement instanceof JsonPrimitive rotPrim && rotPrim.isNumber()) {
-					float coord = rotPrim.getAsFloat();
-					switch (i) {
-						case 0: rot.x = coord;
-						case 1: rot.y = coord;
-					}
-				} else {
-					return new OptionalLocation(pos, null);
-				}
-			}
-			return new OptionalLocation(pos, rot);
-		} else {
-			return new OptionalLocation(pos, null);
+		try {
+			return new OptionalLocation(pos, new Vector2f(
+				getCoordFloat(object, "yaw"),
+				getCoordFloat(object, "pitch")
+			));
+		} catch (Exception ignored) {
+			return new OptionalLocation(pos);
 		}
+	}
+
+	private static double getCoordDouble(JsonObject object, String key) throws Exception {
+		if (object.get(key) instanceof JsonPrimitive coordPrimitive && coordPrimitive.isNumber()) {
+			return coordPrimitive.getAsDouble();
+		}
+		throw new Exception("Expected " + key + " to be a double");
+	}
+
+	private static float getCoordFloat(JsonObject object, String key) throws Exception {
+		if (object.get(key) instanceof JsonPrimitive coordPrimitive && coordPrimitive.isNumber()) {
+			return coordPrimitive.getAsFloat();
+		}
+		throw new Exception("Expected " + key + " to be a float");
 	}
 
 	public double x() {
@@ -112,8 +105,16 @@ public class OptionalLocation {
 		return mPosition;
 	}
 
+	public void positionJoml(Vector3d value) {
+		mPosition = value;
+	}
+
 	public Vector positionBukkit() {
 		return new Vector(mPosition.x, mPosition.y, mPosition.z);
+	}
+
+	public void positionBukkit(Vector value) {
+		mPosition = new Vector3d(value.getX(), value.getY(), value.getZ());
 	}
 
 	public Location locationBukkit(@Nullable World world) {
@@ -121,6 +122,11 @@ public class OptionalLocation {
 			return new Location(world, mPosition.x, mPosition.y, mPosition.z);
 		}
 		return new Location(world, mPosition.x, mPosition.y, mPosition.z, mRotation.x, mRotation.y);
+	}
+
+	public void locationBukkit(Location value) {
+		mPosition = new Vector3d(value.getX(), value.getY(), value.getZ());
+		mRotation = new Vector2f(value.getYaw(), value.getPitch());
 	}
 
 	public @Nullable Float yaw() {
@@ -151,5 +157,20 @@ public class OptionalLocation {
 		} else {
 			mRotation = new Vector2f(yaw, pitch);
 		}
+	}
+
+	public JsonObject toJson() {
+		JsonObject object = new JsonObject();
+
+		object.addProperty("x", mPosition.x);
+		object.addProperty("y", mPosition.y);
+		object.addProperty("z", mPosition.z);
+
+		if (mRotation != null) {
+			object.addProperty("yaw", mRotation.x);
+			object.addProperty("pitch", mRotation.y);
+		}
+
+		return object;
 	}
 }
