@@ -20,8 +20,7 @@ public class ProxyConfigAPI extends CommonConfig {
 		String defaultServer,
 		List<String> excludedServers
 	) {
-		super(redisHost, redisPort, serverDomain, shardName, shardName);
-		// Use shardName as shardCategory
+		super(redisHost, redisPort, serverDomain, shardName);
 		mDefaultServer = defaultServer;
 		mExcludedServers.addAll(excludedServers);
 

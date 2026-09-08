@@ -11,8 +11,8 @@ public class BukkitConfigAPI extends CommonConfig {
 	protected final boolean mSavingDisabled;
 	protected final boolean mScoreboardCleanupEnabled;
 
-	BukkitConfigAPI(Logger logger, String redisHost, int redisPort, String serverDomain, String shardName, String shardCategory, int historyAmount, int ticksPerPlayerAutosave, boolean savingDisabled, boolean scoreboardCleanupEnabled) {
-		super(redisHost, redisPort, serverDomain, shardName, shardCategory);
+	BukkitConfigAPI(Logger logger, String redisHost, int redisPort, String serverDomain, String shardName, int historyAmount, int ticksPerPlayerAutosave, boolean savingDisabled, boolean scoreboardCleanupEnabled) {
+		super(redisHost, redisPort, serverDomain, shardName);
 		mHistoryAmount = historyAmount;
 		mTicksPerPlayerAutosave = ticksPerPlayerAutosave;
 		mSavingDisabled = savingDisabled;
@@ -23,7 +23,6 @@ public class BukkitConfigAPI extends CommonConfig {
 		logger.info("  redis_port = " + mRedisPort);
 		logger.info("  server_domain = " + (mServerDomain == null ? "null" : mServerDomain));
 		logger.info("  shard_name = " + (mShardName == null ? "null" : mShardName));
-		logger.info("  shard_category = " + (mShardCategory == null ? "null" : mShardCategory));
 		logger.info("  history_amount = " + mHistoryAmount);
 		logger.info("  ticks_per_player_autosave = " + mTicksPerPlayerAutosave);
 		logger.info("  saving_disabled = " + mSavingDisabled);

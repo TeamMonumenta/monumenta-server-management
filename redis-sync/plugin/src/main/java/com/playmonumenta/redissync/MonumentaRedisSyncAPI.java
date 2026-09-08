@@ -686,7 +686,7 @@ public class MonumentaRedisSyncAPI {
 				} else {
 					final JsonObject worldShardDataJson;
 					/* Look up in the shard data first the "world" part - data from this world about where the player should be */
-					String worldKey = MonumentaRedisSyncAPI.getRedisPerShardDataWorldKey(worldName);
+					String worldKey = getRedisPerShardDataWorldKey(worldName);
 					String worldShardData = shardData.get(worldKey);
 					if (worldShardData == null || worldShardData.isEmpty()) {
 						// TODO world shard data is empty - is this the right thing to do?

@@ -9,14 +9,12 @@ public abstract class CommonConfig {
 	protected final int mRedisPort;
 	protected final String mServerDomain;
 	protected final String mShardName;
-	protected final String mShardCategory;
 
-	protected CommonConfig(String redisHost, int redisPort, String serverDomain, String shardName, String shardCategory) {
+	protected CommonConfig(String redisHost, int redisPort, String serverDomain, String shardName) {
 		mRedisHost = redisHost;
 		mRedisPort = redisPort;
 		mServerDomain = serverDomain;
 		mShardName = shardName;
-		mShardCategory = shardCategory;
 		COMMON_INSTANCE = this;
 	}
 
@@ -48,9 +46,5 @@ public abstract class CommonConfig {
 
 	public static String getShardName() {
 		return getCommonInstance().mShardName;
-	}
-
-	public static String getShardCategory() {
-		return getCommonInstance().mShardCategory;
 	}
 }
