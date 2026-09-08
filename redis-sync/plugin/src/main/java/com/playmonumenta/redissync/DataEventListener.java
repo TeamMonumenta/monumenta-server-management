@@ -33,14 +33,15 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -122,21 +123,21 @@ public class DataEventListener implements Listener {
 
 	private final Gson mGson = new Gson();
 	private final VersionAdapter mAdapter;
-	private final ConcurrentSkipListSet<UUID> mTransferringPlayers = new ConcurrentSkipListSet<>();
+	private final Set<UUID> mTransferringPlayers = ConcurrentHashMap.newKeySet();
 	private final Map<UUID, ReturnParams> mReturnParams = new HashMap<>();
 	/* Key = shoulder entity UUID (i.e. parrot), value = player */
 	private final ConcurrentMap<UUID, UUID> mTransferringPlayerShoulderEntities = new ConcurrentHashMap<>();
 
 	private final ConcurrentMap<UUID, ConcurrentMap<String, CompletableFuture<?>>> mPendingSaves = new ConcurrentHashMap<>();
 	private final Map<UUID, JsonObject> mPluginData = new HashMap<>();
-	private final ConcurrentSkipListSet<UUID> mLoadingPlayers = new ConcurrentSkipListSet<>();
+	private final Set<UUID> mLoadingPlayers = ConcurrentHashMap.newKeySet();
 	private final Set<UUID> mLoadFailedPlayers = new HashSet<>();
 
 	/*
 	 * Cached local copy of shard data to provide to API to get player locations on other worlds
 	 * Every player that has fully logged into this shard is guaranteed to have an entry in this map
 	 */
-	private final Map<UUID, Map<String, String>> mShardData = new HashMap<>();
+	private final Map<UUID, Map<String, String>> mShardData = new ConcurrentHashMap<>();
 
 	protected DataEventListener(VersionAdapter adapter) {
 		mAdapter = adapter;
@@ -259,6 +260,7 @@ public class DataEventListener implements Listener {
 		ConcurrentMap<String, CompletableFuture<?>> futures = mPendingSaves.get(playerId);
 
 		if (futures == null || futures.isEmpty()) {
+			prunePendingSaves(playerId);
 			return;
 		}
 
@@ -268,14 +270,44 @@ public class DataEventListener implements Listener {
 			@SuppressWarnings("unchecked")
 			CompletableFuture<?>[] futureArr = futures.values().toArray(new CompletableFuture[0]);
 			CompletableFuture.allOf(futureArr).get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
-			futures.values().removeIf(Future::isDone);
 		} catch (TimeoutException ex) {
 			MMLog.severe("Got timeout waiting to commit transactions for player '" + playerName + "'. This is very bad!", ex);
 		} catch (InterruptedException | ExecutionException ex) {
 			MMLog.severe("Failed waiting to commit transactions for player '" + playerName + "'", ex);
 		}
 
+		prunePendingSaves(playerId);
+
 		MMLog.debug("Pending save completed for player=" + playerName);
+	}
+
+	/*
+	 * Records an in-flight save so blockingWaitForPlayerToSave() can wait on it, and drops it again once it finishes.
+	 * Tracks the supplied future, not the one whenComplete() returns - only the former is already done by the time
+	 * the callback runs, so only the former can ever be pruned.
+	 */
+	private void trackPendingSave(UUID playerId, String key, CompletableFuture<?> future, Supplier<String> failureMessage) {
+		ConcurrentMap<String, CompletableFuture<?>> futures = mPendingSaves.computeIfAbsent(playerId, k -> new ConcurrentHashMap<>());
+		futures.put(key, future);
+
+		future.whenComplete((ignored, ex) -> {
+			if (ex != null) {
+				MMLog.severe(failureMessage.get(), ex);
+			}
+			prunePendingSaves(playerId);
+		});
+	}
+
+	/* Drops saves that have completed, and the player's entry entirely once nothing is left in flight */
+	private void prunePendingSaves(UUID playerId) {
+		mPendingSaves.computeIfPresent(playerId, (uuid, futures) -> {
+			futures.values().removeIf(Future::isDone);
+			if (futures.isEmpty()) {
+				/* Returning null removes the entry from mPendingSaves */
+				return null;
+			}
+			return futures;
+		});
 	}
 
 	/* ******************* Data Save/Load Event Handlers ******************* */
@@ -325,7 +357,7 @@ public class DataEventListener implements Listener {
 			}
 
 			MMLog.debug(() -> "Processing PlayerAdvancementDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
-		} catch (InterruptedException | ExecutionException ex) {
+		} catch (CancellationException | InterruptedException | ExecutionException ex) {
 			MMLog.severe("Failed to get advancements data for player '" + player.getName() + "'. This is very bad!", ex);
 		}
 	}
@@ -348,29 +380,17 @@ public class DataEventListener implements Listener {
 			return;
 		}
 
-		ConcurrentMap<String, CompletableFuture<?>> futures = mPendingSaves.computeIfAbsent(playerId, k -> new ConcurrentHashMap<>());
-
 		/* Execute the advancements as a multi() batch */
 		/* Advancements */
 		MMLog.debug("Saving advancements data for player=" + playerName);
 		MMLog.trace(() -> "Data:" + event.getJsonData());
 		String advPath = MonumentaRedisSyncAPI.getRedisAdvancementsPath(player);
 		String advJsonData = event.getJsonData();
-		futures.put("advancements", RedisAPI.multi(commands -> {
+		/* Don't block - the pending save is tracked for completion later */
+		trackPendingSave(playerId, "advancements", RedisAPI.multi(commands -> {
 			commands.lpush(advPath, advJsonData);
 			commands.ltrim(advPath, 0, BukkitConfigAPI.getHistoryAmount());
-		}).whenComplete((ignored, ex) -> {
-			if (ex != null) {
-				MMLog.severe("Advancements saving for player=" + playerName + " failed", ex);
-			}
-			futures.values().removeIf(Future::isDone);
-			if (futures.isEmpty()) {
-				mPendingSaves.remove(playerId);
-			}
-		}));
-
-		/* Don't block - store the pending futures for completion later */
-		mPendingSaves.put(playerId, futures);
+		}), () -> "Advancements saving for player=" + playerName + " failed");
 	}
 
 	private interface Callable {
@@ -411,6 +431,18 @@ public class DataEventListener implements Listener {
 		long startTime = System.currentTimeMillis();
 		MMLog.debug("Started loading data for player=" + playerName);
 		mLoadingPlayers.add(playerId);
+
+		/*
+		 * Backup check - the pre-login check should already have kicked players that still have saves in flight.
+		 * There is no safe way to return data here if the previous session is still committing, so bail out rather
+		 * than load stale data that the player would then save back over the good data.
+		 */
+		if (mPendingSaves.containsKey(playerId)) {
+			mLoadFailedPlayers.add(playerId);
+			MMLog.severe("BUG! Player=" + playerName + " uuid=" + playerId + " started loading with saves still in flight. Kicking to avoid loading stale data!");
+			Bukkit.getScheduler().runTask(MonumentaRedisSync.getInstance(), () -> player.kick(LOAD_ERROR_MSG));
+			return;
+		}
 
 		//TODO: Rework to using something like MonumentaRedisSyncAPI.transformPlayerData()
 		RedisFuture<byte[]> dataFuture;
@@ -639,9 +671,6 @@ public class DataEventListener implements Listener {
 
 		MMLog.debug("Saving data for player=" + playerName);
 
-		ConcurrentMap<String, CompletableFuture<?>> futures = mPendingSaves.computeIfAbsent(playerId, k -> new ConcurrentHashMap<>());
-		futures.values().removeIf(Future::isDone);
-
 		/* Get the existing plugin data */
 		JsonObject pluginData = mPluginData.computeIfAbsent(playerId, k -> new JsonObject());
 
@@ -665,18 +694,10 @@ public class DataEventListener implements Listener {
 
 			MMLog.trace(() -> "data: " + b64encode(data.getData()));
 			String dataPath = MonumentaRedisSyncAPI.getRedisDataPath(player);
-			futures.put("plugin_data", RedisAPI.multiStringBytes(byteConn -> {
+			trackPendingSave(playerId, "plugin_data", RedisAPI.multiStringBytes(byteConn -> {
 				byteConn.lpush(dataPath, data.getData());
 				byteConn.ltrim(dataPath, 0, BukkitConfigAPI.getHistoryAmount());
-			}).whenComplete((ignored, ex) -> {
-				if (ex != null) {
-					MMLog.severe("Failed to save player nbt data for player=" + playerName, ex);
-				}
-				futures.values().removeIf(Future::isDone);
-				if (futures.isEmpty()) {
-					mPendingSaves.remove(playerId);
-				}
-			}));
+			}), () -> "Failed to save player nbt data for player=" + playerName);
 
 			/* Execute the sharddata, history and plugin data as a multi() batch */
 			/*
@@ -724,7 +745,7 @@ public class DataEventListener implements Listener {
 			MMLog.trace(() -> "Data:" + scoreboardData);
 			String scorePath = MonumentaRedisSyncAPI.getRedisScoresPath(player);
 
-			futures.put("player_data", RedisAPI.multi(commands -> {
+			trackPendingSave(playerId, "player_data", RedisAPI.multi(commands -> {
 				commands.hset(shardDataPath, worldKey, data.getShardData());
 				commands.hset(shardDataPath, BukkitConfigAPI.getShardName(), overallShardDataStr);
 				commands.lpush(histPath, history);
@@ -733,21 +754,10 @@ public class DataEventListener implements Listener {
 				commands.ltrim(pluginDataPath, 0, BukkitConfigAPI.getHistoryAmount());
 				commands.lpush(scorePath, scoreboardData);
 				commands.ltrim(scorePath, 0, BukkitConfigAPI.getHistoryAmount());
-			}).whenComplete((ignored, ex) -> {
-				if (ex != null) {
-					MMLog.severe("Failed to save player data for player=" + playerName, ex);
-				}
-				futures.values().removeIf(Future::isDone);
-				if (futures.isEmpty()) {
-					mPendingSaves.remove(playerId);
-				}
-			}));
+			}), () -> "Failed to save player data for player=" + playerName);
 		} catch (IOException ex) {
 			MMLog.severe("Failed to save player data for player=" + playerName, ex);
 		}
-
-		/* Don't block - store the pending futures for completion later */
-		mPendingSaves.put(playerId, futures);
 	}
 
 	/* ******************* Transferring Restriction Event Handlers ******************* */
