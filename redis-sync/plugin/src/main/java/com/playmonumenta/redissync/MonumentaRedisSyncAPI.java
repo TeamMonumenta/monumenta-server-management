@@ -8,8 +8,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.playmonumenta.common.event.PlayerServerTransferEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
-import com.playmonumenta.redissync.event.PlayerContentChangeEvent;
-import com.playmonumenta.redissync.event.UpdateAvailableContentEvent;
+import com.playmonumenta.redissync.data.ContentData;
+import com.playmonumenta.redissync.event.PlayerContentChangeRequestEvent;
+import com.playmonumenta.redissync.event.UpdateAvailableContentIdsEvent;
 import com.playmonumenta.redissync.utils.MMLog;
 import com.playmonumenta.redissync.utils.Trie;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
@@ -127,6 +128,8 @@ public class MonumentaRedisSyncAPI {
 		getAllCachedPlayerNames().toArray(String[]::new));
 
 
+	private static final String DEFAULT_CONTENT_JSON = new ContentData("").toString();
+	private static final byte[] DEFAULT_CONTENT_BYTES = DEFAULT_CONTENT_JSON.getBytes(StandardCharsets.UTF_8);
 	private static final Trie<UUID> mNameToUuidTrie = new Trie<>();
 	private static final Map<String, UUID> mNameToUuid = new ConcurrentHashMap<>();
 	private static final Map<String, UUID> mNameLowercaseToUuid = new ConcurrentHashMap<>();
@@ -173,16 +176,18 @@ public class MonumentaRedisSyncAPI {
 	/**
 	 * Refreshes content provided by other plugins
 	 */
-	public static void refreshAvailableContent() {
-		new UpdateAvailableContentEvent().callEvent();
+	public static void refreshAvailableContentIds() {
+		UpdateAvailableContentIdsEvent event = new UpdateAvailableContentIdsEvent();
+		event.callEvent();
+		DataEventListener.updateAvailableContentEvent(event);
 	}
 
 	/**
-	 * Gets the set of known available content
-	 * @return All known available content
+	 * Gets the set of known available content IDs
+	 * @return All known available content IDs
 	 */
-	public static Set<String> availableContent() {
-		return DataEventListener.getAvailableContent();
+	public static Set<String> availableContentIds() {
+		return DataEventListener.getAvailableContentIds();
 	}
 
 	// Thread-safe: backed by ConcurrentHashMap, callable from any thread
@@ -338,7 +343,7 @@ public class MonumentaRedisSyncAPI {
 				byte[] advance = readResult.get(1);
 				byte[] score = readResult.get(2);
 				byte[] plugin = readResult.get(3);
-				byte[] content = Objects.requireNonNullElse(readResult.get(4), new byte[]{});
+				byte[] content = Objects.requireNonNullElse(readResult.get(4), DEFAULT_CONTENT_BYTES);
 				byte[] history = readResult.get(5);
 
 				if (data == null || advance == null || score == null || plugin == null || history == null) {
@@ -402,7 +407,7 @@ public class MonumentaRedisSyncAPI {
 				byte[] advance = readResult.get(1);
 				byte[] score = readResult.get(2);
 				byte[] plugin = readResult.get(3);
-				byte[] content = Objects.requireNonNullElse(readResult.get(4), new byte[]{});
+				byte[] content = Objects.requireNonNullElse(readResult.get(4), DEFAULT_CONTENT_BYTES);
 				byte[] historyRaw = readResult.get(5);
 
 				/* Make sure there's actually data */
@@ -609,7 +614,7 @@ public class MonumentaRedisSyncAPI {
 				byte[] advance = readResult.get(1);
 				byte[] score = readResult.get(2);
 				byte[] plugin = readResult.get(3);
-				byte[] content = Objects.requireNonNullElse(readResult.get(4), new byte[]{});
+				byte[] content = Objects.requireNonNullElse(readResult.get(4), DEFAULT_CONTENT_BYTES);
 				byte[] historyRaw = readResult.get(5);
 
 				/* Make sure there's actually data */
@@ -675,7 +680,7 @@ public class MonumentaRedisSyncAPI {
 				byte[] advance = readResult.get(1);
 				byte[] score = readResult.get(2);
 				byte[] plugin = readResult.get(3);
-				byte[] content = Objects.requireNonNullElse(readResult.get(4), new byte[]{});
+				byte[] content = Objects.requireNonNullElse(readResult.get(4), DEFAULT_CONTENT_BYTES);
 				byte[] historyRaw = readResult.get(5);
 
 				if (data == null || advance == null || score == null || plugin == null || historyRaw == null) {
@@ -1017,48 +1022,57 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	/**
-	 * Gets player current content
+	 * Gets player current full content data
 	 *
 	 * @param player Player to get data for
-	 * @return The player's content string, which is empty if not set
+	 * @return The player's content JSON, which is empty if not set
 	 */
-	public static String getPlayerContent(Player player) {
-		return getPlayerContent(player.getUniqueId());
+	public static ContentData getPlayerContentData(Player player) {
+		return getPlayerContentData(player.getUniqueId());
 	}
 
 	/**
-	 * Gets player current content
+	 * Gets player current full content data
 	 *
 	 * @param playerUUID Player UUID to get data for
-	 * @return The player's content string, which is empty if not set
+	 * @return The player's content JSON, which is empty if not set
 	 */
-	public static String getPlayerContent(UUID playerUUID) {
-		return DataEventListener.getPlayerContent(playerUUID);
+	public static ContentData getPlayerContentData(UUID playerUUID) {
+		return DataEventListener.getPlayerContentData(playerUUID);
 	}
 
 	/**
-	 * Sets player current content
+	 * Requests that a player be sent to content by another plugin
 	 *
-	 * @param player Player to set data for
-	 * @param content String corresponding to the content
+	 * @param player Player to send data for
+	 * @param contentData JSON corresponding to the content
 	 */
-	public static void setPlayerContent(Player player, String content) {
-		setPlayerContent(player.getUniqueId(), content);
+	public static void requestPlayerContentDataChange(Player player, ContentData contentData) {
+		requestPlayerContentDataChange(player.getUniqueId(), contentData);
 	}
 
 	/**
-	 * Sets player current content
+	 * Requests that a player be sent to content by another plugin
+	 * <p/>
+	 * If no plugin handles this event, the player's content does not change.
 	 *
-	 * @param playerUUID Player UUID to set data for
-	 * @param content String corresponding to the content
+	 * @param playerUUID Player UUID to send data for
+	 * @param contentData JSON corresponding to the content
 	 */
-	public static void setPlayerContent(UUID playerUUID, String content) {
-		PlayerContentChangeEvent newEvent = new PlayerContentChangeEvent(Bukkit.getPlayer(playerUUID), content);
+	public static void requestPlayerContentDataChange(UUID playerUUID, ContentData contentData) {
+		PlayerContentChangeRequestEvent newEvent = new PlayerContentChangeRequestEvent(Bukkit.getPlayer(playerUUID), contentData);
 		Bukkit.getPluginManager().callEvent(newEvent);
-
-		DataEventListener.setPlayerContent(playerUUID, content);
 	}
 
+	/**
+	 * Saves the player's content; should be called by an implementing plugin
+	 *
+	 * @param playerUUID  Player UUID to save data for
+	 * @param contentData
+	 */
+	public static void savePlayerContent(UUID playerUUID, ContentData contentData) {
+		DataEventListener.setPlayerContentData(playerUUID, contentData);
+	}
 
 	/** Future returns non-null if successfully loaded data, null on error */
 	@Nullable

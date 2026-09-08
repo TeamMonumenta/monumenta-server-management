@@ -12,9 +12,10 @@ import com.playmonumenta.common.event.PlayerTransferFailEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.adapters.VersionAdapter.ReturnParams;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
+import com.playmonumenta.redissync.data.ContentData;
 import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
-import com.playmonumenta.redissync.event.UpdateAvailableContentEvent;
+import com.playmonumenta.redissync.event.UpdateAvailableContentIdsEvent;
 import com.playmonumenta.redissync.utils.MMLog;
 import com.playmonumenta.redissync.utils.ScoreboardUtils;
 import io.lettuce.core.RedisFuture;
@@ -130,9 +131,9 @@ public class DataEventListener implements Listener {
 	/* Key = shoulder entity UUID (i.e. parrot), value = player */
 	private final Map<UUID, UUID> mTransferringPlayerShoulderEntities = new LinkedHashMap<>();
 
-	private Set<String> mAvailableContent = Set.of();
+	private Set<String> mAvailableContentIds = Set.of();
 	private final Map<UUID, List<CompletableFuture<?>>> mPendingSaves = new HashMap<>();
-	private final ConcurrentMap<UUID, String> mPlayerContent = new ConcurrentHashMap<>();
+	private final ConcurrentMap<UUID, ContentData> mPlayerContentData = new ConcurrentHashMap<>();
 	private final Map<UUID, JsonObject> mPluginData = new HashMap<>();
 	private final Set<UUID> mLoadingPlayers = new HashSet<>();
 	private final Set<UUID> mLoadFailedPlayers = new HashSet<>();
@@ -223,16 +224,16 @@ public class DataEventListener implements Listener {
 		INSTANCE.waitForPlayerToSaveInternal(player, callback, false);
 	}
 
-	protected static Set<String> getAvailableContent() {
-		return INSTANCE.mAvailableContent;
+	protected static Set<String> getAvailableContentIds() {
+		return INSTANCE.mAvailableContentIds;
 	}
 
-	protected static String getPlayerContent(UUID uuid) {
-		return INSTANCE.mPlayerContent.getOrDefault(uuid, "");
+	protected static ContentData getPlayerContentData(UUID uuid) {
+		return INSTANCE.mPlayerContentData.computeIfAbsent(uuid, k -> new ContentData(""));
 	}
 
-	protected static void setPlayerContent(UUID uuid, String content) {
-		INSTANCE.mPlayerContent.put(uuid, content);
+	protected static void setPlayerContentData(UUID uuid, ContentData contentData) {
+		INSTANCE.mPlayerContentData.put(uuid, contentData);
 	}
 
 	protected static @Nullable JsonObject getPlayerPluginData(UUID uuid) {
@@ -452,13 +453,19 @@ public class DataEventListener implements Listener {
 			MMLog.trace(() -> "Player data: " + b64encode(data));
 
 			/* Load content data */
-			String content = contentFuture.get();
-			if (content == null) {
+			String contentData = contentFuture.get();
+			if (contentData == null) {
 				MMLog.debug("Player '" + player.getName() + "' has no content data");
+				mPlayerContentData.put(player.getUniqueId(), new ContentData(""));
 			} else {
-				mPlayerContent.put(player.getUniqueId(), content);
-				MMLog.trace(() -> "Content data loaded for player=" + player.getName());
-				MMLog.trace(() -> "Content data: " + content);
+				JsonObject obj = mGson.fromJson(contentData, JsonObject.class);
+				if (obj == null) {
+					MMLog.warning("Failed to parse player '" + player.getName() + "' content as JSON. Player will be misplaced.");
+				} else {
+					mPlayerContentData.put(player.getUniqueId(), new ContentData(obj));
+					MMLog.trace(() -> "Content data loaded for player=" + player.getName());
+					MMLog.trace(() -> "Content data: " + contentData);
+				}
 			}
 
 			/* Load plugin data */
@@ -735,8 +742,8 @@ public class DataEventListener implements Listener {
 
 			/* content */
 			String contentPath = MonumentaRedisSyncAPI.getRedisContentPath(player);
-			String content = mPlayerContent.getOrDefault(player.getUniqueId(), "");
-			MMLog.trace(() -> "content: " + content);
+			String contentData = mGson.toJson(mPlayerContentData.computeIfAbsent(player.getUniqueId(), k -> new ContentData("")));
+			MMLog.trace(() -> "content: " + contentData);
 
 			/* plugindata */
 			String pluginDataPath = MonumentaRedisSyncAPI.getRedisPluginDataPath(player);
@@ -757,7 +764,7 @@ public class DataEventListener implements Listener {
 				commands.hset(shardDataPath, BukkitConfigAPI.getShardName(), overallShardDataStr);
 				commands.lpush(histPath, history);
 				commands.ltrim(histPath, 0, BukkitConfigAPI.getHistoryAmount());
-				commands.lpush(contentPath, content);
+				commands.lpush(contentPath, contentData);
 				commands.ltrim(contentPath, 0, BukkitConfigAPI.getHistoryAmount());
 				commands.lpush(pluginDataPath, pluginDataStr);
 				commands.ltrim(pluginDataPath, 0, BukkitConfigAPI.getHistoryAmount());
@@ -818,7 +825,7 @@ public class DataEventListener implements Listener {
 			}
 
 			if (Bukkit.getPlayer(playerUUID) == null) {
-				mPlayerContent.remove(playerUUID);
+				mPlayerContentData.remove(playerUUID);
 				mPluginData.remove(playerUUID);
 				mShardData.remove(playerUUID);
 			}
@@ -989,9 +996,8 @@ public class DataEventListener implements Listener {
 
 	/* ********************* Misc Event Handlers ********************* */
 
-	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-	public void updateAvailableContentEvent(UpdateAvailableContentEvent event) {
-		mAvailableContent = event.getContent();
+	protected static void updateAvailableContentEvent(UpdateAvailableContentIdsEvent event) {
+		INSTANCE.mAvailableContentIds = event.getContentIds();
 	}
 
 	/* ******************* Private Utility Methods ******************* */

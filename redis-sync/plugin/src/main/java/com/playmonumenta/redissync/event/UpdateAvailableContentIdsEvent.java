@@ -11,19 +11,19 @@ import org.jetbrains.annotations.NotNull;
  * This event is fired by the RedisSync plugin when other plugins request it,
  * allowing them to register any content that they can transfer a player to.
  */
-public class UpdateAvailableContentEvent extends Event {
+public class UpdateAvailableContentIdsEvent extends Event {
 	private static final HandlerList HANDLERS = new HandlerList();
 
 	private final Set<String> mContent = new HashSet<>();
 
-	public UpdateAvailableContentEvent() {
+	public UpdateAvailableContentIdsEvent() {
 	}
 
 	public void registerContent(Set<String> content) {
 		mContent.addAll(content);
 	}
 
-	public Set<String> getContent() {
+	public Set<String> getContentIds() {
 		return Collections.unmodifiableSet(mContent);
 	}
 

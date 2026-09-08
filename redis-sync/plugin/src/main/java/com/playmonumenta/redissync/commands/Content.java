@@ -1,5 +1,6 @@
 package com.playmonumenta.redissync.commands;
 
+import com.playmonumenta.redissync.data.ContentData;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
@@ -30,8 +31,8 @@ public class Content {
 							throw CommandAPI.failWithString("Argument must be a player name or a UUID");
 						}
 					}
-					String content = MonumentaRedisSyncAPI.getPlayerContent(uuid);
-					sender.sendMessage(content.isBlank() ? "Content not set" : content);
+					String contentId = MonumentaRedisSyncAPI.getPlayerContentData(uuid).getId();
+					sender.sendMessage(contentId.isBlank() ? "Content not set" : contentId);
 				}))
 			.withSubcommand(new CommandAPICommand("set")
 				.withArguments(playerArg)
@@ -47,7 +48,7 @@ public class Content {
 							throw CommandAPI.failWithString("Argument must be a player name with correct capitalization or a UUID");
 						}
 					}
-					MonumentaRedisSyncAPI.setPlayerContent(uuid, value);
+					MonumentaRedisSyncAPI.requestPlayerContentDataChange(uuid, new ContentData(value));
 				}))
 			.register();
 
