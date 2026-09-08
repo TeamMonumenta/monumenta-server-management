@@ -1,7 +1,7 @@
 package com.playmonumenta.redissync.commands;
 
-import com.playmonumenta.redissync.data.ContentData;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
+import com.playmonumenta.redissync.data.ContentData;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
