@@ -128,7 +128,7 @@ public class DataEventListener implements Listener {
 	/* Key = shoulder entity UUID (i.e. parrot), value = player */
 	private final ConcurrentMap<UUID, UUID> mTransferringPlayerShoulderEntities = new ConcurrentHashMap<>();
 
-	private final ConcurrentMap<UUID, ConcurrentMap<String, CompletableFuture<?>>> mPendingSaves = new ConcurrentHashMap<>();
+	private final ConcurrentMap<UUID, Set<CompletableFuture<?>>> mPendingSaves = new ConcurrentHashMap<>();
 	private final Map<UUID, JsonObject> mPluginData = new HashMap<>();
 	private final Set<UUID> mLoadingPlayers = ConcurrentHashMap.newKeySet();
 	private final Set<UUID> mLoadFailedPlayers = new HashSet<>();
@@ -257,7 +257,7 @@ public class DataEventListener implements Listener {
 	}
 
 	private void blockingWaitForPlayerToSave(UUID playerId, String playerName) {
-		ConcurrentMap<String, CompletableFuture<?>> futures = mPendingSaves.get(playerId);
+		Set<CompletableFuture<?>> futures = mPendingSaves.get(playerId);
 
 		if (futures == null || futures.isEmpty()) {
 			prunePendingSaves(playerId);
@@ -268,7 +268,7 @@ public class DataEventListener implements Listener {
 
 		try {
 			@SuppressWarnings("unchecked")
-			CompletableFuture<?>[] futureArr = futures.values().toArray(new CompletableFuture[0]);
+			CompletableFuture<?>[] futureArr = futures.toArray(new CompletableFuture[0]);
 			CompletableFuture.allOf(futureArr).get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
 		} catch (TimeoutException ex) {
 			MMLog.severe("Got timeout waiting to commit transactions for player '" + playerName + "'. This is very bad!", ex);
@@ -286,9 +286,9 @@ public class DataEventListener implements Listener {
 	 * Tracks the supplied future, not the one whenComplete() returns - only the former is already done by the time
 	 * the callback runs, so only the former can ever be pruned.
 	 */
-	private void trackPendingSave(UUID playerId, String key, CompletableFuture<?> future, Supplier<String> failureMessage) {
-		ConcurrentMap<String, CompletableFuture<?>> futures = mPendingSaves.computeIfAbsent(playerId, k -> new ConcurrentHashMap<>());
-		futures.put(key, future);
+	private void trackPendingSave(UUID playerId, CompletableFuture<?> future, Supplier<String> failureMessage) {
+		Set<CompletableFuture<?>> futures = mPendingSaves.computeIfAbsent(playerId, k -> ConcurrentHashMap.newKeySet());
+		futures.add(future);
 
 		future.whenComplete((ignored, ex) -> {
 			if (ex != null) {
@@ -301,7 +301,7 @@ public class DataEventListener implements Listener {
 	/* Drops saves that have completed, and the player's entry entirely once nothing is left in flight */
 	private void prunePendingSaves(UUID playerId) {
 		mPendingSaves.computeIfPresent(playerId, (uuid, futures) -> {
-			futures.values().removeIf(Future::isDone);
+			futures.removeIf(Future::isDone);
 			if (futures.isEmpty()) {
 				/* Returning null removes the entry from mPendingSaves */
 				return null;
@@ -387,7 +387,7 @@ public class DataEventListener implements Listener {
 		String advPath = MonumentaRedisSyncAPI.getRedisAdvancementsPath(player);
 		String advJsonData = event.getJsonData();
 		/* Don't block - the pending save is tracked for completion later */
-		trackPendingSave(playerId, "advancements", RedisAPI.multi(commands -> {
+		trackPendingSave(playerId, RedisAPI.multi(commands -> {
 			commands.lpush(advPath, advJsonData);
 			commands.ltrim(advPath, 0, BukkitConfigAPI.getHistoryAmount());
 		}), () -> "Advancements saving for player=" + playerName + " failed");
@@ -694,7 +694,7 @@ public class DataEventListener implements Listener {
 
 			MMLog.trace(() -> "data: " + b64encode(data.getData()));
 			String dataPath = MonumentaRedisSyncAPI.getRedisDataPath(player);
-			trackPendingSave(playerId, "plugin_data", RedisAPI.multiStringBytes(byteConn -> {
+			trackPendingSave(playerId, RedisAPI.multiStringBytes(byteConn -> {
 				byteConn.lpush(dataPath, data.getData());
 				byteConn.ltrim(dataPath, 0, BukkitConfigAPI.getHistoryAmount());
 			}), () -> "Failed to save player nbt data for player=" + playerName);
@@ -745,7 +745,7 @@ public class DataEventListener implements Listener {
 			MMLog.trace(() -> "Data:" + scoreboardData);
 			String scorePath = MonumentaRedisSyncAPI.getRedisScoresPath(player);
 
-			trackPendingSave(playerId, "player_data", RedisAPI.multi(commands -> {
+			trackPendingSave(playerId, RedisAPI.multi(commands -> {
 				commands.hset(shardDataPath, worldKey, data.getShardData());
 				commands.hset(shardDataPath, BukkitConfigAPI.getShardName(), overallShardDataStr);
 				commands.lpush(histPath, history);
