@@ -495,6 +495,7 @@ public class DataEventListener implements Listener {
 				JsonObject obj = mGson.fromJson(contentData, JsonObject.class);
 				if (obj == null) {
 					MMLog.warning("Failed to parse player '" + player.getName() + "' content as JSON. Player will be misplaced.");
+					mPlayerContentData.put(player.getUniqueId(), new ContentData(""));
 				} else {
 					mPlayerContentData.put(player.getUniqueId(), new ContentData(obj));
 					MMLog.trace(() -> "Content data loaded for player=" + player.getName());
