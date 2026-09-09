@@ -1204,7 +1204,7 @@ public class MonumentaRedisSyncAPI {
 			conn.lpush(getRedisContentPath(data.getUniqueId()), data.getContent().getBytes(StandardCharsets.UTF_8));
 			conn.lpush(getRedisHistoryPath(data.getUniqueId()), data.getHistory().getBytes(StandardCharsets.UTF_8));
 		}).thenApply(result -> {
-			if (result.isEmpty() || result.size() != 6 || result.get(0) == null|| result.get(1) == null
+			if (result.isEmpty() || result.size() != 6 || result.get(0) == null || result.get(1) == null
 				 || result.get(2) == null || result.get(3) == null || result.get(4) == null || result.get(5) == null) {
 				MMLog.severe("Failed to commit player data");
 				return false;
