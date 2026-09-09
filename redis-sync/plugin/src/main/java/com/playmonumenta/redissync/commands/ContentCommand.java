@@ -62,7 +62,6 @@ public class ContentCommand {
 	}
 
 	private static void execute(NativeProxyCommandSender sender, CommandArguments args) throws WrapperCommandSyntaxException {
-		CommandSender callee = sender.getCallee();
 		String content = Objects.requireNonNull(args.getUnchecked("content"));
 		Player player = Objects.requireNonNull(args.getUnchecked("player"));
 		Collection<Player> others = Objects.requireNonNull(args.getUnchecked("others"));
