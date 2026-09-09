@@ -68,17 +68,6 @@ public class ContentCommand {
 		Collection<Player> others = Objects.requireNonNull(args.getUnchecked("others"));
 		ContentOptionals optionals = parseOptionals(args.getUnchecked("optionals"));
 
-		callee.sendPlainMessage("content: " + content);
-		callee.sendPlainMessage("player: " + player.getName());
-		callee.sendPlainMessage("others: " + others.size());
-		if (optionals != null) {
-			callee.sendPlainMessage("returnto: " + optionals.returnTo);
-			callee.sendPlainMessage("arriveat: " + optionals.arriveAt);
-			callee.sendPlainMessage("onarrival: " + optionals.onArrival);
-		} else {
-			callee.sendPlainMessage("optionals: null");
-		}
-
 		ContentData data = new ContentData(content);
 		if (optionals != null) {
 			data.setReturnLocation(optionals.returnTo);
