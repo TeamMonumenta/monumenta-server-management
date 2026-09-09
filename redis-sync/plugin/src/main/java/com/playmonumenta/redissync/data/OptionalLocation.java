@@ -6,60 +6,49 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Vector2f;
-import org.joml.Vector3d;
 
 public class OptionalLocation {
-	private Vector3d mPosition;
-	private @Nullable Vector2f mRotation;
+	private double mX;
+	private double mY;
+	private double mZ;
+	private float mYaw;
+	private float mPitch;
 
-	public OptionalLocation(Vector3d position) {
-		this(position, null);
+	public OptionalLocation(double x, double y, double z) {
+		this(x, y, z, 0f, 0f);
 	}
 
-	public OptionalLocation(Vector3d position, @Nullable Vector2f rotation) {
-		mPosition = position;
-		mRotation = rotation;
+	public OptionalLocation(double x, double y, double z, float yaw, float pitch) {
+		mX = x;
+		mY = y;
+		mZ = z;
+		mYaw = yaw;
+		mPitch = pitch;
 	}
 
 	public OptionalLocation(Vector position) {
-		this(position, null, null);
+		this(position, 0f, 0f);
 	}
 
-	public OptionalLocation(Vector position, @Nullable Float yaw, @Nullable Float pitch) {
-		mPosition = new Vector3d(position.getX(), position.getY(), position.getZ());
-
-		if (yaw == null || pitch == null) {
-			mRotation = null;
-		} else {
-			mRotation = new Vector2f(yaw, pitch);
-		}
+	public OptionalLocation(Vector position, float yaw, float pitch) {
+		this(position.getX(), position.getY(), position.getZ(), yaw, pitch);
 	}
 
 	public OptionalLocation(Location location) {
-		mPosition = new Vector3d(location.x(), location.y(), location.z());
-		mRotation = new Vector2f(location.getYaw(), location.getPitch());
+		this(location.x(), location.y(), location.z(), location.getYaw(), location.getPitch());
 	}
 
 	public static @Nullable OptionalLocation fromJson(JsonObject object) {
-		Vector3d pos;
 		try {
-			pos = new Vector3d(
+			return new OptionalLocation(
 				getCoordDouble(object, "x"),
 				getCoordDouble(object, "y"),
-				getCoordDouble(object, "z")
+				getCoordDouble(object, "z"),
+				getCoordFloat(object, "yaw"),
+				getCoordFloat(object, "pitch")
 			);
 		} catch (Exception ignored) {
 			return null;
-		}
-
-		try {
-			return new OptionalLocation(pos, new Vector2f(
-				getCoordFloat(object, "yaw"),
-				getCoordFloat(object, "pitch")
-			));
-		} catch (Exception ignored) {
-			return new OptionalLocation(pos);
 		}
 	}
 
@@ -78,98 +67,72 @@ public class OptionalLocation {
 	}
 
 	public double x() {
-		return mPosition.x;
+		return mX;
 	}
 
 	public void x(double value) {
-		mPosition.x = value;
+		mX = value;
 	}
 
 	public double y() {
-		return mPosition.y;
+		return mY;
 	}
 
 	public void y(double value) {
-		mPosition.y = value;
+		mY = value;
 	}
 
 	public double z() {
-		return mPosition.z;
+		return mZ;
 	}
 
 	public void z(double value) {
-		mPosition.z = value;
-	}
-
-	public Vector3d positionJoml() {
-		return mPosition;
-	}
-
-	public void positionJoml(Vector3d value) {
-		mPosition = value;
+		mZ = value;
 	}
 
 	public Vector positionBukkit() {
-		return new Vector(mPosition.x, mPosition.y, mPosition.z);
+		return new Vector(mX, mY, mZ);
 	}
 
 	public void positionBukkit(Vector value) {
-		mPosition = new Vector3d(value.getX(), value.getY(), value.getZ());
+		mX = value.getX();
+		mY = value.getY();
+		mZ = value.getZ();
 	}
 
 	public Location locationBukkit(@Nullable World world) {
-		if (mRotation == null) {
-			return new Location(world, mPosition.x, mPosition.y, mPosition.z);
-		}
-		return new Location(world, mPosition.x, mPosition.y, mPosition.z, mRotation.x, mRotation.y);
+		return new Location(world, mX, mY, mZ, mYaw, mPitch);
 	}
 
 	public void locationBukkit(Location value) {
-		mPosition = new Vector3d(value.getX(), value.getY(), value.getZ());
-		mRotation = new Vector2f(value.getYaw(), value.getPitch());
+		mX = value.x();
+		mY = value.y();
+		mZ = value.z();
+		mYaw = value.getYaw();
+		mPitch = value.getPitch();
 	}
 
-	public @Nullable Float yaw() {
-		if (mRotation == null) {
-			return null;
-		}
-		return mRotation.x;
+	public float yaw() {
+		return mYaw;
 	}
 
-	public @Nullable Float pitch() {
-		if (mRotation == null) {
-			return null;
-		}
-		return mRotation.y;
+	public float pitch() {
+		return mPitch;
 	}
 
-	public @Nullable Vector2f rotationJoml() {
-		return mRotation;
-	}
-
-	public void rotationJoml(@Nullable Vector2f rotation) {
-		mRotation = rotation;
-	}
-
-	public void rotation(@Nullable Float yaw, @Nullable Float pitch) {
-		if (yaw == null || pitch == null) {
-			mRotation = null;
-		} else {
-			mRotation = new Vector2f(yaw, pitch);
-		}
+	public void rotation(float yaw, float pitch) {
+		mYaw = yaw;
+		mPitch = pitch;
 	}
 
 	public JsonObject toJson() {
 		JsonObject object = new JsonObject();
 
-		object.addProperty("x", mPosition.x);
-		object.addProperty("y", mPosition.y);
-		object.addProperty("z", mPosition.z);
-
-		if (mRotation != null) {
-			object.addProperty("yaw", mRotation.x);
-			object.addProperty("pitch", mRotation.y);
-		}
+		object.addProperty("x", mX);
+		object.addProperty("y", mY);
+		object.addProperty("z", mZ);
+		object.addProperty("yaw", mYaw);
+		object.addProperty("pitch", mPitch);
 
 		return object;
 	}
