@@ -12,8 +12,10 @@ import com.playmonumenta.common.event.PlayerTransferFailEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.adapters.VersionAdapter.ReturnParams;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
+import com.playmonumenta.redissync.data.ContentData;
 import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
+import com.playmonumenta.redissync.event.UpdateAvailableContentIdsEvent;
 import com.playmonumenta.redissync.utils.MMLog;
 import com.playmonumenta.redissync.utils.ScoreboardUtils;
 import io.lettuce.core.RedisFuture;
@@ -128,6 +130,8 @@ public class DataEventListener implements Listener {
 	/* Key = shoulder entity UUID (i.e. parrot), value = player */
 	private final ConcurrentMap<UUID, UUID> mTransferringPlayerShoulderEntities = new ConcurrentHashMap<>();
 
+	private Set<String> mAvailableContentIds = Set.of();
+	private final ConcurrentMap<UUID, ContentData> mPlayerContentData = new ConcurrentHashMap<>();
 	private final ConcurrentMap<UUID, Set<CompletableFuture<?>>> mPendingSaves = new ConcurrentHashMap<>();
 	private final Map<UUID, JsonObject> mPluginData = new HashMap<>();
 	private final Set<UUID> mLoadingPlayers = ConcurrentHashMap.newKeySet();
@@ -217,6 +221,18 @@ public class DataEventListener implements Listener {
 
 	protected static void waitForPlayerToSaveThenAsync(Player player, Runnable callback) {
 		INSTANCE.waitForPlayerToSaveInternal(player, callback, false);
+	}
+
+	protected static Set<String> getAvailableContentIds() {
+		return INSTANCE.mAvailableContentIds;
+	}
+
+	protected static ContentData getPlayerContentData(UUID uuid) {
+		return INSTANCE.mPlayerContentData.computeIfAbsent(uuid, k -> new ContentData(""));
+	}
+
+	protected static void setPlayerContentData(UUID uuid, ContentData contentData) {
+		INSTANCE.mPlayerContentData.put(uuid, contentData);
 	}
 
 	protected static @Nullable JsonObject getPlayerPluginData(UUID uuid) {
@@ -449,10 +465,12 @@ public class DataEventListener implements Listener {
 		try (RedisAPI.BorrowedCommands<String, byte[]> byteConn = RedisAPI.borrowStringBytes()) {
 			dataFuture = byteConn.lindex(MonumentaRedisSyncAPI.getRedisDataPath(player), 0);
 		}
+		RedisFuture<String> contentFuture;
 		RedisFuture<String> pluginDataFuture;
 		RedisFuture<String> scoreFuture;
 		RedisFuture<Map<String, String>> shardDataFuture;
 		try (RedisAPI.BorrowedCommands<String, String> commands = RedisAPI.borrow()) {
+			contentFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisContentPath(player), 0);
 			pluginDataFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisPluginDataPath(player), 0);
 			scoreFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisScoresPath(player), 0);
 			shardDataFuture = commands.hgetall(MonumentaRedisSyncAPI.getRedisPerShardDataPath(player));
@@ -467,6 +485,23 @@ public class DataEventListener implements Listener {
 			}
 			MMLog.trace("Player data loaded for player=" + playerName);
 			MMLog.trace(() -> "Player data: " + b64encode(data));
+
+			/* Load content data */
+			String contentData = contentFuture.get();
+			if (contentData == null) {
+				MMLog.debug("Player '" + player.getName() + "' has no content data");
+				mPlayerContentData.put(player.getUniqueId(), new ContentData(""));
+			} else {
+				JsonObject obj = mGson.fromJson(contentData, JsonObject.class);
+				if (obj == null) {
+					MMLog.warning("Failed to parse player '" + player.getName() + "' content as JSON. Player will be misplaced.");
+					mPlayerContentData.put(player.getUniqueId(), new ContentData(""));
+				} else {
+					mPlayerContentData.put(player.getUniqueId(), new ContentData(obj));
+					MMLog.trace(() -> "Content data loaded for player=" + player.getName());
+					MMLog.trace(() -> "Content data: " + contentData);
+				}
+			}
 
 			/* Load plugin data */
 			String pluginData = pluginDataFuture.get();
@@ -731,6 +766,11 @@ public class DataEventListener implements Listener {
 			String history = BukkitConfigAPI.getShardName() + "|" + System.currentTimeMillis() + "|" + playerName;
 			MMLog.trace(() -> "history: " + history);
 
+			/* content */
+			String contentPath = MonumentaRedisSyncAPI.getRedisContentPath(player);
+			String contentData = mGson.toJson(mPlayerContentData.computeIfAbsent(player.getUniqueId(), k -> new ContentData("")));
+			MMLog.trace(() -> "content: " + contentData);
+
 			/* plugindata */
 			String pluginDataPath = MonumentaRedisSyncAPI.getRedisPluginDataPath(player);
 			mPluginData.put(playerId, pluginData); // Update cache
@@ -750,6 +790,8 @@ public class DataEventListener implements Listener {
 				commands.hset(shardDataPath, BukkitConfigAPI.getShardName(), overallShardDataStr);
 				commands.lpush(histPath, history);
 				commands.ltrim(histPath, 0, BukkitConfigAPI.getHistoryAmount());
+				commands.lpush(contentPath, contentData);
+				commands.ltrim(contentPath, 0, BukkitConfigAPI.getHistoryAmount());
 				commands.lpush(pluginDataPath, pluginDataStr);
 				commands.ltrim(pluginDataPath, 0, BukkitConfigAPI.getHistoryAmount());
 				commands.lpush(scorePath, scoreboardData);
@@ -803,6 +845,7 @@ public class DataEventListener implements Listener {
 			}
 
 			if (Bukkit.getPlayer(playerUUID) == null) {
+				mPlayerContentData.remove(playerUUID);
 				mPluginData.remove(playerUUID);
 				mShardData.remove(playerUUID);
 			}
@@ -969,6 +1012,12 @@ public class DataEventListener implements Listener {
 			MMLog.warning(() -> "A player uuid=" + uuid + " name=" + profile.getName() + " tried to login while loading/online! Preventing duplicate uuid stupidity");
 			event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, Component.translatable("multiplayer.disconnect.duplicate_login"));
 		}
+	}
+
+	/* ********************* Misc Event Handlers ********************* */
+
+	protected static void updateAvailableContentEvent(UpdateAvailableContentIdsEvent event) {
+		INSTANCE.mAvailableContentIds = event.getContentIds();
 	}
 
 	/* ******************* Private Utility Methods ******************* */
