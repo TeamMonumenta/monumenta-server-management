@@ -262,7 +262,7 @@ public class WorldCommands {
 				.withSubcommand(new CommandAPICommand("reload")
 					.withPermission(CommandPermission.fromString("monumenta.worldmanagement.reload"))
 					.executes((sender, args) -> {
-						WorldManagementPlugin.getInstance().reload();
+						WorldManagementPlugin.getInstance().loadConfig();
 						sender.sendMessage(Component.text("Finished reloading config; world generation restarted if possible."));
 					}))
 				.withSubcommand(new CommandAPICommand("stopgeneration")

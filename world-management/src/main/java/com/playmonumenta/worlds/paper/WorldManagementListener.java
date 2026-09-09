@@ -3,8 +3,11 @@ package com.playmonumenta.worlds.paper;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
+import com.playmonumenta.redissync.data.ContentData;
+import com.playmonumenta.redissync.event.PlayerContentChangeRequestEvent;
 import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
+import com.playmonumenta.redissync.event.UpdateAvailableContentIdsEvent;
 import com.playmonumenta.worlds.common.MMLog;
 import java.util.HashMap;
 import java.util.List;
@@ -142,7 +145,7 @@ public class WorldManagementListener implements Listener {
 	// FIXME: replace with configuration phase aware code
 	// (Async)PlayerSpawnLocationEvent is the earliest event that you can access the player object
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-	public void playerInitalSpawnEvent(PlayerSpawnLocationEvent event) {
+	public void playerInitialSpawnEvent(PlayerSpawnLocationEvent event) {
 		// get world
 		final var loc = event.getSpawnLocation();
 		final var world = loc.getWorld();
@@ -253,6 +256,21 @@ public class WorldManagementListener implements Listener {
 		}
 	}
 
+	@EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = false)
+	public void updateAvailableContentIdsEvent(UpdateAvailableContentIdsEvent event) {
+		event.registerContent(WorldManagementPlugin.getRemoteContentIds());
+	}
+
+	@EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = false)
+	public void playerContentChangeRequestEvent(PlayerContentChangeRequestEvent event) {
+		Player player = event.getPlayer();
+		ContentData contentData = event.getContent();
+
+		// TODO Send the player to that content instead,
+		//  saving when they arrive on the correct world like the world changed event does
+		MonumentaRedisSyncAPI.savePlayerContent(player.getUniqueId(), contentData);
+	}
+
 	protected void reloadConfig() {
 		if (mUnloadTask != null && !mUnloadTask.isCancelled()) {
 			mUnloadTask.cancel();
@@ -315,7 +333,7 @@ public class WorldManagementListener implements Listener {
 			if (worlds.isEmpty()) {
 				throw new Exception("There are no loaded worlds; has the server started?");
 			}
-			return worlds.get(0);
+			return worlds.getFirst();
 		} else if (score < 0) {
 			throw new Exception("Tried to sort player but instance score is negative");
 		}
