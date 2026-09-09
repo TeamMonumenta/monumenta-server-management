@@ -147,7 +147,6 @@ public class WorldManagementPlugin extends JavaPlugin {
 	public void reload() {
 		getListener().reloadConfig();
 		getWorldGenerator().reloadConfig();
-		NetworkRelayIntegration.broadcastContentChange();
 	}
 
 	protected void printConfigHeader(String configKey) {
