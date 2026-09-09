@@ -43,9 +43,9 @@ public class ContentCommand {
 				new GreedyStringArgument("optionals")
 					.replaceSuggestions(ContentCommand::optionalSuggestions)
 			)
-			.executesNative(((sender, args) -> {
+			.executesNative((sender, args) -> {
 				execute(args);
-			}))
+			})
 			.register();
 
 		new CommandAPICommand("contentdebug")
