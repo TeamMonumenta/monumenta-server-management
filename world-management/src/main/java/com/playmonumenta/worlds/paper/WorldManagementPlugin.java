@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
+import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.worlds.common.MMLog;
 import java.io.File;
 import java.io.IOException;
@@ -39,7 +40,7 @@ public class WorldManagementPlugin extends JavaPlugin {
 	private static @Nullable String mNotifyWorldPermission = "monumenta.worldmanagement.worldnotify";
 	private static final Map<String, ContentInfo> mContentInfoMap = new HashMap<>();
 	private static final ConcurrentMap<String, ConcurrentMap<String, ContentInfo>> mRemoteContentByContent = new ConcurrentHashMap<>();
-	private static final ConcurrentMap<String, ConcurrentMap<String, ContentInfo>> mRemoteContentByShard = new ConcurrentHashMap<>();
+	private static final ConcurrentMap<String, Map<String, ContentInfo>> mRemoteContentByShard = new ConcurrentHashMap<>();
 
 	private @Nullable WorldManagementListener mListener = null;
 	private @Nullable WorldGenerator mGenerator = null;
@@ -194,6 +195,8 @@ public class WorldManagementPlugin extends JavaPlugin {
 
 	protected static void registerRemoteContent(String shard, JsonObject content) {
 		Gson gson = new Gson();
+		Map<String, ContentInfo> oldShardContent = mRemoteContentByShard.computeIfAbsent(shard, k -> new ConcurrentHashMap<>());
+		ConcurrentMap<String, ContentInfo> shardContent = new ConcurrentHashMap<>();
 		for (Map.Entry<String, JsonElement> entry : content.entrySet()) {
 			String contentName = entry.getKey();
 			ContentInfo contentInfo;
@@ -203,13 +206,28 @@ public class WorldManagementPlugin extends JavaPlugin {
 				continue;
 			}
 
-			mRemoteContentByShard
-				.computeIfAbsent(shard, k -> new ConcurrentHashMap<>())
-				.put(contentName, contentInfo);
+			shardContent.put(contentName, contentInfo);
 			mRemoteContentByContent
 				.computeIfAbsent(contentName, k -> new ConcurrentHashMap<>())
 				.put(shard, contentInfo);
 		}
+
+		// If the shard no longer supports certain content, remove it from the shards with that content
+		oldShardContent.keySet().stream()
+			.filter(oldContent -> !shardContent.containsKey(oldContent))
+			.forEach(oldContent -> {
+				ConcurrentMap<String, ContentInfo> remoteContentForContent = mRemoteContentByContent.get(oldContent);
+				if (remoteContentForContent != null) {
+					remoteContentForContent.remove(shard);
+					// Don't bother removing the empty map; this being async, something else
+					// may register an entry, or the shard may come back up
+				}
+			});
+
+		mRemoteContentByShard.put(shard, Collections.unmodifiableMap(shardContent));
+
+		// Request to refresh the set of available content IDs (gives other plugins a chance to do so as well)
+		MonumentaRedisSyncAPI.refreshAvailableContentIds();
 	}
 
 	protected static void unregisterRemoteShard(String shard) {
@@ -224,12 +242,32 @@ public class WorldManagementPlugin extends JavaPlugin {
 		}
 	}
 
+	protected static Set<String> getRemoteContentIds() {
+		return Collections.unmodifiableSet(mRemoteContentByContent.keySet());
+	}
+
+	protected static Map<String, ContentInfo> getRemoteContentInfoByContent(String content) {
+		Map<String, ContentInfo> remoteContentByContent = mRemoteContentByContent.get(content);
+		if (remoteContentByContent == null) {
+			return Map.of();
+		}
+		return Collections.unmodifiableMap(remoteContentByContent);
+	}
+
+	protected static Map<String, ContentInfo> getRemoteContentInfoOnShard(String shard) {
+		Map<String, ContentInfo> remoteContentOnShard = mRemoteContentByShard.get(shard);
+		if (remoteContentOnShard == null) {
+			return Map.of();
+		}
+		return remoteContentOnShard;
+	}
+
 	protected void showShardsSupportingContent(Audience audience) {
 		mRemoteContentByContent.forEach((String content, Map<String, ContentInfo> remoteShardContent) -> {
 			audience.sendMessage(
 				Component.empty()
-					.append(Component.text(content + ": ", NamedTextColor.DARK_BLUE, TextDecoration.BOLD))
-					.append(Component.text(String.join(", ", remoteShardContent.keySet()), NamedTextColor.BLUE))
+					.append(Component.text(content + ": ", NamedTextColor.BLUE, TextDecoration.BOLD))
+					.append(Component.text(String.join(", ", remoteShardContent.keySet()), NamedTextColor.GREEN))
 			);
 		});
 	}
