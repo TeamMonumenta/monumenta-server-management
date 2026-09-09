@@ -2,6 +2,7 @@ package com.playmonumenta.redissync.commands;
 
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.playmonumenta.redissync.data.OptionalLocation;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPIBukkit;
 import dev.jorel.commandapi.CommandAPICommand;
@@ -24,8 +25,6 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Vector2d;
-import org.joml.Vector3d;
 
 public class ContentCommand {
 	public static void register() {
@@ -185,18 +184,19 @@ public class ContentCommand {
 				if (state.count >= 3) {
 					// future tokens can be either numbers or options
 					state.optional = true;
-					Vector3d location = new Vector3d(values[0], values[1], values[2]);
-					Vector2d rotation = null;
+					OptionalLocation location = new OptionalLocation(values[0], values[1], values[2]);
 					// rotation if count is 4 or 5
-					if (state.count > 3) {
-						rotation = new Vector2d(values[3], values[4]);
+					if (state.count >= 4) {
+						location.yaw((float) values[3]);
+						if (state.count >= 5) {
+							location.pitch((float) values[4]);
+						}
 					}
-					ContentLocation contentLocation = new ContentLocation(location, rotation);
 					// set returnTo or arriveAt
 					if (option == ContentOption.RETURNTO) {
-						state.returnTo = contentLocation;
+						state.returnTo = location;
 					} else {
-						state.arriveAt = contentLocation;
+						state.arriveAt = location;
 					}
 				} else {
 					break;
@@ -213,8 +213,8 @@ public class ContentCommand {
 		private boolean optional = false;
 		private final Set<ContentOption> unused = EnumSet.allOf(ContentOption.class);
 		private @Nullable ContentOption expecting = null;
-		private @Nullable ContentLocation returnTo = null;
-		private @Nullable ContentLocation arriveAt = null;
+		private @Nullable OptionalLocation returnTo = null;
+		private @Nullable OptionalLocation arriveAt = null;
 		private @Nullable NamespacedKey onArrival = null;
 
 		private void reset() {
@@ -224,9 +224,7 @@ public class ContentCommand {
 		}
 	}
 
-	private record ContentOptionals(@Nullable ContentLocation returnTo, @Nullable ContentLocation arriveAt, @Nullable NamespacedKey onArrival) {}
-
-	private record ContentLocation(Vector3d location, @Nullable Vector2d rotation) {}
+	private record ContentOptionals(@Nullable OptionalLocation returnTo, @Nullable OptionalLocation arriveAt, @Nullable NamespacedKey onArrival) {}
 
 	private enum ContentOption {
 		RETURNTO,
