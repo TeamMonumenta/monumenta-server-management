@@ -30,12 +30,14 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
 public class ContentCommand {
+	private static final String PERMISSION = "monumenta.command.content";
+
 	public static void register() {
 		new CommandAPICommand("content")
-			.withPermission("monumenta.command.content")
+			.withPermission(PERMISSION)
 			.withArguments(
 				new StringArgument("content")
-					.replaceSuggestions(ArgumentSuggestions.strings(MonumentaRedisSyncAPI.availableContentIds())),
+					.replaceSuggestions(ArgumentSuggestions.stringCollection(info -> MonumentaRedisSyncAPI.availableContentIds())),
 				new EntitySelectorArgument.OnePlayer("player"),
 				new EntitySelectorArgument.ManyPlayers("others")
 			)
@@ -45,11 +47,22 @@ public class ContentCommand {
 			)
 			.executesNative(ContentCommand::execute)
 			.register();
+
+		new CommandAPICommand("contentdebug")
+			.withPermission(PERMISSION)
+			.withArguments(new EntitySelectorArgument.OnePlayer("player"))
+			.executesNative((sender, args) -> {
+				CommandSender callee = sender.getCallee();
+				Player player = Objects.requireNonNull(args.getUnchecked("player"));
+
+				String content = MonumentaRedisSyncAPI.getPlayerContentData(player).getId();
+				callee.sendMessage(content.isEmpty() ? "content not set" : content);
+			})
+			.register();
 	}
 
 	private static void execute(NativeProxyCommandSender sender, CommandArguments args) throws WrapperCommandSyntaxException {
 		CommandSender callee = sender.getCallee();
-
 		String content = Objects.requireNonNull(args.getUnchecked("content"));
 		Player player = Objects.requireNonNull(args.getUnchecked("player"));
 		Collection<Player> others = Objects.requireNonNull(args.getUnchecked("others"));
