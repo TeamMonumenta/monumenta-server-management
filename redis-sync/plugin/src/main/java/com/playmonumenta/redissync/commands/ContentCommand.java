@@ -164,7 +164,7 @@ public class ContentCommand {
 				}
 				state.index++;
 				state.onArrival = key;
-			} else {
+			} else if (option == ContentOption.RETURNTO || option == ContentOption.ARRIVEAT) {
 				double[] values = new double[5];
 				// expecting up to 5 doubles
 				while (state.count < 5 && state.index < tokens.length) {
@@ -195,7 +195,7 @@ public class ContentCommand {
 					// set returnTo or arriveAt
 					if (option == ContentOption.RETURNTO) {
 						state.returnTo = contentLocation;
-					} else if (option == ContentOption.ARRIVEAT) {
+					} else {
 						state.arriveAt = contentLocation;
 					}
 				} else {
