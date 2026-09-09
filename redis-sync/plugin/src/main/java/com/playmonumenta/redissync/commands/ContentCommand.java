@@ -2,11 +2,13 @@ package com.playmonumenta.redissync.commands;
 
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.data.OptionalLocation;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPIBukkit;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.SuggestionInfo;
+import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import dev.jorel.commandapi.arguments.EntitySelectorArgument;
 import dev.jorel.commandapi.arguments.GreedyStringArgument;
 import dev.jorel.commandapi.arguments.StringArgument;
@@ -31,12 +33,14 @@ public class ContentCommand {
 		new CommandAPICommand("content")
 			.withPermission("monumenta.command.content")
 			.withArguments(
-				new StringArgument("content"),
+				new StringArgument("content")
+					.replaceSuggestions(ArgumentSuggestions.strings(MonumentaRedisSyncAPI.availableContentIds())),
 				new EntitySelectorArgument.OnePlayer("player"),
 				new EntitySelectorArgument.ManyPlayers("others")
 			)
 			.withOptionalArguments(
-				new GreedyStringArgument("optionals").replaceSuggestions(ContentCommand::optionalSuggestions)
+				new GreedyStringArgument("optionals")
+					.replaceSuggestions(ContentCommand::optionalSuggestions)
 			)
 			.executesNative(ContentCommand::execute)
 			.register();
