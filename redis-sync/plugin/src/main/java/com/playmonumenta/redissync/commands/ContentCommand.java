@@ -15,8 +15,6 @@ import dev.jorel.commandapi.arguments.GreedyStringArgument;
 import dev.jorel.commandapi.arguments.StringArgument;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import dev.jorel.commandapi.executors.CommandArguments;
-import dev.jorel.commandapi.wrappers.NativeProxyCommandSender;
-import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Objects;
@@ -45,7 +43,9 @@ public class ContentCommand {
 				new GreedyStringArgument("optionals")
 					.replaceSuggestions(ContentCommand::optionalSuggestions)
 			)
-			.executesNative(ContentCommand::execute)
+			.executesNative(((sender, args) -> {
+				execute(args);
+			}))
 			.register();
 
 		new CommandAPICommand("contentdebug")
@@ -61,10 +61,9 @@ public class ContentCommand {
 			.register();
 	}
 
-	private static void execute(NativeProxyCommandSender sender, CommandArguments args) throws WrapperCommandSyntaxException {
+	private static void execute(CommandArguments args) throws WrapperCommandSyntaxException {
 		String content = Objects.requireNonNull(args.getUnchecked("content"));
 		Player player = Objects.requireNonNull(args.getUnchecked("player"));
-		Collection<Player> others = Objects.requireNonNull(args.getUnchecked("others"));
 		ContentOptionals optionals = parseOptionals(args.getUnchecked("optionals"));
 
 		ContentData data = new ContentData(content);
