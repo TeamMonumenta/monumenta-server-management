@@ -3,6 +3,7 @@ package com.playmonumenta.redissync.commands;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
+import com.playmonumenta.redissync.data.ContentData;
 import com.playmonumenta.redissync.data.OptionalLocation;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPIBukkit;
@@ -64,6 +65,14 @@ public class ContentCommand {
 		} else {
 			callee.sendPlainMessage("optionals: null");
 		}
+
+		ContentData data = new ContentData(content);
+		if (optionals != null) {
+			data.setReturnLocation(optionals.returnTo);
+			data.setArrivalLocation(optionals.arriveAt);
+			data.setMcfunctionOnArrival(optionals.onArrival);
+		}
+		MonumentaRedisSyncAPI.requestPlayerContentDataChange(player, data);
 	}
 
 	private static @Nullable ContentOptionals parseOptionals(@Nullable String input) throws WrapperCommandSyntaxException {
