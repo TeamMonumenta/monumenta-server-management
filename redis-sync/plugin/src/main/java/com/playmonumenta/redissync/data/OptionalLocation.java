@@ -116,8 +116,16 @@ public class OptionalLocation {
 		return mYaw;
 	}
 
+	public void yaw(float yaw) {
+		mYaw = yaw;
+	}
+
 	public float pitch() {
 		return mPitch;
+	}
+
+	public void pitch(float pitch) {
+		mPitch = pitch;
 	}
 
 	public void rotation(float yaw, float pitch) {
