@@ -724,51 +724,51 @@ public class MonumentaRedisSyncAPI {
 			shardDataFuture = commands.hgetall(shardDataPath);
 		}
 		shardDataFuture.toCompletableFuture().whenComplete((shardData, ex) -> {
-			if (ex == null) {
-				if (shardData == null || shardData.isEmpty()) {
-					// If we want to be able to set players' world data on shards they have never been to before,
-					// this needs to change. Instead, we would need to set a default shard data (empty json?)
-					MMLog.info("Attempted to set data for player=" + player.getName() + " on shard=" + shard + " they have never visited before (nothing occured).");
-					return;
-				} else {
-					final JsonObject worldShardDataJson;
-					/* Look up in the shard data first the "world" part - data from this world about where the player should be */
-					String worldKey = getRedisPerShardDataWorldKey(worldName);
-					String worldShardData = shardData.get(worldKey);
-					if (worldShardData == null || worldShardData.isEmpty()) {
-						MMLog.trace("No world shard data for player '" + player.getName() + "', using default");
-						worldShardDataJson = new JsonObject();
-					} else {
-						MMLog.trace("Found world shard data for player '" + player.getName() + "': '" + worldShardData + "'");
-						worldShardDataJson = new Gson().fromJson(worldShardData, JsonObject.class);
-					}
-
-					JsonArray pos = new JsonArray();
-					pos.add(loc.getX());
-					pos.add(loc.getY());
-					pos.add(loc.getZ());
-					worldShardDataJson.add("Pos", pos);
-
-					JsonArray rotation = new JsonArray();
-					rotation.add(yaw);
-					rotation.add(pitch);
-					worldShardDataJson.add("Rotation", rotation);
-
-					JsonObject newShardData = new JsonObject();
-					newShardData.addProperty("World", player.getWorld().getName());
-					String overallShardDataStr = new Gson().toJson(newShardData);
-
-					RedisAPI.multi(commands -> {
-						commands.hset(shardDataPath, worldKey, worldShardDataJson.getAsString());
-						commands.hset(shardDataPath, shard, overallShardDataStr);
-					}).exceptionally(e -> {
-						MMLog.severe("Failed to save player data for player=" + player.getName(), e);
-						return null;
-					});
-				}
-			} else {
+			if (ex != null) {
 				MMLog.severe("Failed to set location on other shard for player=" + player.getName(), ex);
 			}
+
+			if (shardData == null || shardData.isEmpty()) {
+				// If we want to be able to set players' world data on shards they have never been to before,
+				// this needs to change. Instead, we would need to set a default shard data (empty json?)
+				MMLog.info("Attempted to set data for player=" + player.getName() + " on shard=" + shard + " they have never visited before (nothing occured).");
+				return;
+			}
+
+			final JsonObject worldShardDataJson;
+			/* Look up in the shard data first the "world" part - data from this world about where the player should be */
+			String worldKey = getRedisPerShardDataWorldKey(worldName);
+			String worldShardData = shardData.get(worldKey);
+			if (worldShardData == null || worldShardData.isEmpty()) {
+				MMLog.trace("No world shard data for player '" + player.getName() + "', using default");
+				worldShardDataJson = new JsonObject();
+			} else {
+				MMLog.trace("Found world shard data for player '" + player.getName() + "': '" + worldShardData + "'");
+				worldShardDataJson = new Gson().fromJson(worldShardData, JsonObject.class);
+			}
+
+			JsonArray pos = new JsonArray();
+			pos.add(loc.getX());
+			pos.add(loc.getY());
+			pos.add(loc.getZ());
+			worldShardDataJson.add("Pos", pos);
+
+			JsonArray rotation = new JsonArray();
+			rotation.add(yaw);
+			rotation.add(pitch);
+			worldShardDataJson.add("Rotation", rotation);
+
+			JsonObject newShardData = new JsonObject();
+			newShardData.addProperty("World", player.getWorld().getName());
+			String overallShardDataStr = new Gson().toJson(newShardData);
+
+			RedisAPI.multi(commands -> {
+				commands.hset(shardDataPath, worldKey, worldShardDataJson.getAsString());
+				commands.hset(shardDataPath, shard, overallShardDataStr);
+			}).exceptionally(e -> {
+				MMLog.severe("Failed to save player data for player=" + player.getName(), e);
+				return null;
+			});
 		});
 	}
 
