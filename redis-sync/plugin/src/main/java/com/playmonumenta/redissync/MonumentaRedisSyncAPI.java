@@ -128,7 +128,7 @@ public class MonumentaRedisSyncAPI {
 		getAllCachedPlayerNames().toArray(String[]::new));
 
 
-	private static final String DEFAULT_CONTENT_JSON = new ContentData("").toString();
+	private static final String DEFAULT_CONTENT_JSON =  new ContentData("").toJson().toString();
 	private static final byte[] DEFAULT_CONTENT_BYTES = DEFAULT_CONTENT_JSON.getBytes(StandardCharsets.UTF_8);
 	private static final Trie<UUID> mNameToUuidTrie = new Trie<>();
 	private static final Map<String, UUID> mNameToUuid = new ConcurrentHashMap<>();
