@@ -713,7 +713,6 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static void setPlayerWorldAndLocationOnShard(Player player, String shard, String worldName, Vector loc, double yaw, double pitch) {
-		// TODO do we care about this
 		if (BukkitConfigAPI.getSavingDisabled()) {
 			/* No data saved, no data loaded */
 			return;
@@ -725,24 +724,24 @@ public class MonumentaRedisSyncAPI {
 			shardDataFuture = commands.hgetall(shardDataPath);
 		}
 		shardDataFuture.toCompletableFuture().whenComplete((shardData, ex) -> {
-			if (ex != null) {
+			if (ex == null) {
 				if (shardData == null || shardData.isEmpty()) {
-					//TODO player has not been to the shard we are trying to modify before - what do we do now?
+					// If we want to be able to set players' world data on shards they have never been to before,
+					// this needs to change. Instead, we would need to set a default shard data (empty json?)
+					MMLog.info("Attempted to set data for player=" + player.getName() + " on shard=" + shard + " they have never visited before (nothing occured).");
+					return;
 				} else {
 					final JsonObject worldShardDataJson;
 					/* Look up in the shard data first the "world" part - data from this world about where the player should be */
 					String worldKey = getRedisPerShardDataWorldKey(worldName);
 					String worldShardData = shardData.get(worldKey);
 					if (worldShardData == null || worldShardData.isEmpty()) {
-						// TODO world shard data is empty - is this the right thing to do?
 						MMLog.trace("No world shard data for player '" + player.getName() + "', using default");
 						worldShardDataJson = new JsonObject();
 					} else {
 						MMLog.trace("Found world shard data for player '" + player.getName() + "': '" + worldShardData + "'");
 						worldShardDataJson = new Gson().fromJson(worldShardData, JsonObject.class);
 					}
-
-					//TODO theoretically this could be generified to inject any relevant data in here. Not sure why we'd want that though
 
 					JsonArray pos = new JsonArray();
 					pos.add(loc.getX());
@@ -759,7 +758,6 @@ public class MonumentaRedisSyncAPI {
 					newShardData.addProperty("World", player.getWorld().getName());
 					String overallShardDataStr = new Gson().toJson(newShardData);
 
-					// TODO This does actually save the data right?
 					RedisAPI.multi(commands -> {
 						commands.hset(shardDataPath, worldKey, worldShardDataJson.getAsString());
 						commands.hset(shardDataPath, shard, overallShardDataStr);
@@ -769,7 +767,7 @@ public class MonumentaRedisSyncAPI {
 					});
 				}
 			} else {
-				//TODO handle exception
+				MMLog.severe("Failed to set location on other shard for player=" + player.getName(), ex);
 			}
 		});
 	}
