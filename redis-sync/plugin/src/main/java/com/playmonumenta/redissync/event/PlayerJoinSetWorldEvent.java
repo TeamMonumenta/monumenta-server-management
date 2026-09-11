@@ -1,6 +1,5 @@
 package com.playmonumenta.redissync.event;
 
-import java.util.UUID;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
@@ -21,23 +20,12 @@ public class PlayerJoinSetWorldEvent extends PlayerEvent {
 	private static final HandlerList handlers = new HandlerList();
 
 	private @NotNull World mWorld;
-	private final @Nullable UUID mLastSavedWorldUUID;
 	private final @Nullable String mLastSavedWorldName;
 
-	public PlayerJoinSetWorldEvent(Player player, @NotNull World world, @Nullable UUID lastSavedWorldUUID, @Nullable String lastSavedWorldName) {
+	public PlayerJoinSetWorldEvent(Player player, @NotNull World world, @Nullable String lastSavedWorldName) {
 		super(player);
 		mWorld = world;
-		mLastSavedWorldUUID = lastSavedWorldUUID;
 		mLastSavedWorldName = lastSavedWorldName;
-	}
-
-	/*
-	 * Get the last saved world UUID attached to the player. This is the world they were on most recently when data saving was triggered.
-	 * This might be different than getWorld() either if the last saved world was unloaded when they logged in or if the world has been changed by another plugin.
-	 * May be useful for another plugin to dynamically load this world or handle some kind of world removal cleanup logic
-	 */
-	public @Nullable UUID getLastSavedWorldUUID() {
-		return mLastSavedWorldUUID;
 	}
 
 	/*

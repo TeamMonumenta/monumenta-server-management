@@ -712,6 +712,64 @@ public class MonumentaRedisSyncAPI {
 		});
 	}
 
+	public static void setPlayerWorldAndLocationOnShard(Player player, String shard, String worldName, Vector loc, double yaw, double pitch) {
+		if (BukkitConfigAPI.getSavingDisabled()) {
+			/* No data saved, no data loaded */
+			return;
+		}
+
+		String shardDataPath = getRedisPerShardDataPath(player);
+		RedisFuture<Map<String, String>> shardDataFuture;
+		try (RedisAPI.BorrowedCommands<String, String> commands = RedisAPI.borrow()) {
+			shardDataFuture = commands.hgetall(shardDataPath);
+		}
+		shardDataFuture.toCompletableFuture().whenComplete((shardData, ex) -> {
+			if (ex != null) {
+				MMLog.severe("Failed to set location on other shard for player=" + player.getName(), ex);
+			}
+
+			final JsonObject worldShardDataJson;
+			String worldKey = getRedisPerShardDataWorldKey(worldName);
+			if (shardData == null || shardData.isEmpty()) {
+				MMLog.trace("No shard data for player '" + player.getName() + "', using default");
+				worldShardDataJson = new JsonObject();
+			} else {
+				/* Look up in the shard data first the "world" part - data from this world about where the player should be */
+				String worldShardData = shardData.get(worldKey);
+				if (worldShardData == null || worldShardData.isEmpty()) {
+					MMLog.trace("No world shard data for player '" + player.getName() + "', using default");
+					worldShardDataJson = new JsonObject();
+				} else {
+					MMLog.trace("Found world shard data for player '" + player.getName() + "': '" + worldShardData + "'");
+					worldShardDataJson = new Gson().fromJson(worldShardData, JsonObject.class);
+				}
+			}
+
+			JsonArray pos = new JsonArray();
+			pos.add(loc.getX());
+			pos.add(loc.getY());
+			pos.add(loc.getZ());
+			worldShardDataJson.add("Pos", pos);
+
+			JsonArray rotation = new JsonArray();
+			rotation.add(yaw);
+			rotation.add(pitch);
+			worldShardDataJson.add("Rotation", rotation);
+
+			JsonObject newShardData = new JsonObject();
+			newShardData.addProperty("World", player.getWorld().getName());
+			String overallShardDataStr = new Gson().toJson(newShardData);
+
+			RedisAPI.multi(commands -> {
+				commands.hset(shardDataPath, worldKey, worldShardDataJson.getAsString());
+				commands.hset(shardDataPath, shard, overallShardDataStr);
+			}).exceptionally(e -> {
+				MMLog.severe("Failed to save player data for player=" + player.getName(), e);
+				return null;
+			});
+		});
+	}
+
 	public static String getRedisDataPath(Player player) {
 		return getRedisDataPath(player.getUniqueId());
 	}
@@ -737,11 +795,11 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static String getRedisPerShardDataWorldKey(World world) {
-		return getRedisPerShardDataWorldKey(world.getUID(), world.getName());
+		return getRedisPerShardDataWorldKey(world.getName());
 	}
 
-	public static String getRedisPerShardDataWorldKey(UUID worldUUID, String worldName) {
-		return worldUUID.toString() + ":" + worldName;
+	public static String getRedisPerShardDataWorldKey(String worldName) {
+		return "worlddata:" + worldName;
 	}
 
 	public static String getRedisPluginDataPath(Player player) {
