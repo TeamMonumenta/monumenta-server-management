@@ -8,6 +8,7 @@ import com.destroystokyo.paper.profile.PlayerProfile;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 import com.playmonumenta.common.event.PlayerTransferFailEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.adapters.VersionAdapter.ReturnParams;
@@ -492,9 +493,14 @@ public class DataEventListener implements Listener {
 				MMLog.debug("Player '" + player.getName() + "' has no content data");
 				mPlayerContentData.put(player.getUniqueId(), new ContentData(""));
 			} else {
-				JsonObject obj = mGson.fromJson(contentData, JsonObject.class);
+				JsonObject obj;
+				try {
+					obj = mGson.fromJson(contentData, JsonObject.class);
+				} catch (JsonSyntaxException ignored) {
+					obj = null;
+				}
 				if (obj == null) {
-					MMLog.warning("Failed to parse player '" + player.getName() + "' content as JSON. Player will be misplaced.");
+					MMLog.warning("Failed to parse player '" + player.getName() + "' content as JSON. Player may be misplaced.");
 					mPlayerContentData.put(player.getUniqueId(), new ContentData(""));
 				} else {
 					mPlayerContentData.put(player.getUniqueId(), new ContentData(obj));
@@ -768,7 +774,7 @@ public class DataEventListener implements Listener {
 
 			/* content */
 			String contentPath = MonumentaRedisSyncAPI.getRedisContentPath(player);
-			String contentData = mGson.toJson(mPlayerContentData.computeIfAbsent(player.getUniqueId(), k -> new ContentData("")));
+			String contentData = mGson.toJson(mPlayerContentData.computeIfAbsent(player.getUniqueId(), k -> new ContentData("")).toJson());
 			MMLog.trace(() -> "content: " + contentData);
 
 			/* plugindata */
