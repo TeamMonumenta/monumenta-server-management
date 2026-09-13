@@ -182,12 +182,6 @@ public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 		}
 	}
 
-	private void applyLong(JsonObject obj, CompoundTag nbt, String key) {
-		if (obj.has(key)) {
-			nbt.putLong(key, obj.get(key).getAsLong());
-		}
-	}
-
 	private void applyFloat(JsonObject obj, CompoundTag nbt, String key) {
 		if (obj.has(key)) {
 			nbt.putFloat(key, obj.get(key).getAsFloat());
@@ -249,13 +243,6 @@ public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 	private void copyInt(JsonObject obj, CompoundTag nbt, String key) {
 		if (nbt.contains(key)) {
 			obj.addProperty(key, nbt.getInt(key));
-			nbt.remove(key);
-		}
-	}
-
-	private void copyLong(JsonObject obj, CompoundTag nbt, String key) {
-		if (nbt.contains(key)) {
-			obj.addProperty(key, nbt.getLong(key));
 			nbt.remove(key);
 		}
 	}
