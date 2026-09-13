@@ -757,11 +757,11 @@ public class MonumentaRedisSyncAPI {
 			worldShardDataJson.add("Rotation", rotation);
 
 			JsonObject newShardData = new JsonObject();
-			newShardData.addProperty("World", player.getWorld().getName());
+			newShardData.addProperty("World", worldName);
 			String overallShardDataStr = new Gson().toJson(newShardData);
 
 			RedisAPI.multi(commands -> {
-				commands.hset(shardDataPath, worldKey, worldShardDataJson.getAsString());
+				commands.hset(shardDataPath, worldKey, worldShardDataJson.toString());
 				commands.hset(shardDataPath, shard, overallShardDataStr);
 			}).exceptionally(e -> {
 				MMLog.severe("Failed to save player data for player=" + player.getName(), e);
