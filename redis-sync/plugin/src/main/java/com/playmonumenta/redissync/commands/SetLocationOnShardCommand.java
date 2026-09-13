@@ -2,7 +2,6 @@ package com.playmonumenta.redissync.commands;
 
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.NetworkRelayIntegration;
-import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.Argument;
@@ -17,6 +16,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
 public class SetLocationOnShardCommand {
+	@SuppressWarnings({"unchecked"})
 	public static void register() {
 		String command = "setlocationonshard";
 		CommandPermission perms = CommandPermission.fromString("monumenta.command.setlocationonshard");
@@ -30,8 +30,9 @@ public class SetLocationOnShardCommand {
 		new CommandAPICommand(command)
 			.withArguments(playersArg)
 			.withArguments(serverArg)
-			.withOptionalArguments(locationArg)
-			.withOptionalArguments(rotationArg)
+			.withArguments(worldArg)
+			.withArguments(locationArg)
+			.withArguments(rotationArg)
 			.withPermission(perms)
 			.executes((sender, args) -> {
 					Collection<Player> players = args.getByArgument(playersArg);
