@@ -626,8 +626,6 @@ public class DataEventListener implements Listener {
 			}
 
 			worldShardDataJson.addProperty("world", playerWorld.getName());
-			worldShardDataJson.addProperty("WorldUUIDMost", playerWorld.getUID().getMostSignificantBits());
-			worldShardDataJson.addProperty("WorldUUIDLeast", playerWorld.getUID().getLeastSignificantBits());
 
 			/* At this point shardDataJson contains at minimum the world the player should be attached to and the location/rotation */
 

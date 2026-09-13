@@ -10,6 +10,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Map;
+import java.util.UUID;
 import net.minecraft.SharedConstants;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.DoubleTag;
@@ -19,6 +20,8 @@ import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.scores.Scoreboard;
 import org.apache.logging.log4j.Logger;
+import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.craftbukkit.v1_20_R3.scoreboard.CraftScoreboard;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
@@ -70,9 +73,16 @@ public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 		applyFloat(shardData, nbt, "FallDistance");
 		applyBool(shardData, nbt, "OnGround");
 		applyInt(shardData, nbt, "Dimension");
-		applyStr(shardData, nbt, "world");
-		applyLong(shardData, nbt, "WorldUUIDMost");
-		applyLong(shardData, nbt, "WorldUUIDLeast");
+		if (shardData.has("world")) {
+			String worldName = shardData.get("world").getAsString();
+			nbt.putString("world", worldName);
+			World world = Bukkit.getWorld(worldName);
+			if (world != null) {
+				UUID uuid = world.getUID();
+				nbt.putLong("WorldUUIDMost", uuid.getMostSignificantBits());
+				nbt.putLong("WorldUUIDLeast", uuid.getLeastSignificantBits());
+			}
+		}
 		applyDoubleList(shardData, nbt, "Pos");
 		applyDoubleList(shardData, nbt, "Motion");
 		applyFloatList(shardData, nbt, "Rotation");
@@ -103,8 +113,6 @@ public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 		copyBool(obj, nbt, "OnGround");
 		copyInt(obj, nbt, "Dimension");
 		copyStr(obj, nbt, "world");
-		copyLong(obj, nbt, "WorldUUIDMost");
-		copyLong(obj, nbt, "WorldUUIDLeast");
 		copyDoubleList(obj, nbt, "Pos");
 		copyDoubleList(obj, nbt, "Motion");
 		copyFloatList(obj, nbt, "Rotation");
