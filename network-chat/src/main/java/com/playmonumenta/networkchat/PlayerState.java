@@ -536,8 +536,8 @@ public class PlayerState {
 
 		if (mUnwatchedChannelIds.containsKey(channelId)) {
 			return false;
-		} else if (!mWatchedChannelIds.containsKey(channelId)) {
-			return false;
+		} else if (mWatchedChannelIds.containsKey(channelId)) {
+			return true;
 		}
 
 		isListening = mDefaultChannelSettings.isListening();
