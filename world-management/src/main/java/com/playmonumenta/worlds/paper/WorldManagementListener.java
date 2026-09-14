@@ -263,12 +263,13 @@ public class WorldManagementListener implements Listener {
 
 	@EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = false)
 	public void playerContentChangeRequestEvent(PlayerContentChangeRequestEvent event) {
-		Player player = event.getPlayer();
 		ContentData contentData = event.getContent();
 
 		// TODO Send the player to that content instead,
 		//  saving when they arrive on the correct world like the world changed event does
-		MonumentaRedisSyncAPI.savePlayerContent(player.getUniqueId(), contentData);
+		for (Player other : event.getOthers()) {
+			MonumentaRedisSyncAPI.savePlayerContent(other.getUniqueId(), contentData);
+		}
 	}
 
 	protected void reloadConfig() {
