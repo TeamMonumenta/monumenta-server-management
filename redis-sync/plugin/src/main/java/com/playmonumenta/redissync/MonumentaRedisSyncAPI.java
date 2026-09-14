@@ -712,7 +712,7 @@ public class MonumentaRedisSyncAPI {
 		});
 	}
 
-	public static void setPlayerWorldAndLocationOnShard(Player player, String shard, String worldName, Vector loc, double yaw, double pitch) {
+	public static void setPlayerWorldAndLocationOnShard(Player player, String shard, String worldName, Vector loc, double yaw, double pitch, boolean transferWhenComplete) {
 		if (BukkitConfigAPI.getSavingDisabled()) {
 			/* No data saved, no data loaded */
 			return;
@@ -763,9 +763,18 @@ public class MonumentaRedisSyncAPI {
 			RedisAPI.multi(commands -> {
 				commands.hset(shardDataPath, worldKey, worldShardDataJson.toString());
 				commands.hset(shardDataPath, shard, overallShardDataStr);
-			}).exceptionally(e -> {
-				MMLog.severe("Failed to save player data for player=" + player.getName(), e);
-				return null;
+			}).whenComplete((unused, ex2) -> {
+				if (ex2 != null) {
+					MMLog.severe("Failed to save player data for player=" + player.getName(), ex2);
+					return;
+				}
+				if (transferWhenComplete) {
+					try {
+						sendPlayer(player, shard);
+					} catch (Exception ex3) {
+						MMLog.severe("Caught exception when transferring player after remotely setting their world and location", ex3);
+					}
+				}
 			});
 		});
 	}

@@ -6,6 +6,7 @@ import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
+import dev.jorel.commandapi.arguments.BooleanArgument;
 import dev.jorel.commandapi.arguments.EntitySelectorArgument;
 import dev.jorel.commandapi.arguments.LocationArgument;
 import dev.jorel.commandapi.arguments.RotationArgument;
@@ -26,6 +27,7 @@ public class SetLocationOnShardCommand {
 		Argument<String> worldArg = new StringArgument("world");
 		LocationArgument locationArg = new LocationArgument("location"); // technically this doesn't really make sense, but only the vector is used from the location
 		RotationArgument rotationArg = new RotationArgument("rotation");
+		BooleanArgument transferArg = new BooleanArgument("transfer");
 
 		new CommandAPICommand(command)
 			.withArguments(playersArg)
@@ -33,6 +35,7 @@ public class SetLocationOnShardCommand {
 			.withArguments(worldArg)
 			.withArguments(locationArg)
 			.withArguments(rotationArg)
+			.withOptionalArguments(transferArg)
 			.withPermission(perms)
 			.executes((sender, args) -> {
 					Collection<Player> players = args.getByArgument(playersArg);
@@ -40,8 +43,9 @@ public class SetLocationOnShardCommand {
 					String world = args.getByArgument(worldArg);
 					Location location = args.getByArgument(locationArg);
 					Rotation rotation = args.getByArgument(rotationArg);
+					boolean transfer = args.getByArgumentOrDefault(transferArg, false);
 					for (Player player : players) {
-						MonumentaRedisSyncAPI.setPlayerWorldAndLocationOnShard(player, shard, world, location.toVector(), rotation.getYaw(), rotation.getPitch());
+						MonumentaRedisSyncAPI.setPlayerWorldAndLocationOnShard(player, shard, world, location.toVector(), rotation.getYaw(), rotation.getPitch(), transfer);
 					}
 				}
 			).register();
