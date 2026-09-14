@@ -1,7 +1,6 @@
 package com.playmonumenta.redissync.event;
 
 import com.playmonumenta.redissync.data.ContentData;
-import java.util.Collection;
 import java.util.Set;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
@@ -27,7 +26,7 @@ public class PlayerContentChangeRequestEvent extends PlayerEvent {
 		mContent = content;
 	}
 
-	public Collection<Player> getOthers() {
+	public Set<Player> getOthers() {
 		return mOthers;
 	}
 
