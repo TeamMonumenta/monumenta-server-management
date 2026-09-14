@@ -2,6 +2,7 @@ package com.playmonumenta.redissync.commands;
 
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.NetworkRelayIntegration;
+import com.playmonumenta.redissync.utils.MMLog;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.Argument;
@@ -45,7 +46,16 @@ public class SetLocationOnShardCommand {
 					Rotation rotation = args.getByArgument(rotationArg);
 					boolean transfer = args.getByArgumentOrDefault(transferArg, false);
 					for (Player player : players) {
-						MonumentaRedisSyncAPI.setPlayerWorldAndLocationOnShard(player, shard, world, location.toVector(), rotation.getYaw(), rotation.getPitch(), transfer);
+						MonumentaRedisSyncAPI.setPlayerWorldAndLocationOnShard(player, shard, world, location.toVector(), rotation.getYaw(), rotation.getPitch(), transfer)
+							.whenComplete((unused, ex1) -> {
+								if (ex1 != null && transfer) {
+									try {
+										MonumentaRedisSyncAPI.sendPlayer(player, shard);
+									} catch (Exception ex2) {
+										MMLog.severe("Caught exception when transferring player after remotely setting their world and location", ex2);
+									}
+								}
+							});
 					}
 				}
 			).register();
