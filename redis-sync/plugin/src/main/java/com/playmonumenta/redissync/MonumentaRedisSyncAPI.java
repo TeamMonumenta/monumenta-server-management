@@ -721,31 +721,22 @@ public class MonumentaRedisSyncAPI {
 		CompletableFuture<Void> future = new CompletableFuture<>();
 
 		String shardDataPath = getRedisPerShardDataPath(player);
-		RedisFuture<Map<String, String>> shardDataFuture;
+		RedisFuture<String> shardDataFuture;
+		String worldKey = getRedisPerShardDataWorldKey(worldName);
 		try (RedisAPI.BorrowedCommands<String, String> commands = RedisAPI.borrow()) {
-			shardDataFuture = commands.hgetall(shardDataPath);
+			shardDataFuture = commands.hget(shardDataPath, worldKey);
 		}
-		shardDataFuture.toCompletableFuture().whenComplete((shardData, ex) -> {
+		shardDataFuture.toCompletableFuture().whenComplete((worldShardData, ex) -> {
 			if (ex != null) {
 				MMLog.severe("Failed to set location on other shard for player=" + player.getName(), ex);
+				future.completeExceptionally(ex);
+				return;
 			}
 
 			final JsonObject worldShardDataJson;
-			String worldKey = getRedisPerShardDataWorldKey(worldName);
-			if (shardData == null || shardData.isEmpty()) {
-				MMLog.trace("No shard data for player '" + player.getName() + "', using default");
-				worldShardDataJson = new JsonObject();
-			} else {
-				/* Look up in the shard data first the "world" part - data from this world about where the player should be */
-				String worldShardData = shardData.get(worldKey);
-				if (worldShardData == null || worldShardData.isEmpty()) {
-					MMLog.trace("No world shard data for player '" + player.getName() + "', using default");
-					worldShardDataJson = new JsonObject();
-				} else {
-					MMLog.trace("Found world shard data for player '" + player.getName() + "': '" + worldShardData + "'");
-					worldShardDataJson = new Gson().fromJson(worldShardData, JsonObject.class);
-				}
-			}
+			/* Look up in the shard data first the "world" part - data from this world about where the player should be */
+			MMLog.trace("Found world shard data for player '" + player.getName() + "': '" + worldShardData + "'");
+			worldShardDataJson = new Gson().fromJson(worldShardData, JsonObject.class);
 
 			JsonArray pos = new JsonArray();
 			pos.add(loc.getX());
