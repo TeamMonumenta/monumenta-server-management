@@ -712,11 +712,13 @@ public class MonumentaRedisSyncAPI {
 		});
 	}
 
-	public static void setPlayerWorldAndLocationOnShard(Player player, String shard, String worldName, Vector loc, double yaw, double pitch) {
+	public static CompletableFuture<Void> setPlayerWorldAndLocationOnShard(Player player, String shard, String worldName, Vector loc, double yaw, double pitch) {
 		if (BukkitConfigAPI.getSavingDisabled()) {
 			/* No data saved, no data loaded */
-			return;
+			return CompletableFuture.completedFuture(null);
 		}
+
+		CompletableFuture<Void> future = new CompletableFuture<>();
 
 		String shardDataPath = getRedisPerShardDataPath(player);
 		RedisFuture<Map<String, String>> shardDataFuture;
@@ -763,11 +765,16 @@ public class MonumentaRedisSyncAPI {
 			RedisAPI.multi(commands -> {
 				commands.hset(shardDataPath, worldKey, worldShardDataJson.toString());
 				commands.hset(shardDataPath, shard, overallShardDataStr);
-			}).exceptionally(e -> {
-				MMLog.severe("Failed to save player data for player=" + player.getName(), e);
-				return null;
+			}).whenComplete((unused, ex2) -> {
+				if (ex2 != null) {
+					MMLog.severe("Failed to save player data for player=" + player.getName(), ex2);
+					future.completeExceptionally(ex2);
+					return;
+				}
+				future.complete(null);
 			});
 		});
+		return future;
 	}
 
 	public static String getRedisDataPath(Player player) {

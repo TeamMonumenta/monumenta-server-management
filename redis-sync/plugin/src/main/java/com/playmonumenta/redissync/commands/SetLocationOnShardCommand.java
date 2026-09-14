@@ -2,10 +2,12 @@ package com.playmonumenta.redissync.commands;
 
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.NetworkRelayIntegration;
+import com.playmonumenta.redissync.utils.MMLog;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
+import dev.jorel.commandapi.arguments.BooleanArgument;
 import dev.jorel.commandapi.arguments.EntitySelectorArgument;
 import dev.jorel.commandapi.arguments.LocationArgument;
 import dev.jorel.commandapi.arguments.RotationArgument;
@@ -26,6 +28,7 @@ public class SetLocationOnShardCommand {
 		Argument<String> worldArg = new StringArgument("world");
 		LocationArgument locationArg = new LocationArgument("location"); // technically this doesn't really make sense, but only the vector is used from the location
 		RotationArgument rotationArg = new RotationArgument("rotation");
+		BooleanArgument transferArg = new BooleanArgument("transfer");
 
 		new CommandAPICommand(command)
 			.withArguments(playersArg)
@@ -33,6 +36,7 @@ public class SetLocationOnShardCommand {
 			.withArguments(worldArg)
 			.withArguments(locationArg)
 			.withArguments(rotationArg)
+			.withOptionalArguments(transferArg)
 			.withPermission(perms)
 			.executes((sender, args) -> {
 					Collection<Player> players = args.getByArgument(playersArg);
@@ -40,8 +44,18 @@ public class SetLocationOnShardCommand {
 					String world = args.getByArgument(worldArg);
 					Location location = args.getByArgument(locationArg);
 					Rotation rotation = args.getByArgument(rotationArg);
+					boolean transfer = args.getByArgumentOrDefault(transferArg, false);
 					for (Player player : players) {
-						MonumentaRedisSyncAPI.setPlayerWorldAndLocationOnShard(player, shard, world, location.toVector(), rotation.getYaw(), rotation.getPitch());
+						MonumentaRedisSyncAPI.setPlayerWorldAndLocationOnShard(player, shard, world, location.toVector(), rotation.getYaw(), rotation.getPitch())
+							.whenComplete((unused, ex1) -> {
+								if (ex1 != null && transfer) {
+									try {
+										MonumentaRedisSyncAPI.sendPlayer(player, shard);
+									} catch (Exception ex2) {
+										MMLog.severe("Caught exception when transferring player after remotely setting their world and location", ex2);
+									}
+								}
+							});
 					}
 				}
 			).register();
