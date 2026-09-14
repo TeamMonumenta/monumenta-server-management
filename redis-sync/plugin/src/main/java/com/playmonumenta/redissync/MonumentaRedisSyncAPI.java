@@ -1105,6 +1105,18 @@ public class MonumentaRedisSyncAPI {
 	 * If no plugin handles this event, the player's content does not change.
 	 *
 	 * @param player Player to send data for
+	 * @param contentData JSON corresponding to the content
+	 */
+	public static void requestPlayerContentDataChange(Player player, ContentData contentData) {
+		requestPlayerContentDataChange(player, Collections.emptySet(), contentData);
+	}
+
+	/**
+	 * Requests that a player be sent to content by another plugin
+	 * <p/>
+	 * If no plugin handles this event, the player's content does not change.
+	 *
+	 * @param player Player to send data for
 	 * @param others Other players to send data for
 	 * @param contentData JSON corresponding to the content
 	 */
