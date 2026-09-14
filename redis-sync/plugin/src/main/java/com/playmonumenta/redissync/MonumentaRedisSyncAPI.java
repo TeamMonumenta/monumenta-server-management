@@ -19,8 +19,10 @@ import io.lettuce.core.KeyValue;
 import io.lettuce.core.RedisFuture;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -1099,12 +1101,14 @@ public class MonumentaRedisSyncAPI {
 
 	/**
 	 * Requests that a player be sent to content by another plugin
+	 * <p/>
+	 * If no plugin handles this event, the player's content does not change.
 	 *
 	 * @param player Player to send data for
 	 * @param contentData JSON corresponding to the content
 	 */
 	public static void requestPlayerContentDataChange(Player player, ContentData contentData) {
-		requestPlayerContentDataChange(player.getUniqueId(), contentData);
+		requestPlayerContentDataChange(player, Collections.emptySet(), contentData);
 	}
 
 	/**
@@ -1112,11 +1116,14 @@ public class MonumentaRedisSyncAPI {
 	 * <p/>
 	 * If no plugin handles this event, the player's content does not change.
 	 *
-	 * @param playerUUID Player UUID to send data for
+	 * @param player Player to send data for
+	 * @param others Other players to send data for
 	 * @param contentData JSON corresponding to the content
 	 */
-	public static void requestPlayerContentDataChange(UUID playerUUID, ContentData contentData) {
-		PlayerContentChangeRequestEvent newEvent = new PlayerContentChangeRequestEvent(Bukkit.getPlayer(playerUUID), contentData);
+	public static void requestPlayerContentDataChange(Player player, Collection<Player> others, ContentData contentData) {
+		Set<Player> copyOthers = new HashSet<>(others);
+		copyOthers.remove(player);
+		PlayerContentChangeRequestEvent newEvent = new PlayerContentChangeRequestEvent(player, copyOthers, contentData);
 		Bukkit.getPluginManager().callEvent(newEvent);
 	}
 
