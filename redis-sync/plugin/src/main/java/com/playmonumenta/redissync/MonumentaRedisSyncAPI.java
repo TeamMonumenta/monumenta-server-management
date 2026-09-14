@@ -712,7 +712,7 @@ public class MonumentaRedisSyncAPI {
 		});
 	}
 
-	public static CompletableFuture<Void> setPlayerWorldAndLocationOnShard(Player player, String shard, String worldName, Vector loc, double yaw, double pitch, boolean transferWhenComplete) {
+	public static CompletableFuture<Void> setPlayerWorldAndLocationOnShard(Player player, String shard, String worldName, Vector loc, double yaw, double pitch) {
 		if (BukkitConfigAPI.getSavingDisabled()) {
 			/* No data saved, no data loaded */
 			return CompletableFuture.completedFuture(null);

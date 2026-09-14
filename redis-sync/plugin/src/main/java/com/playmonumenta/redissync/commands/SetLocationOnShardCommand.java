@@ -46,7 +46,7 @@ public class SetLocationOnShardCommand {
 					Rotation rotation = args.getByArgument(rotationArg);
 					boolean transfer = args.getByArgumentOrDefault(transferArg, false);
 					for (Player player : players) {
-						MonumentaRedisSyncAPI.setPlayerWorldAndLocationOnShard(player, shard, world, location.toVector(), rotation.getYaw(), rotation.getPitch(), transfer)
+						MonumentaRedisSyncAPI.setPlayerWorldAndLocationOnShard(player, shard, world, location.toVector(), rotation.getYaw(), rotation.getPitch())
 							.whenComplete((unused, ex1) -> {
 								if (ex1 != null && transfer) {
 									try {
