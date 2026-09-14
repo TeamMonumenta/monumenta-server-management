@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -1108,7 +1109,9 @@ public class MonumentaRedisSyncAPI {
 	 * @param contentData JSON corresponding to the content
 	 */
 	public static void requestPlayerContentDataChange(Player player, Collection<Player> others, ContentData contentData) {
-		PlayerContentChangeRequestEvent newEvent = new PlayerContentChangeRequestEvent(player, others, contentData);
+		Set<Player> copyOthers = new HashSet<>(others);
+		copyOthers.remove(player);
+		PlayerContentChangeRequestEvent newEvent = new PlayerContentChangeRequestEvent(player, copyOthers, contentData);
 		Bukkit.getPluginManager().callEvent(newEvent);
 	}
 
