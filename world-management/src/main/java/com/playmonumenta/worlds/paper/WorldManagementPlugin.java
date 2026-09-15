@@ -230,8 +230,11 @@ public class WorldManagementPlugin extends JavaPlugin {
 	}
 
 	protected static void unregisterRemoteShard(String shard) {
-		Set<String> contentSet = mRemoteContentByShard.remove(shard).keySet();
-		for (String content : contentSet) {
+		Map<String, ContentInfo> contentMap = mRemoteContentByShard.remove(shard);
+		if (contentMap == null) {
+			return;
+		}
+		for (String content : contentMap.keySet()) {
 			ConcurrentMap<String, ContentInfo> remoteContentForContent = mRemoteContentByContent.get(content);
 			if (remoteContentForContent != null) {
 				remoteContentForContent.remove(shard);
