@@ -6,7 +6,12 @@ import com.playmonumenta.common.zones.commands.ShowZones;
 import com.playmonumenta.common.zones.commands.TestZone;
 import com.playmonumenta.common.zones.listeners.RedisSyncListener;
 import com.playmonumenta.common.zones.listeners.WorldListener;
+import java.io.File;
+import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -16,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 public class MonumentaCommonPlugin extends JavaPlugin {
 	private static @Nullable MonumentaCommonPlugin INSTANCE = null;
 
+	private @MonotonicNonNull File mConfigFile;
 	public boolean mShowZonesDynmap = false;
 	public boolean mFallbackZoneLookup = false;
 
@@ -23,6 +29,7 @@ public class MonumentaCommonPlugin extends JavaPlugin {
 
 	@Override
 	public void onLoad() {
+		reloadZoneConfigYaml(null);
 		DebugZones.register();
 		TestZone.register();
 		ShowZones.register(this);
@@ -64,5 +71,31 @@ public class MonumentaCommonPlugin extends JavaPlugin {
 			throw new RuntimeException("Attempted to access MonumentaCommonPlugin plugin before it loaded.");
 		}
 		return instance;
+	}
+
+	public void reloadZoneConfigYaml(@Nullable Audience sender) {
+		if (mConfigFile == null) {
+			mConfigFile = new File(getDataFolder(), "zone_config.yml");
+		}
+
+		FileConfiguration config = YamlConfiguration.loadConfiguration(mConfigFile);
+
+		if (config.isBoolean("show_zones_dynmap")) {
+			mShowZonesDynmap = config.getBoolean("show_zones_dynmap", false);
+		} else {
+			mShowZonesDynmap = false;
+		}
+		if (sender != null) {
+			sender.sendMessage(Component.text("show_zones_dynmap: " + mShowZonesDynmap));
+		}
+
+		if (config.isBoolean("fallback_zone_lookup")) {
+			mFallbackZoneLookup = config.getBoolean("fallback_zone_lookup", false);
+		} else {
+			mFallbackZoneLookup = false;
+		}
+		if (sender != null) {
+			sender.sendMessage(Component.text("fallback_zone_lookup: " + mFallbackZoneLookup));
+		}
 	}
 }
