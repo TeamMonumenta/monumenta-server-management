@@ -404,6 +404,7 @@ public class ZoneManager {
 		mQueuedReloadRequesters.add(Bukkit.getConsoleSender());
 		mReloadRequesters = Audience.audience(mQueuedReloadRequesters);
 		mQueuedReloadRequesters = new HashSet<>();
+		MonumentaCommonPlugin.getInstance().reloadZoneConfigYaml(mReloadRequesters);
 
 		long cpuNanos = System.nanoTime();
 		mReloadingState = new ZoneState();
