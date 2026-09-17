@@ -1,6 +1,7 @@
 package com.playmonumenta.common.managers;
 
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import com.playmonumenta.common.MonumentaCommonPlugin;
 import com.playmonumenta.common.event.RefreshTimeEvent;
 import com.playmonumenta.common.utils.DateUtils;
@@ -18,7 +19,7 @@ import org.bukkit.Bukkit;
 
 public class TimeWarpManager {
 	public static String CONFIG_NAME = "time_warp.json";
-	public static final String TIMEWARP_OFFSET_PATH = "timewarp_seconds_offset";
+	public static final String TIMEWARP_OFFSET_PATH = "offset_seconds";
 	private static long mSecondOffset = 0;
 
 	public static void reset() {
@@ -52,7 +53,11 @@ public class TimeWarpManager {
 		File configFile = getConfigFile();
 		try {
 			JsonObject config = FileUtils.readJson(configFile.getAbsolutePath());
-			set(config.get(TIMEWARP_OFFSET_PATH).getAsLong());
+			if (config.get(TIMEWARP_OFFSET_PATH) instanceof JsonPrimitive timewarpPrimitive && timewarpPrimitive.isNumber()) {
+				set(timewarpPrimitive.getAsLong());
+			} else {
+				set(0L);
+			}
 		} catch (Exception e) {
 			MMLog.warning("Failed to load " + CONFIG_NAME + ": " + e.getMessage());
 			reset();
@@ -66,7 +71,7 @@ public class TimeWarpManager {
 		Bukkit.getServer().sendMessage(Component.text("The hands of time drift, its sands fly ever swift...", NamedTextColor.DARK_AQUA, TextDecoration.ITALIC));
 
 		JsonObject config = new JsonObject();
-		config.addProperty("offset_seconds", mSecondOffset);
+		config.addProperty(TIMEWARP_OFFSET_PATH, mSecondOffset);
 		try {
 			FileUtils.writeJson(getConfigFile().getAbsolutePath(), config);
 		} catch (IOException e) {
