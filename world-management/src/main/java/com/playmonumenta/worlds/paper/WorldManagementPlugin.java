@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,7 +39,7 @@ public class WorldManagementPlugin extends JavaPlugin {
 	private static boolean mAllowInstanceAutocreation = false;
 	private static int mUnloadInactiveWorldAfterTicks = 10 * 60 * 20;
 	private static @Nullable String mNotifyWorldPermission = "monumenta.worldmanagement.worldnotify";
-	private static final Map<String, ContentInfo> mContentInfoMap = new HashMap<>();
+	private static final LinkedHashMap<String, ContentInfo> mContentInfoMap = new LinkedHashMap<>();
 	private static final ConcurrentMap<String, ConcurrentMap<String, ContentInfo>> mRemoteContentByContent = new ConcurrentHashMap<>();
 	private static final ConcurrentMap<String, Map<String, ContentInfo>> mRemoteContentByShard = new ConcurrentHashMap<>();
 
@@ -117,7 +118,7 @@ public class WorldManagementPlugin extends JavaPlugin {
 				} else {
 					printConfigHeader("  " + contentName);
 					ContentInfo contentInfo = new ContentInfo(this, contentName, contentConfig);
-					mContentInfoMap.put(contentName, contentInfo);
+					mContentInfoMap.putLast(contentName, contentInfo);
 				}
 			}
 		}
