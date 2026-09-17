@@ -57,6 +57,7 @@ public class MonumentaCommonPlugin extends JavaPlugin {
 		TimeWarpCommand.register();
 		GetDateCommand.register();
 		RefreshTimeCommand.register();
+		DateUtils.refreshTime();
 	}
 
 	@Override
@@ -65,7 +66,6 @@ public class MonumentaCommonPlugin extends JavaPlugin {
 		MMLogPaper.registerCommand(com.playmonumenta.common.utils.MMLog.getLog());
 
 		INSTANCE = this;
-		DateUtils.refreshTime();
 		PluginManager manager = getServer().getPluginManager();
 		manager.registerEvents(new RedisSyncListener(), this);
 		manager.registerEvents(new WorldListener(this), this);
