@@ -114,6 +114,9 @@ public class WorldManagementPlugin extends JavaPlugin {
 				ConfigurationSection contentConfig = instancingConfig.getConfigurationSection(contentName);
 				if (contentConfig == null) {
 					printConfig("  " + contentName, null);
+				} else if (contentConfig.getString("instance-objective", "null").equals("null")) {
+					// TODO: REMOVE THIS PLACEHOLDER HANDLER
+					printConfig("  " + contentName, null);
 				} else {
 					printConfigHeader("  " + contentName);
 					ContentInfo contentInfo = new ContentInfo(this, contentName, contentConfig);
