@@ -3,7 +3,6 @@ package com.playmonumenta.worlds.paper;
 import com.playmonumenta.worlds.common.MMLog;
 import com.playmonumenta.worlds.common.utils.FileUtils;
 import com.playmonumenta.worlds.paper.RegionFileRewriter.RegionKind;
-import de.tr7zw.nbtapi.iface.ReadWriteNBT;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
