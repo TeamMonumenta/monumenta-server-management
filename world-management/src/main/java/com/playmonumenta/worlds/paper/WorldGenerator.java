@@ -16,6 +16,8 @@ import java.util.regex.Pattern;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.Nullable;
 
+import static com.playmonumenta.worlds.paper.MonumentaWorldManagementAPI.WORLDS_FOLDER;
+
 public class WorldGenerator {
 	private static class TemplatePregenState {
 		public final String mName;
@@ -88,14 +90,14 @@ public class WorldGenerator {
 				continue;
 			}
 
-			File templateLevelDat = new File(templateName, "level.dat");
-			if (!templateLevelDat.isFile()) {
+			File templateWorldClocksDat = MonumentaWorldManagementAPI.worldClocksDatFile(templateName);
+			if (!templateWorldClocksDat.isFile()) {
 				MMLog.warning("template is not a world: " + templateName);
 				templateNameIter.remove();
 				continue;
 			}
 
-			templateModifiedTimestamp.put(templateName, templateLevelDat.lastModified());
+			templateModifiedTimestamp.put(templateName, templateWorldClocksDat.lastModified());
 
 			mPregenStates.put(templateName, new TemplatePregenState(templateName, pregenLimit));
 		}
@@ -105,7 +107,7 @@ public class WorldGenerator {
 		}
 
 		// Get list of pregenerated/pregenerating worlds
-		File root = new File(".");
+		File root = WORLDS_FOLDER;
 		String[] childPaths = root.list();
 		if (childPaths == null) {
 			// What
@@ -133,7 +135,7 @@ public class WorldGenerator {
 				Matcher matcher = pregenState.mRegex.matcher(name);
 				if (matcher.matches()) {
 					Long templateTimestamp = templateModifiedTimestamp.get(pregenState.mName);
-					long worldTimestamp = new File(new File(root, name), "level.dat").lastModified();
+					long worldTimestamp = MonumentaWorldManagementAPI.worldClocksDatFile(name).lastModified();
 					if (templateTimestamp == null) {
 						MMLog.info("Detected pregenerated world " + name
 							+ ", but the timestamp for the template was not found. Accepting as up to date.");
@@ -187,8 +189,8 @@ public class WorldGenerator {
 	}
 
 	public static boolean worldExists(String name) {
-		File target = new File(name);
-		return target.isDirectory() && new File(target, "level.dat").isFile();
+		File target = new File(WORLDS_FOLDER, name);
+		return target.isDirectory() && MonumentaWorldManagementAPI.worldClocksDatFile(target).isFile();
 	}
 
 	public void getWorldInstance(String worldName, String templateName) throws Exception {
@@ -221,8 +223,8 @@ public class WorldGenerator {
 		}
 
 		MMLog.info("Moving " + pregeneratedWorldName + " to " + worldName);
-		File oldPath = new File(pregeneratedWorldName);
-		File target = new File(worldName);
+		File oldPath = new File(WORLDS_FOLDER, pregeneratedWorldName);
+		File target = new File(WORLDS_FOLDER, worldName);
 		if (!oldPath.renameTo(target)) {
 			if (worldExists(pregeneratedWorldName)) {
 				MMLog.warning("Failed to move " + pregeneratedWorldName + " to " + worldName);
@@ -284,7 +286,7 @@ public class WorldGenerator {
 			for (int pregenIndex = 0; pregenIndex < pregenState.mLimit; pregenIndex++) {
 				pregenName = pregenBase + pregenIndex;
 				if (pregenState.mOutdatedPregen.remove(pregenName)) {
-					File outdatedFile = new File(pregenName);
+					File outdatedFile = new File(WORLDS_FOLDER, pregenName);
 					if (outdatedFile.exists()) {
 						try {
 							FileUtils.deleteRecursively(outdatedFile.toPath());
@@ -322,8 +324,8 @@ public class WorldGenerator {
 			}
 
 			// Move to pregenerated world path
-			File generatingWorld = new File(generatingWorldName);
-			File pregeneratedWorld = new File(pregeneratedWorldName);
+			File generatingWorld = new File(WORLDS_FOLDER, generatingWorldName);
+			File pregeneratedWorld = new File(WORLDS_FOLDER, pregeneratedWorldName);
 			if (!generatingWorld.renameTo(pregeneratedWorld)) {
 				String msg = "Failed to move pregenerating world " + generatingWorld + " to " + pregeneratedWorld;
 				MMLog.severe(msg);

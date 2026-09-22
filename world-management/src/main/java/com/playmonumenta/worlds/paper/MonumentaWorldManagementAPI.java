@@ -24,6 +24,7 @@ import org.jetbrains.annotations.Nullable;
 
 public class MonumentaWorldManagementAPI {
 
+	public static final File WORLDS_FOLDER = new File(new File("world", "dimensions"), "minecraft");
 	private static String[] AVAILABLE_WORLDS_CACHE = new String[0];
 
 	/**
@@ -44,7 +45,7 @@ public class MonumentaWorldManagementAPI {
 	 * Note that this uses file I/O and so will be slow - recommend calling this only from an async thread
 	 */
 	public static boolean isWorldAvailable(String worldName) {
-		File test = new File(worldName);
+		File test = new File(WORLDS_FOLDER + worldName);
 		// File is a directory - and contains level.dat
 		return test.isDirectory() && new File(test, "level.dat").isFile();
 	}
@@ -64,11 +65,10 @@ public class MonumentaWorldManagementAPI {
 	 * Updates the available worlds cache, but may take a tick or two before the cache is updated
 	 */
 	public static String[] getAvailableWorlds() {
-		File root = new File(".");
-		String[] directories = root.list((current, name) -> {
+		String[] directories = WORLDS_FOLDER.list((current, name) -> {
 			File test = new File(current, name);
-			// File is a directory - and contains level.dat
-			return test.isDirectory() && new File(test, "level.dat").isFile();
+			// File is a directory - level.dat isn't in dimension folders in 26.1+, see note on worldClocksDatPath
+			return test.isDirectory() && worldClocksDatFile(test).isFile();
 		});
 		Bukkit.getScheduler().runTask(WorldManagementPlugin.getInstance(), () -> AVAILABLE_WORLDS_CACHE = directories);
 		return directories;
@@ -139,7 +139,7 @@ public class MonumentaWorldManagementAPI {
 		//TODO Check redis to make sure world isn't loaded or created elsewhere
 
 		/* Copy world if it doesn't exist */
-		File worldFolder = new File(worldName);
+		File worldFolder = new File(WORLDS_FOLDER, worldName);
 		if (worldFolder.isDirectory()) {
 			MMLog.debug("ensureWorldLoaded folder exists: worldName=" + worldName + " templateName=" + templateName + " thread=" + Thread.currentThread().getName());
 		} else {
@@ -340,5 +340,17 @@ public class MonumentaWorldManagementAPI {
 		});
 
 		return future;
+	}
+
+	// TODO: for now we use world_clocks.dat as a replacement for level.dat to determine world validity/timestamp
+	// there might be a better way to do this? what defines a "dimension"? do we need to validate worlds at all?
+	// in 1.20.4 we only needed to validate that a folder was a world because world folders were alongside logs/, plugins/, etc
+	// additionally, is the file always updated when a world is modified? seems consistent but may not be
+	public static File worldClocksDatFile(String worldName) {
+		return worldClocksDatFile(new File(WORLDS_FOLDER, worldName));
+	}
+
+	public static File worldClocksDatFile(File worldFolder) {
+		return new File(new File(new File(worldFolder, "data"), "minecraft"), "world_clocks.dat");
 	}
 }
