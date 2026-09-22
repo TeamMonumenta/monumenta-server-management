@@ -31,7 +31,7 @@ monumenta {
 	paper(
 		"com.playmonumenta.worlds.paper.WorldManagementPlugin",
 		BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
-		"1.20", "1.20-R0.1-SNAPSHOT",
+		"26.1.2", "26.1.2.build.+",
 		depends = listOf("CommandAPI", "MonumentaCommon", "MonumentaNetworkRelay", "MonumentaRedisSync"),
 		// TODO: NBTAPI is actually a hard dependency. But because of the way Monumenta shades it into the mixins project,
 		//  it is always available to plugins, but it can't be listed as a hard dependency or loading will fail

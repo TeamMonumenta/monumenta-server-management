@@ -261,12 +261,12 @@ public class MonumentaWorldManagementAPI {
 		Bukkit.getScheduler().runTaskAsynchronously(WorldManagementPlugin.getInstance(), () -> {
 			// Copy into a temp folder and rename into place so the world never appears at its final name
 			// while still being written, and so a failed copy leaves nothing behind.
-			File tempWorld = new File(newWorldName + ".generating");
+			File tempWorld = new File(WORLDS_FOLDER, newWorldName + ".generating");
 			try {
 				// Copy and regenerate entity UUIDs in-process
-				WorldCopier.copyWorldRegenUuids(new File(fromWorldName).toPath(), tempWorld.toPath());
+				WorldCopier.copyWorldRegenUuids(new File(WORLDS_FOLDER, fromWorldName).toPath(), tempWorld.toPath());
 
-				File finalWorld = new File(newWorldName);
+				File finalWorld = new File(WORLDS_FOLDER, newWorldName);
 				if (!tempWorld.renameTo(finalWorld)) {
 					throw new IOException("Failed to move copied world '" + tempWorld + "' to '" + finalWorld + "'");
 				}
