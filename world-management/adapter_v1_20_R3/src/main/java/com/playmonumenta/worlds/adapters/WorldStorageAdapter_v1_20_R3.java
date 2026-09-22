@@ -51,13 +51,8 @@ public class WorldStorageAdapter_v1_20_R3 implements WorldStorageAdapter {
 		private final RegionFile mRegionFile;
 
 		private RegionAccessImpl(Path path) throws IOException {
-			// Args:
-			// - regionstorageinfo (TBD)
-			// - path to region file
-			// - path to the directory that oversized chunks spill into as c.<x>.<z>.mcc
-			// - write synchronously (disabled because if a crash leaves something half-written
-			//   we just delete and retry instead of trying to recover it, since this is only
-			//   used for world copying before players ever get access to the chunks)
+			// Args: the directory oversized chunks spill into as c.<x>.<z>.mcc, then dsync - left off
+			// because a copy a crash leaves half-written is discarded and redone, not recovered.
 			mRegionFile = new RegionFile(path, path.getParent(), false);
 		}
 
