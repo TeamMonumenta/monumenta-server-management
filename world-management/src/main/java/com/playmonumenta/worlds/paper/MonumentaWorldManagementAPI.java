@@ -47,7 +47,7 @@ public class MonumentaWorldManagementAPI {
 	public static boolean isWorldAvailable(String worldName) {
 		File test = new File(WORLDS_FOLDER + worldName);
 		// File is a directory - and contains level.dat
-		return test.isDirectory() && new File(test, "level.dat").isFile();
+		return test.isDirectory() && worldClocksDatFile(test).isFile();
 	}
 
 	/**
