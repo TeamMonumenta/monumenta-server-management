@@ -215,7 +215,7 @@ public class MonumentaWorldManagementAPI {
 			}
 		}
 
-		world.setKeepSpawnInMemory(false);
+		// world.setKeepSpawnInMemory(false);
 		for (Chunk chunk : world.getLoadedChunks()) {
 			world.unloadChunkRequest(chunk.getX(), chunk.getZ());
 		}
