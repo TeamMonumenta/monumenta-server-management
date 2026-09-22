@@ -381,6 +381,11 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 	}
 
 	@Override
+	public boolean mayManage(CommandSender sender) {
+		return false;
+	}
+
+	@Override
 	public boolean mayChat(CommandSender sender) {
 		if (!mayListen(sender)) {
 			return false;

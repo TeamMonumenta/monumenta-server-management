@@ -1,11 +1,16 @@
 package com.playmonumenta.worlds.paper;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import com.playmonumenta.networkrelay.DestOfflineEvent;
+import com.playmonumenta.networkrelay.NetworkRelayAPI;
+import com.playmonumenta.networkrelay.NetworkRelayMessageEvent;
 import com.playmonumenta.networkrelay.shardhealth.AverageShardHealthDataAddSampleEvent;
 import com.playmonumenta.networkrelay.shardhealth.AverageShardHealthDataDivideSamplesEvent;
 import com.playmonumenta.networkrelay.shardhealth.GatherShardHealthDataEvent;
 import com.playmonumenta.networkrelay.shardhealth.GetPluginHealthFactorsEvent;
+import com.playmonumenta.worlds.common.MMLog;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -13,6 +18,48 @@ import org.bukkit.event.Listener;
 public class NetworkRelayIntegration implements Listener {
 	public static final String PLUGIN_IDENTIFIER = "MonumentaWorldManagement";
 	public static final String PREGEN_PROGRESS_KEY = "pregenProgress";
+	public static final String CONTENT_CHANNEL = "MonumentaWorldManagementContent";
+	public static final String CONTENT_REQUEST_CHANNEL = "MonumentaWorldManagementContentRequest";
+
+	public static void broadcastContentRequest() {
+		try {
+			NetworkRelayAPI.sendBroadcastMessage(CONTENT_REQUEST_CHANNEL, new JsonObject());
+		} catch (Exception ex) {
+			MMLog.warning("Failed to broadcast content request", ex);
+		}
+	}
+
+	public static void broadcastContentChange() {
+		sendContentChange("*");
+	}
+
+	public static void sendContentChange(String destination) {
+		Gson gson = new Gson();
+		JsonObject contentInfoConfig = new JsonObject();
+		WorldManagementPlugin.getContentInfo()
+			.forEach((key, value) -> contentInfoConfig.add(key, gson.toJsonTree(value)));
+
+		try {
+			NetworkRelayAPI.sendMessage(destination, CONTENT_CHANNEL, contentInfoConfig);
+		} catch (Exception ex) {
+			MMLog.warning("Failed to broadcast content config", ex);
+		}
+	}
+
+	@EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+	public void networkRelayMessageEvent(NetworkRelayMessageEvent event) {
+		switch (event.getChannel()) {
+			case CONTENT_REQUEST_CHANNEL -> sendContentChange(event.getSource());
+			case CONTENT_CHANNEL -> WorldManagementPlugin.registerRemoteContent(event.getSource(), event.getData());
+			default -> {
+			}
+		}
+	}
+
+	@EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+	public void destOfflineEvent(DestOfflineEvent event) {
+		WorldManagementPlugin.unregisterRemoteShard(event.getDest());
+	}
 
 	@EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
 	public void gatherShardHealthDataEvent(GatherShardHealthDataEvent event) {

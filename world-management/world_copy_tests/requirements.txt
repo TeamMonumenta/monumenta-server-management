@@ -1,0 +1,15 @@
+# Python dependencies of monumenta-automation's copy_world.py import graph.
+# Install into a pypy3 venv; see README.md "Environment setup".
+bitstring
+cached-property
+cryptography
+kubernetes
+mutf8
+numpy
+pika
+pyOpenSSL
+redis
+requests
+service_identity
+twisted
+zope.interface

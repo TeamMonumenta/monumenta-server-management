@@ -2,6 +2,8 @@ package com.playmonumenta.structures.managers;
 
 import com.fastasyncworldedit.core.util.collection.BlockSet;
 import com.fastasyncworldedit.core.util.collection.MemBlockSet;
+import com.playmonumenta.common.zones.Zone;
+import com.playmonumenta.common.zones.ZoneNamespace;
 import com.playmonumenta.structures.StructuresAPI;
 import com.playmonumenta.structures.StructuresPlugin;
 import com.playmonumenta.structures.events.StructureRespawnEvent;
@@ -12,11 +14,13 @@ import com.sk89q.worldedit.regions.Region;
 import com.sk89q.worldedit.world.block.BlockType;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Pattern;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -156,19 +160,21 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 		}
 	}
 
-	public static CompletableFuture<RespawningStructure> withParameters(StructuresPlugin plugin,
-																		World world,
-																		int extraRadius,
-																		String configLabel,
-																		String name,
-																		List<String> genericPaths,
-																		Vector loadPos,
-																		int respawnTime,
-																		int ticksLeft,
-																		@Nullable String postRespawnCommand,
-																		@Nullable List<String> specialPaths,
-																		@Nullable String nextRespawnPath,
-																		@Nullable SpawnerBreakTrigger spawnerBreakTrigger) {
+	public static CompletableFuture<RespawningStructure> withParameters(
+		StructuresPlugin plugin,
+		World world,
+		int extraRadius,
+		String configLabel,
+		String name,
+		List<String> genericPaths,
+		Vector loadPos,
+		int respawnTime,
+		int ticksLeft,
+		@Nullable String postRespawnCommand,
+		@Nullable List<String> specialPaths,
+		@Nullable String nextRespawnPath,
+		@Nullable SpawnerBreakTrigger spawnerBreakTrigger
+	) {
 
 		CompletableFuture<RespawningStructure> future = new CompletableFuture<>();
 
@@ -648,25 +654,29 @@ public class RespawningStructure implements Comparable<RespawningStructure> {
 
 	public void registerZone() {
 		RespawnManager respawnManager = StructuresPlugin.getRespawnManager();
+		ZoneNamespace zoneNamespaceInside = respawnManager.mZoneNamespaceInside;
+		ZoneNamespace zoneNamespaceNearby = respawnManager.mZoneNamespaceNearby;
 
-		respawnManager.registerRespawningStructureZone(
-			respawnManager.mZoneManager.registerInsideZone(
-				mInnerBounds.mLowerCorner.clone(),
-				mInnerBounds.mUpperCorner.clone(),
-				mWorld,
-				mName
-			),
-			this
+		Zone insideZone = new Zone(
+			zoneNamespaceInside,
+			Pattern.quote(mWorld.getName()),
+			mInnerBounds.mLowerCorner.clone(),
+			mInnerBounds.mUpperCorner.clone(),
+			mName,
+			new LinkedHashSet<>()
 		);
+		Zone nearbyZone = new Zone(
+			zoneNamespaceNearby,
+			Pattern.quote(mWorld.getName()),
+			mOuterBounds.mLowerCorner.clone(),
+			mOuterBounds.mUpperCorner.clone(),
+			mName,
+			new LinkedHashSet<>()
+		);
+		zoneNamespaceInside.addZone(insideZone);
+		zoneNamespaceNearby.addZone(nearbyZone);
 
-		respawnManager.registerRespawningStructureZone(
-			respawnManager.mZoneManager.registerNearbyZone(
-				mOuterBounds.mLowerCorner.clone(),
-				mOuterBounds.mUpperCorner.clone(),
-				mWorld,
-				mName
-			),
-			this
-		);
+		respawnManager.registerRespawningStructureZone(insideZone, this);
+		respawnManager.registerRespawningStructureZone(nearbyZone, this);
 	}
 }

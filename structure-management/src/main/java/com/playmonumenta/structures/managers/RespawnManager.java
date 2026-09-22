@@ -1,11 +1,12 @@
 package com.playmonumenta.structures.managers;
 
+import com.playmonumenta.common.zones.Zone;
+import com.playmonumenta.common.zones.ZoneFragment;
+import com.playmonumenta.common.zones.ZoneManager;
+import com.playmonumenta.common.zones.ZoneNamespace;
 import com.playmonumenta.structures.StructuresPlugin;
-import com.playmonumenta.structures.api.service.ZoneService;
-import com.playmonumenta.structures.api.service.ZoneServiceProvider;
 import com.playmonumenta.structures.utils.MMLog;
 import com.playmonumenta.structures.utils.MessagingUtils;
-import com.playmonumenta.structures.utils.Services;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,48 +35,8 @@ import org.bukkit.util.Vector;
 import org.jetbrains.annotations.Nullable;
 
 public class RespawnManager {
-	private static class DefaultZoneServiceImpl implements ZoneService {
-		private record Entry(RespawningStructure.StructureBounds bounds, World world) implements ZoneInstance {
-		}
-
-		private final List<Entry> mInsideZones = new ArrayList<>();
-		private final List<Entry> mNearbyZones = new ArrayList<>();
-
-		@Override
-		public boolean isInside(Location loc) {
-			return mInsideZones.stream().anyMatch(x -> x.bounds.within(loc.toVector()) && x.world == loc.getWorld());
-		}
-
-		@Override
-		public ZoneInstance registerInsideZone(Vector lowerCorner, Vector upperCorner, World world, String name) {
-			final var entry = new Entry(new RespawningStructure.StructureBounds(lowerCorner, upperCorner), world);
-			mInsideZones.add(entry);
-			return entry;
-		}
-
-		@Override
-		public ZoneInstance registerNearbyZone(Vector lowerCorner, Vector upperCorner, World world, String name) {
-			final var entry = new Entry(new RespawningStructure.StructureBounds(lowerCorner, upperCorner), world);
-			mNearbyZones.add(entry);
-			return entry;
-		}
-
-		@Override
-		public List<ZoneInstance> findZones(Vector loc, boolean includeNearby) {
-			final var inList = includeNearby ? mNearbyZones : mInsideZones;
-			return inList.stream().filter(x -> x.bounds.within(loc)).collect(Collectors.toUnmodifiableList());
-		}
-
-		@Override
-		public void reload() {
-		}
-
-		@Override
-		public void reset() {
-			mInsideZones.clear();
-			mNearbyZones.clear();
-		}
-	}
+	public static final String ZONE_NAMESPACE_INSIDE = "Respawning Structures Inside";
+	public static final String ZONE_NAMESPACE_NEARBY = "Respawning Structures Nearby";
 
 	private static @Nullable RespawnManager INSTANCE = null;
 	public static ArgumentSuggestions<CommandSender> SUGGESTIONS_STRUCTURES = ArgumentSuggestions.strings((info) -> {
@@ -87,7 +48,6 @@ public class RespawnManager {
 
 	private final StructuresPlugin mPlugin;
 	private final World mWorld;
-	protected final ZoneService mZoneManager;
 
 	private final SortedMap<String, RespawningStructure> mRespawns = new ConcurrentSkipListMap<>();
 	private final int mTickPeriod;
@@ -101,15 +61,18 @@ public class RespawnManager {
 	};
 	private boolean mTaskScheduled = false;
 	private boolean mStructuresLoaded = false;
-	private final Map<ZoneService.ZoneInstance, RespawningStructure> mStructuresByZone = new LinkedHashMap<>();
+	protected ZoneNamespace mZoneNamespaceInside;
+	protected ZoneNamespace mZoneNamespaceNearby;
+	private final Map<Zone, RespawningStructure> mStructuresByZone = new LinkedHashMap<>();
 
 	public RespawnManager(StructuresPlugin plugin, World world, YamlConfiguration config, YamlConfiguration shardState) {
 		INSTANCE = this;
 		mPlugin = plugin;
 		mWorld = world;
 
-		mZoneManager = Services.loadService(mPlugin.getSLF4JLogger(), ZoneServiceProvider.class)
-			.orElseGet(DefaultZoneServiceImpl::new);
+		mZoneNamespaceInside = new ZoneNamespace(ZONE_NAMESPACE_INSIDE);
+		mZoneNamespaceNearby = new ZoneNamespace(ZONE_NAMESPACE_NEARBY, true);
+		mStructuresByZone.clear();
 
 		// Load the frequency that the plugin should check for respawning structures
 		if (!config.isInt("check_respawn_period")) {
@@ -136,8 +99,6 @@ public class RespawnManager {
 		} else {
 			keys = respawnSection.getKeys(false);
 		}
-
-		mStructuresByZone.clear();
 
 		final List<CompletableFuture<?>> futures = new ArrayList<>();
 
@@ -167,13 +128,13 @@ public class RespawnManager {
 		}
 
 		CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).whenCompleteAsync((unused, throwable) -> {
-			mRunnable.runTaskTimer(mPlugin, 0, mTickPeriod);
-
 			// Enable the plugin zone namespaces that have been populated (but not registered) during the reload
-			mZoneManager.reload();
+			reloadZones().whenCompleteAsync((unused2, throwable2) -> {
+				mRunnable.runTaskTimer(mPlugin, 0, mTickPeriod);
 
-			mTaskScheduled = true;
-			mStructuresLoaded = true;
+				mTaskScheduled = true;
+				mStructuresLoaded = true;
+			}, StructuresPlugin.getInstance());
 		}, StructuresPlugin.getInstance());
 	}
 
@@ -187,13 +148,15 @@ public class RespawnManager {
 	public CompletableFuture<Void> addStructure(int extraRadius, String configLabel, String name, String path,
 												Vector loadPos, int respawnTime) {
 
-		return RespawningStructure.withParameters(mPlugin, mWorld, extraRadius, configLabel,
+		return RespawningStructure.withParameters(
+			mPlugin, mWorld, extraRadius, configLabel,
 			name, Collections.singletonList(path), loadPos,
 			respawnTime, respawnTime, null, null,
-			null, null).thenApply((structure) -> {
+			null, null
+		).thenApply((structure) -> {
 			mRespawns.put(configLabel, structure);
 			mPlugin.saveConfig();
-			mZoneManager.reload();
+			reloadZones();
 			return null;
 		});
 	}
@@ -206,18 +169,24 @@ public class RespawnManager {
 		mRespawns.remove(configLabel);
 		mPlugin.saveConfig();
 
-		mZoneManager.reset();
+		mZoneNamespaceInside = new ZoneNamespace(ZONE_NAMESPACE_INSIDE);
+		mZoneNamespaceNearby = new ZoneNamespace(ZONE_NAMESPACE_NEARBY, true);
 		mStructuresByZone.clear();
 
 		for (RespawningStructure struct : mRespawns.values()) {
 			struct.registerZone();
 		}
 
-		mZoneManager.reload();
+		reloadZones();
 	}
 
 	public List<RespawningStructure> getStructures(Vector loc, boolean includeNearby) {
-		return mZoneManager.findZones(loc, includeNearby)
+		ZoneFragment zoneFragment = ZoneManager.getInstance().getZoneFragment(loc);
+		if (zoneFragment == null) {
+			return new ArrayList<>();
+		}
+		String namespace = includeNearby ? ZONE_NAMESPACE_NEARBY : ZONE_NAMESPACE_INSIDE;
+		return zoneFragment.getParentAndEclipsed(namespace)
 			.stream()
 			.map(mStructuresByZone::get)
 			.filter(Objects::nonNull)
@@ -337,7 +306,7 @@ public class RespawnManager {
 		}
 	}
 
-	protected void registerRespawningStructureZone(ZoneService.ZoneInstance zone, RespawningStructure structure) {
+	protected void registerRespawningStructureZone(Zone zone, RespawningStructure structure) {
 		mStructuresByZone.put(zone, structure);
 	}
 
@@ -347,5 +316,27 @@ public class RespawnManager {
 			throw new Exception("Structure '" + label + "' not found!");
 		}
 		return struct;
+	}
+
+	private CompletableFuture<Void> reloadZones() {
+		ZoneManager zoneManager = ZoneManager.getInstance();
+		Set<String> loadedNamespaces = zoneManager.getNamespaceNames();
+
+		Set<ZoneNamespace> newNamespaces = new HashSet<>();
+		Set<ZoneNamespace> replacedNamespaces = new HashSet<>();
+
+		if (loadedNamespaces.contains(ZONE_NAMESPACE_INSIDE)) {
+			replacedNamespaces.add(mZoneNamespaceInside);
+		} else {
+			newNamespaces.add(mZoneNamespaceInside);
+		}
+
+		if (loadedNamespaces.contains(ZONE_NAMESPACE_NEARBY)) {
+			replacedNamespaces.add(mZoneNamespaceNearby);
+		} else {
+			newNamespaces.add(mZoneNamespaceNearby);
+		}
+
+		return zoneManager.bulkPluginZoneNamespaceChanges(newNamespaces, replacedNamespaces, Set.of());
 	}
 }

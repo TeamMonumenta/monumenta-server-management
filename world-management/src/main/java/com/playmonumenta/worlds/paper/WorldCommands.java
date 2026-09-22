@@ -262,7 +262,7 @@ public class WorldCommands {
 				.withSubcommand(new CommandAPICommand("reload")
 					.withPermission(CommandPermission.fromString("monumenta.worldmanagement.reload"))
 					.executes((sender, args) -> {
-						WorldManagementPlugin.getInstance().reload();
+						WorldManagementPlugin.getInstance().loadConfig();
 						sender.sendMessage(Component.text("Finished reloading config; world generation restarted if possible."));
 					}))
 				.withSubcommand(new CommandAPICommand("stopgeneration")
@@ -270,6 +270,11 @@ public class WorldCommands {
 					.executes((sender, args) -> {
 						WorldManagementPlugin.getInstance().getWorldGenerator().cancelGeneration(true);
 						sender.sendMessage(Component.text("World generation stopped. Reload config to restart."));
+					}))
+				.withSubcommand(new CommandAPICommand("listremotecontent")
+					.withPermission(CommandPermission.fromString("monumenta.worldmanagement.listremotecontent"))
+					.executes((sender, args) -> {
+						WorldManagementPlugin.getInstance().showShardsSupportingContent(sender);
 					}))
 			).register();
 

@@ -1,6 +1,7 @@
 package com.playmonumenta.networkrelay.shardhealth;
 
 import com.google.gson.JsonObject;
+import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
@@ -18,6 +19,7 @@ public class GetPluginHealthFactorsEvent extends Event {
 	private double mPluginHealth = 1.0;
 
 	public GetPluginHealthFactorsEvent(String pluginIdentifier, JsonObject pluginData) {
+		super(!Bukkit.isPrimaryThread());
 		mPluginIdentifier = pluginIdentifier;
 		mPluginData = pluginData;
 	}

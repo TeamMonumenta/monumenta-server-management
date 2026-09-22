@@ -13,10 +13,14 @@ repositories {
 	mavenLocal()
 }
 
+val nbtapi = libs.nbtapi
+val annotations = libs.annotations
+
 dependencies {
 	compileOnly(libs.monumenta.common)
 	compileOnly(libs.log4j.core)
 	compileOnly(libs.commandapi)
+	compileOnly(libs.nbtapi)
 	compileOnly(project(":network-relay"))
 	compileOnly(project(":redis-sync:redissync"))
 }
@@ -28,8 +32,22 @@ monumenta {
 		"com.playmonumenta.worlds.paper.WorldManagementPlugin",
 		BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
 		"1.20", "1.20-R0.1-SNAPSHOT",
-		depends = listOf("CommandAPI", "MonumentaCommon", "MonumentaRedisSync"),
-		softDepends = listOf("MonumentaNetworkRelay")
+		depends = listOf("CommandAPI", "MonumentaCommon", "MonumentaNetworkRelay", "MonumentaRedisSync"),
+		// TODO: NBTAPI is actually a hard dependency. But because of the way Monumenta shades it into the mixins project,
+		//  it is always available to plugins, but it can't be listed as a hard dependency or loading will fail
+		softDepends = listOf("NBTAPI")
 	)
+	versionAdapterApi("adapter_api") {
+		dependencies {
+			compileOnly(nbtapi)
+			compileOnly(annotations)
+		}
+	}
+	versionAdapter("adapter_v1_20_R3", "1.20.4") {
+		dependencies {
+			compileOnly(nbtapi)
+			compileOnly(annotations)
+		}
+	}
 	gitPrefix("world-management/")
 }

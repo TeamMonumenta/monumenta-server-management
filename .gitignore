@@ -152,3 +152,4 @@ build
 .pmdCache
 
 adventure-text-minimessage
+*.pyc

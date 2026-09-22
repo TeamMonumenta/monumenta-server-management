@@ -1,5 +1,5 @@
 [versions]
-monumenta-common = "1.0.0"
+monumenta-common = "1.2.0"
 minimessage = "4.11.0"
 commons = "1.3"
 junit = "5.9.3"
@@ -7,6 +7,7 @@ snakeyaml = "2.0"
 annotations = "16.0.2"
 rabbitmq = "5.20.0"
 commandapi = "9.4.1"
+dynmap = "2.0"
 placeholderapi = "2.11.6"
 velocity = "3.3.0-SNAPSHOT"
 viaversion = "5.2.0"
@@ -18,6 +19,8 @@ fawe = "2.9.1"
 protocollib = "5.0.0"
 gradle-config = "6.+"
 sq = "7.5"
+nbtapi = "2.15.2"
+brigadier = "1.3.10"
 
 [libraries]
 minimessage = { module = "net.kyori:adventure-text-minimessage", version.ref = "minimessage" }
@@ -28,6 +31,7 @@ snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
 annotations = { module = "org.jetbrains:annotations", version.ref = "annotations" }
 rabbitmq = { module = "com.rabbitmq:amqp-client", version.ref = "rabbitmq" }
 commandapi = { module = "dev.jorel:commandapi-bukkit-core", version.ref = "commandapi" }
+dynmap = { module = "org.dynmap:DynmapCoreAPI", version.ref = "dynmap" }
 placeholderapi = { module = "me.clip:placeholderapi", version.ref = "placeholderapi" }
 velocity = { module = "com.velocitypowered:velocity-api", version.ref = "velocity" }
 viaversion = { module = "com.viaversion:viaversion-api", version.ref = "viaversion" }
@@ -40,6 +44,8 @@ fawe-bukkit = { module = "com.fastasyncworldedit:FastAsyncWorldEdit-Bukkit", ver
 protocollib = { module = "com.comphenix.protocol:ProtocolLib", version.ref = "protocollib" }
 sq = { module = "com.playmonumenta:scripted-quests", version.ref = "sq" }
 monumenta-common = { module = "com.playmonumenta:monumenta-common", version.ref = "monumenta-common" }
+nbtapi = { module = "de.tr7zw:item-nbt-api-plugin", version.ref = "nbtapi" }
+brigadier = { module = "com.mojang:brigadier", version.ref = "brigadier" }
 
 [plugins]
 gradle-config = { id = "com.playmonumenta.gradle-config", version.ref = "gradle-config" }
