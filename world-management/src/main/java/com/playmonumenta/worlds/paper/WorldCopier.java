@@ -25,7 +25,7 @@ import java.util.Set;
 public final class WorldCopier {
 	// Copied verbatim; region/ and entities/ are handled separately because their chunks are
 	// rewritten. Any other top-level directory, and any file other than level.dat, is dropped.
-	private static final Set<String> RAW_COPIED_DIRS = Set.of("monumenta");
+	private static final Set<String> RAW_COPIED_DIRS = Set.of("monumenta", "data");
 
 	private WorldCopier() {
 	}
@@ -58,8 +58,6 @@ public final class WorldCopier {
 						} else {
 							MMLog.warning("WorldCopier: skipping non-whitelisted directory " + entry);
 						}
-					} else if (name.equals("level.dat")) {
-						copyLevelDat(entry, target, dest.getFileName().toString());
 					} else {
 						MMLog.warning("WorldCopier: skipping non-whitelisted file " + entry);
 					}
@@ -107,14 +105,6 @@ public final class WorldCopier {
 				}
 			}
 		}
-	}
-
-	// Bukkit keys a loaded world by LevelName, so a copy keeping the template's name would collide
-	// with the template and with every sibling instance.
-	private static void copyLevelDat(Path src, Path dst, String destWorldName) throws IOException {
-		ReadWriteNBT nbt = WorldStorageAdapters.get().readNbtFile(src);
-		nbt.getOrCreateCompound("Data").setString("LevelName", destWorldName);
-		WorldStorageAdapters.get().writeNbtFile(dst, nbt);
 	}
 
 	// Recursively copies a subtree as raw bytes. Fails if the destination already exists.

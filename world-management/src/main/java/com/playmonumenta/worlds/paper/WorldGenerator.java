@@ -13,6 +13,9 @@ import java.util.regex.Pattern;
 import org.bukkit.Bukkit;
 import org.jetbrains.annotations.Nullable;
 
+import static com.playmonumenta.worlds.paper.MonumentaWorldManagementAPI.WORLDS_FOLDER;
+import static com.playmonumenta.worlds.paper.MonumentaWorldManagementAPI.worldClocksDatFile;
+
 /*
  * Pregenerates world instances by copying template worlds on an async thread, so a player joining an
  * instance that does not yet exist can be served a ready-made copy with a cheap rename on the main thread.
@@ -95,13 +98,13 @@ public class WorldGenerator {
 				continue;
 			}
 
-			File templateLevelDat = new File(templateName, "level.dat");
-			if (!templateLevelDat.isFile()) {
+			File templateWorldClocksDat = worldClocksDatFile(templateName);
+			if (!templateWorldClocksDat.isFile()) {
 				MMLog.severe("template is not a world: " + templateName);
 				continue;
 			}
 
-			mTemplates.put(templateName, new TemplateState(templateName, pregenLimit, templateLevelDat.lastModified()));
+			mTemplates.put(templateName, new TemplateState(templateName, pregenLimit, templateWorldClocksDat.lastModified()));
 		}
 		if (mTemplates.isEmpty()) {
 			MMLog.severe("No valid templates, shutting down world generator.");
@@ -116,7 +119,7 @@ public class WorldGenerator {
 
 	// Classifies every existing pregen_* folder as a fresh or outdated spare, and clears failed copies.
 	private void scanExistingSpares() {
-		File root = new File(".");
+		File root = WORLDS_FOLDER;
 		String[] childPaths = root.list();
 		if (childPaths == null) {
 			MMLog.severe("Failed to list pregenerated worlds");
@@ -148,7 +151,7 @@ public class WorldGenerator {
 				if (index >= state.mLimit) {
 					MMLog.info("Deleting pregenerated world " + name + " beyond configured limit " + state.mLimit);
 					deleteWorldFolder(spareDir);
-				} else if (new File(spareDir, "level.dat").lastModified() >= state.mTemplateMtime) {
+				} else if (worldClocksDatFile(spareDir).lastModified() >= state.mTemplateMtime) {
 					MMLog.info("Detected up to date pregenerated world " + name);
 					state.mFresh.add(index);
 				} else {
@@ -178,8 +181,8 @@ public class WorldGenerator {
 	}
 
 	public static boolean worldExists(String name) {
-		File target = new File(name);
-		return target.isDirectory() && new File(target, "level.dat").isFile();
+		File target = new File(WORLDS_FOLDER, name);
+		return target.isDirectory() && worldClocksDatFile(target).isFile();
 	}
 
 	// Renames a ready spare into place as worldName. Prefers a fresh spare; falls back to outdated.
@@ -214,8 +217,8 @@ public class WorldGenerator {
 		}
 
 		MMLog.info("Moving " + pregenName + " to " + worldName);
-		File oldPath = new File(pregenName);
-		File target = new File(worldName);
+		File oldPath = new File(WORLDS_FOLDER, pregenName);
+		File target = new File(WORLDS_FOLDER, worldName);
 		if (!oldPath.renameTo(target)) {
 			if (worldExists(pregenName)) {
 				// renameTo() is all-or-nothing, so a spare still in place is still usable; put it back
@@ -312,14 +315,15 @@ public class WorldGenerator {
 			+ ", " + (int) (100 * progress()) + "% total)");
 
 		String generatingName = pregenName + GENERATING_SUFFIX;
-		WorldCopier.copyWorldRegenUuids(new File(state.mName).toPath(), new File(generatingName).toPath());
+		WorldCopier.copyWorldRegenUuids(new File(WORLDS_FOLDER, state.mName).toPath(),
+			new File(WORLDS_FOLDER, generatingName).toPath());
 
 		// Replace any outdated spare sitting in this slot before moving the fresh copy into place.
-		File pregenDir = new File(pregenName);
+		File pregenDir = new File(WORLDS_FOLDER, pregenName);
 		if (pregenDir.exists()) {
 			FileUtils.deleteRecursively(pregenDir.toPath());
 		}
-		if (!new File(generatingName).renameTo(pregenDir)) {
+		if (!new File(WORLDS_FOLDER, generatingName).renameTo(pregenDir)) {
 			throw new Exception("Failed to move pregenerating world " + generatingName + " to " + pregenName);
 		}
 	}
