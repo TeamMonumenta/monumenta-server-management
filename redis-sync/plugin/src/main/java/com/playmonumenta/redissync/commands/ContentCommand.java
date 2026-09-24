@@ -6,8 +6,8 @@ import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.data.ContentData;
 import com.playmonumenta.redissync.data.OptionalLocation;
 import dev.jorel.commandapi.CommandAPI;
-import dev.jorel.commandapi.CommandAPIBukkit;
 import dev.jorel.commandapi.CommandAPICommand;
+import dev.jorel.commandapi.CommandAPIPaper;
 import dev.jorel.commandapi.SuggestionInfo;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import dev.jorel.commandapi.arguments.EntitySelectorArgument;
@@ -116,7 +116,7 @@ public class ContentCommand {
 
 		if (state.expecting == ContentOption.ONARRIVAL) {
 			// function suggestion logic, probably should cache, unsure how expensive this is
-			CommandAPIBukkit.get().getFunctions().stream()
+			CommandAPIPaper.getPaper().getNMS().getFunctions().stream()
 				.map(NamespacedKey::asString)
 				.forEach(builder::suggest);
 		} else if (state.expecting == ContentOption.RETURNTO || state.expecting == ContentOption.ARRIVEAT) {

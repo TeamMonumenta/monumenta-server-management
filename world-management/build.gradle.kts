@@ -41,7 +41,7 @@ monumenta {
 			compileOnly(annotations)
 		}
 	}
-	versionAdapter("adapter_v1_20_R3", "1.20.4") {
+	versionAdapter("adapter_v1_20_R3", "1.20.4-R0.1-SNAPSHOT") {
 		dependencies {
 			compileOnly(nbtapi)
 			compileOnly(annotations)
