@@ -18,6 +18,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Chunk;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.ProxiedCommandSender;
 import org.jetbrains.annotations.Nullable;
 
 public class ForceloadLazy {
@@ -69,6 +70,9 @@ public class ForceloadLazy {
 		}
 		final String sendMessage = msg.toString();
 
+		// CommandAPI's proxy sender (from "execute as") can't be converted back to a command source, so run callbacks as the callee
+		final CommandSender callbackSender = sender instanceof ProxiedCommandSender proxied ? proxied.getCallee() : sender;
+
 		final Consumer<Chunk> chunkConsumer = (final Chunk chunk) -> {
 			chunk.setForceLoaded(true);
 			int remaining = numRemaining.decrementAndGet();
@@ -76,7 +80,7 @@ public class ForceloadLazy {
 				if (callback != null) {
 					for (FunctionWrapper func : callback) {
 						if (func != null) {
-							func.run(sender);
+							func.run(callbackSender);
 						}
 					}
 				}
