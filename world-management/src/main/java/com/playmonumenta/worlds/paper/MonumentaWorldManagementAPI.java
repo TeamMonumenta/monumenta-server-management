@@ -93,6 +93,8 @@ public class MonumentaWorldManagementAPI {
 	 * - Additional instances will start pregenerating (if configured)
 	 * <p>
 	 * Must be called from the main thread
+	 * @param player The player to be sorted
+	 * @throws Exception If the world management listener is null (not initialized)
 	 */
 	public static void sortWorld(Player player) throws Exception {
 		WorldManagementListener listener = WorldManagementListener.getInstance();

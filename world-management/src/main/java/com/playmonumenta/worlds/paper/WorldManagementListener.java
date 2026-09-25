@@ -12,6 +12,7 @@ import com.playmonumenta.worlds.common.MMLog;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -265,12 +266,24 @@ public class WorldManagementListener implements Listener {
 	public void playerContentChangeRequestEvent(PlayerContentChangeRequestEvent event) {
 		Player player = event.getPlayer();
 		ContentData contentData = event.getContent();
+		Set<Player> others = event.getOthers();
 
-		// TODO Send the player to that content instead,
-		//  saving when they arrive on the correct world like the world changed event does
 		MonumentaRedisSyncAPI.savePlayerContent(player.getUniqueId(), contentData);
-		for (Player other : event.getOthers()) {
+		for (Player other : others) {
 			MonumentaRedisSyncAPI.savePlayerContent(other.getUniqueId(), contentData);
+		}
+
+		try {
+			// Need to sort the first player first, so that when the world can
+			// be on other shards, their proxy ping is taken into account
+			MonumentaWorldManagementAPI.sortWorld(player);
+
+			for (Player other : others) {
+				MonumentaWorldManagementAPI.sortWorld(other);
+			}
+		} catch (Exception ex) {
+			MMLog.severe("Attempted to sort " + player.getName() + " and " + others.size() + " others before WorldManagementPlugin initialized its listener", ex);
+			return;
 		}
 	}
 

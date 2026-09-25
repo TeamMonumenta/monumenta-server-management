@@ -34,6 +34,7 @@ import org.jetbrains.annotations.Nullable;
 public class WorldManagementPlugin extends JavaPlugin {
 	private static @Nullable WorldManagementPlugin INSTANCE = null;
 
+	private static boolean mSortWorldByContent = false;
 	private static boolean mSortWorldByScoreOnJoin = false;
 	private static boolean mSortWorldByScoreOnRespawn = false;
 	private static boolean mAllowInstanceAutocreation = false;
@@ -123,6 +124,9 @@ public class WorldManagementPlugin extends JavaPlugin {
 			}
 		}
 
+		mSortWorldByContent = config.getBoolean("sort-world-by-content", mSortWorldByContent);
+		printConfig("sort-world-by-content", mSortWorldByContent);
+
 		mSortWorldByScoreOnJoin = config.getBoolean("sort-world-by-score-on-join", mSortWorldByScoreOnJoin);
 		printConfig("sort-world-by-score-on-join", mSortWorldByScoreOnJoin);
 
@@ -158,6 +162,10 @@ public class WorldManagementPlugin extends JavaPlugin {
 		MMLog.info(configKey + "=" + (value == null ? "null" : value));
 	}
 
+	public static boolean isSortByContent() {
+		return mSortWorldByContent;
+	}
+
 	public static boolean isSortWorldByScoreOnJoin() {
 		return mSortWorldByScoreOnJoin;
 	}
@@ -175,9 +183,17 @@ public class WorldManagementPlugin extends JavaPlugin {
 	}
 
 	public static @Nullable ContentInfo getContentInfo(Player player) {
-		// TODO: For now, just use the first content name.
-		// Eventually need some sorcery to let a player select a different entry
-		ContentInfo info = null;
+		// TODO: If the content is not available on the current shard, use the first entry
+		// Eventually need to sort the player's shard if this does not match
+		ContentInfo info;
+		if (isSortByContent()) {
+			info = mContentInfoMap.get(MonumentaRedisSyncAPI.getPlayerContentData(player).getId());
+			if (info != null) {
+				return info;
+			}
+		} else {
+			info = null;
+		}
 		for (ContentInfo contentInfo : mContentInfoMap.values()) {
 			info = contentInfo;
 			break;
