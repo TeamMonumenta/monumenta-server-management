@@ -1,24 +1,38 @@
-package com.destroystokyo.paper.event.player;
+package com.playmonumenta.papermixins.paperapi.v1.event;
 
-import java.io.File;
-import org.bukkit.entity.Player;
+import java.nio.file.Path;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
-import org.bukkit.event.player.PlayerEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Called when the server loads the playerdata data for a player
  */
-public class PlayerDataLoadEvent extends PlayerEvent {
-	private static final HandlerList mHandlers = new HandlerList();
-	@Nullable private Object mData;
-	@NotNull private File mPath;
+public class PlayerDataLoadEvent extends Event {
+	private static final HandlerList handlers = new HandlerList();
 
-	public PlayerDataLoadEvent(@NotNull Player who, @NotNull File path) {
-		super(who);
-		this.mData = null;
-		this.mPath = path;
+	@Nullable
+	private Object mData;
+	@NotNull
+	private Path mPath;
+	@NotNull
+	private final OfflinePlayer mPlayer;
+
+	public PlayerDataLoadEvent(@NotNull OfflinePlayer who, @NotNull Path path) {
+		mPlayer = who;
+		mData = null;
+		mPath = path;
+	}
+
+	public @NotNull OfflinePlayer getPlayer() {
+		return mPlayer;
+	}
+
+	@NotNull
+	public static HandlerList getHandlerList() {
+		return handlers;
 	}
 
 	/**
@@ -29,7 +43,7 @@ public class PlayerDataLoadEvent extends PlayerEvent {
 	 * @return data File to load from
 	 */
 	@NotNull
-	public File getPath() {
+	public Path getPath() {
 		return mPath;
 	}
 
@@ -40,7 +54,7 @@ public class PlayerDataLoadEvent extends PlayerEvent {
 	 *
 	 * @param path data File to load from
 	 */
-	public void setPath(@NotNull File path) {
+	public void setPath(@NotNull Path path) {
 		this.mPath = path;
 	}
 
@@ -72,11 +86,15 @@ public class PlayerDataLoadEvent extends PlayerEvent {
 	@NotNull
 	@Override
 	public HandlerList getHandlers() {
-		return mHandlers;
+		return handlers;
 	}
 
-	@NotNull
-	public static HandlerList getHandlerList() {
-		return mHandlers;
+	@Override
+	public String toString() {
+		return "PlayerDataLoadEvent{" +
+			"data=" + mData +
+			", path=" + mPath +
+			", player=" + mPlayer.getName() +
+			'}';
 	}
 }

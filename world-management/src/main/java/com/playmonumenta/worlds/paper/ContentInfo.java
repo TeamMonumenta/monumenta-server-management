@@ -6,8 +6,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
 public class ContentInfo {
@@ -96,12 +96,12 @@ public class ContentInfo {
 		return new HashSet<>(mVariantTemplates.values());
 	}
 
-	public @Nullable String getVariant(Player player) throws IndexOutOfBoundsException {
+	public @Nullable String getVariant(OfflinePlayer player) throws IndexOutOfBoundsException {
 		int score;
 		if (mVariantObjective == null) {
 			score = 0;
 		} else {
-			score = ScoreboardUtils.getScoreboardValue(player, mVariantObjective).orElse(0);
+			score = ScoreboardUtils.getScoreboardValue(player.getName(), mVariantObjective).orElse(0);
 		}
 		String variantTemplate = mVariantTemplates.get(score);
 		if (variantTemplate == null && score != 0) {

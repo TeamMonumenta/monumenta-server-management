@@ -1,11 +1,12 @@
 package com.playmonumenta.redissync.event;
 
+import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
-import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
-import org.bukkit.event.player.PlayerEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 /**
  * This event fires when a player joins and their data is loaded, but before they are loaded into a world.
@@ -15,17 +16,22 @@ import org.jetbrains.annotations.Nullable;
  * Note that at the time this event is called, the player's scores are available but all player data is blank, including inventory and tags.
  * The API MonumentaRedisSyncAPI.getPlayerWorldData() is also available at this point
  */
-public class PlayerJoinSetWorldEvent extends PlayerEvent {
+public class PlayerJoinSetWorldEvent extends Event {
 
 	private static final HandlerList handlers = new HandlerList();
 
+	private final @NotNull OfflinePlayer mPlayer;
 	private @NotNull World mWorld;
 	private final @Nullable String mLastSavedWorldName;
 
-	public PlayerJoinSetWorldEvent(Player player, @NotNull World world, @Nullable String lastSavedWorldName) {
-		super(player);
+	public PlayerJoinSetWorldEvent(@NonNull OfflinePlayer player, @NotNull World world, @Nullable String lastSavedWorldName) {
+		mPlayer = player;
 		mWorld = world;
 		mLastSavedWorldName = lastSavedWorldName;
+	}
+
+	public @NonNull OfflinePlayer getPlayer() {
+		return mPlayer;
 	}
 
 	/*

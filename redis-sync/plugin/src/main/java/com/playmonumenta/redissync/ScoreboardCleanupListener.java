@@ -1,14 +1,14 @@
 package com.playmonumenta.redissync;
 
-import com.destroystokyo.paper.event.player.PlayerAdvancementDataLoadEvent;
-import com.destroystokyo.paper.event.player.PlayerDataLoadEvent;
+import com.playmonumenta.papermixins.paperapi.v1.event.PlayerAdvancementDataLoadEvent;
+import com.playmonumenta.papermixins.paperapi.v1.event.PlayerDataLoadEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.utils.MMLog;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -62,7 +62,7 @@ public class ScoreboardCleanupListener implements Listener {
 		}, CLEANUP_LOGOUT_DELAY));
 	}
 
-	private void cancelCleanupTask(Player player) {
+	private void cancelCleanupTask(OfflinePlayer player) {
 		BukkitTask cleanupTask = mCleanupTasks.remove(player.getUniqueId());
 		if (cleanupTask != null && !cleanupTask.isCancelled()) {
 			cleanupTask.cancel();

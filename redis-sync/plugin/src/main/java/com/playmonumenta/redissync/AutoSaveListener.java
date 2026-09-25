@@ -1,7 +1,7 @@
 package com.playmonumenta.redissync;
 
-import com.destroystokyo.paper.event.player.PlayerAdvancementDataLoadEvent;
-import com.destroystokyo.paper.event.player.PlayerDataLoadEvent;
+import com.playmonumenta.papermixins.paperapi.v1.event.PlayerAdvancementDataLoadEvent;
+import com.playmonumenta.papermixins.paperapi.v1.event.PlayerDataLoadEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.utils.MMLog;
 import java.util.ArrayList;
@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -91,7 +92,7 @@ public class AutoSaveListener implements Listener {
 		cancelSaveTask(event.getPlayer());
 	}
 
-	private void cancelSaveTask(Player player) {
+	private void cancelSaveTask(OfflinePlayer player) {
 		BukkitTask cleanupTask = mPendingSaves.remove(player.getUniqueId());
 		if (cleanupTask != null && !cleanupTask.isCancelled()) {
 			cleanupTask.cancel();

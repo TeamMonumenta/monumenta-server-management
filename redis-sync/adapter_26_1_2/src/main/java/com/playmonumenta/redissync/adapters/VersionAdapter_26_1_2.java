@@ -70,7 +70,7 @@ public class VersionAdapter_26_1_2 implements VersionAdapter {
 		applyBool(shardData, nbt, "FallFlying");
 		applyFloat(shardData, nbt, "FallDistance");
 		applyBool(shardData, nbt, "OnGround");
-		applyInt(shardData, nbt, "Dimension");
+		//applyInt(shardData, nbt, "Dimension");
 		applyStr(shardData, nbt, "world");
 		applyLong(shardData, nbt, "WorldUUIDMost");
 		applyLong(shardData, nbt, "WorldUUIDLeast");
@@ -103,7 +103,7 @@ public class VersionAdapter_26_1_2 implements VersionAdapter {
 		copyBool(obj, nbt, "FallFlying");
 		copyFloat(obj, nbt, "FallDistance");
 		copyBool(obj, nbt, "OnGround");
-		copyInt(obj, nbt, "Dimension");
+		//copyInt(obj, nbt, "Dimension");
 		copyStr(obj, nbt, "world");
 		copyLong(obj, nbt, "WorldUUIDMost");
 		copyLong(obj, nbt, "WorldUUIDLeast");

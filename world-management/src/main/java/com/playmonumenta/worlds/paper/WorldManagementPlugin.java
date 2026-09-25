@@ -24,9 +24,9 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.apache.logging.log4j.Level;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.Nullable;
@@ -174,7 +174,7 @@ public class WorldManagementPlugin extends JavaPlugin {
 		return Collections.unmodifiableMap(mContentInfoMap);
 	}
 
-	public static @Nullable ContentInfo getContentInfo(Player player) {
+	public static @Nullable ContentInfo getContentInfo(OfflinePlayer player) {
 		// TODO: For now, just use the first content name.
 		// Eventually need some sorcery to let a player select a different entry
 		ContentInfo info = null;

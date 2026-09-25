@@ -16,6 +16,7 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -108,7 +109,7 @@ public class WorldManagementListener implements Listener {
 	// TODO: replace with PlayerSpawnLocationEvent
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
 	public void playerJoinSetWorldEvent(PlayerJoinSetWorldEvent event) {
-		Player player = event.getPlayer();
+		OfflinePlayer player = event.getPlayer();
 		MMLog.debug("playerJoinSetWorldEvent: player=" + player.getName() + " thread=" + Thread.currentThread().getName());
 
 		if (!WorldManagementPlugin.isSortWorldByScoreOnJoin()) {
@@ -121,7 +122,6 @@ public class WorldManagementListener implements Listener {
 					event.setWorld(world);
 				} catch (Exception ex) {
 					String msg = "Failed to load the last world you were on (" + lastSavedWorldName + "): " + ex.getMessage();
-					player.sendMessage(msg);
 					MMLog.warning(msg, ex);
 				}
 			}
@@ -133,13 +133,14 @@ public class WorldManagementListener implements Listener {
 			}
 		}
 
-		if (WorldManagementPlugin.getNotifyWorldPermission() != null && player.hasPermission(WorldManagementPlugin.getNotifyWorldPermission())) {
-			Bukkit.getScheduler().runTaskLater(mPlugin, () -> {
-				if (Bukkit.getOnlinePlayers().contains(player)) {
-					player.sendMessage(Component.text("Joined world " + event.getWorld().getName(), NamedTextColor.GREEN));
+		Bukkit.getScheduler().runTaskLater(mPlugin, () -> {
+			Player onlinePlayer = player.getPlayer();
+			if (onlinePlayer != null && WorldManagementPlugin.getNotifyWorldPermission() != null && onlinePlayer.hasPermission(WorldManagementPlugin.getNotifyWorldPermission())) {
+				if (Bukkit.getOnlinePlayers().contains(onlinePlayer)) {
+					onlinePlayer.sendMessage(Component.text("Joined world " + event.getWorld().getName(), NamedTextColor.GREEN));
 				}
-			}, 1);
-		}
+			}
+		}, 1);
 	}
 
 	// FIXME: replace with configuration phase aware code
@@ -324,13 +325,13 @@ public class WorldManagementListener implements Listener {
 	 * <p>
 	 * Must be called from the main thread
 	 */
-	protected World getSortWorld(Player player) throws Exception {
+	protected World getSortWorld(OfflinePlayer player) throws Exception {
 		ContentInfo info = WorldManagementPlugin.getContentInfo(player);
 		if (info == null) {
 			throw new Exception("Tried to get sort world for player but no instancing content info exists");
 		}
 
-		int score = ScoreboardUtils.getScoreboardValue(player, info.getInstanceObjective()).orElse(0);
+		int score = ScoreboardUtils.getScoreboardValue(player.getName(), info.getInstanceObjective()).orElse(0);
 		if (score == 0) {
 			List<World> worlds = Bukkit.getWorlds();
 			if (worlds.isEmpty()) {

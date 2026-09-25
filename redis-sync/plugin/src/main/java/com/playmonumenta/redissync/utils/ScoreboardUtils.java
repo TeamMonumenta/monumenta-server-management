@@ -5,14 +5,13 @@ import com.google.gson.JsonObject;
 import java.util.Map;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 import org.bukkit.scoreboard.Criteria;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Score;
 import org.bukkit.scoreboard.Scoreboard;
 
 public class ScoreboardUtils {
-	public static void loadFromJsonObject(Player player, JsonObject data) {
+	public static void loadFromJsonObject(String playerName, JsonObject data) {
 		Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
 
 		for (Map.Entry<String, JsonElement> entry : data.entrySet()) {
@@ -31,7 +30,7 @@ public class ScoreboardUtils {
 				continue;
 			}
 
-			Score score = objective.getScore(player.getName());
+			Score score = objective.getScore(playerName);
 			score.setScore(scoreVal);
 		}
 	}

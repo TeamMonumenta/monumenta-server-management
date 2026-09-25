@@ -1,9 +1,9 @@
 package com.playmonumenta.redissync;
 
-import com.destroystokyo.paper.event.player.PlayerAdvancementDataLoadEvent;
-import com.destroystokyo.paper.event.player.PlayerAdvancementDataSaveEvent;
-import com.destroystokyo.paper.event.player.PlayerDataLoadEvent;
-import com.destroystokyo.paper.event.player.PlayerDataSaveEvent;
+import com.playmonumenta.papermixins.paperapi.v1.event.PlayerAdvancementDataLoadEvent;
+import com.playmonumenta.papermixins.paperapi.v1.event.PlayerAdvancementDataSaveEvent;
+import com.playmonumenta.papermixins.paperapi.v1.event.PlayerDataLoadEvent;
+import com.playmonumenta.papermixins.paperapi.v1.event.PlayerDataSaveEvent;
 import com.destroystokyo.paper.profile.PlayerProfile;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -49,6 +49,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -436,7 +437,7 @@ public class DataEventListener implements Listener {
 
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
 	public void playerDataLoadEvent(PlayerDataLoadEvent event) {
-		Player player = event.getPlayer();
+		OfflinePlayer player = event.getPlayer();
 		UUID playerId = player.getUniqueId();
 		String playerName = player.getName();
 
@@ -457,24 +458,29 @@ public class DataEventListener implements Listener {
 		if (mPendingSaves.containsKey(playerId)) {
 			mLoadFailedPlayers.add(playerId);
 			MMLog.severe("BUG! Player=" + playerName + " uuid=" + playerId + " started loading with saves still in flight. Kicking to avoid loading stale data!");
-			Bukkit.getScheduler().runTask(MonumentaRedisSync.getInstance(), () -> player.kick(LOAD_ERROR_MSG));
+			Bukkit.getScheduler().runTask(MonumentaRedisSync.getInstance(), () -> {
+				Player onlinePlayer = event.getPlayer().getPlayer();
+				if (onlinePlayer != null) {
+					onlinePlayer.kick(LOAD_ERROR_MSG);
+				}
+			});
 			return;
 		}
 
 		//TODO: Rework to using something like MonumentaRedisSyncAPI.transformPlayerData()
 		RedisFuture<byte[]> dataFuture;
 		try (RedisAPI.BorrowedCommands<String, byte[]> byteConn = RedisAPI.borrowStringBytes()) {
-			dataFuture = byteConn.lindex(MonumentaRedisSyncAPI.getRedisDataPath(player), 0);
+			dataFuture = byteConn.lindex(MonumentaRedisSyncAPI.getRedisDataPath(playerId), 0);
 		}
 		RedisFuture<String> contentFuture;
 		RedisFuture<String> pluginDataFuture;
 		RedisFuture<String> scoreFuture;
 		RedisFuture<Map<String, String>> shardDataFuture;
 		try (RedisAPI.BorrowedCommands<String, String> commands = RedisAPI.borrow()) {
-			contentFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisContentPath(player), 0);
-			pluginDataFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisPluginDataPath(player), 0);
-			scoreFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisScoresPath(player), 0);
-			shardDataFuture = commands.hgetall(MonumentaRedisSyncAPI.getRedisPerShardDataPath(player));
+			contentFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisContentPath(playerId), 0);
+			pluginDataFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisPluginDataPath(playerId), 0);
+			scoreFuture = commands.lindex(MonumentaRedisSyncAPI.getRedisScoresPath(playerId), 0);
+			shardDataFuture = commands.hgetall(MonumentaRedisSyncAPI.getRedisPerShardDataPath(playerId));
 		}
 
 		try {
@@ -527,7 +533,7 @@ public class DataEventListener implements Listener {
 			if (scoreData != null) {
 				JsonObject obj = mGson.fromJson(scoreData, JsonObject.class);
 				if (obj != null) {
-					ScoreboardUtils.loadFromJsonObject(player, obj);
+					ScoreboardUtils.loadFromJsonObject(playerName, obj);
 				} else {
 					MMLog.severe("Failed to parse player '" + playerName + "' scoreboard data as JSON. This results in data loss!");
 				}
@@ -664,7 +670,12 @@ public class DataEventListener implements Listener {
 			}
 
 			MMLog.severe("Bail: kicking player early in order to prevent data loss!");
-			Bukkit.getScheduler().runTask(MonumentaRedisSync.getInstance(), () -> event.getPlayer().kick(LOAD_ERROR_MSG));
+			Bukkit.getScheduler().runTask(MonumentaRedisSync.getInstance(), () -> {
+				Player onlinePlayer = event.getPlayer().getPlayer();
+				if (onlinePlayer != null) {
+					onlinePlayer.kick(LOAD_ERROR_MSG);
+				}
+			});
 		}
 	}
 
