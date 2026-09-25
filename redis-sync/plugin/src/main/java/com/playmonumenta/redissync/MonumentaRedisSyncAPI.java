@@ -736,9 +736,13 @@ public class MonumentaRedisSyncAPI {
 			}
 
 			final JsonObject worldShardDataJson;
-			/* Look up in the shard data first the "world" part - data from this world about where the player should be */
-			MMLog.trace("Found world shard data for player '" + player.getName() + "': '" + worldShardData + "'");
-			worldShardDataJson = new Gson().fromJson(worldShardData, JsonObject.class);
+			if (worldShardData == null || worldShardData.isEmpty()) {
+				MMLog.trace("No world shard data for player '" + player.getName() + "', using default");
+				worldShardDataJson = new JsonObject();
+			} else {
+				MMLog.trace("Found world shard data for player '" + player.getName() + "': '" + worldShardData + "'");
+				worldShardDataJson = new Gson().fromJson(worldShardData, JsonObject.class);
+			}
 
 			JsonArray pos = new JsonArray();
 			pos.add(loc.getX());
