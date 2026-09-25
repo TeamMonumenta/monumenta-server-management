@@ -21,6 +21,8 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.CommandSender;
@@ -57,7 +59,8 @@ public class ContentCommand {
 				Player player = Objects.requireNonNull(args.getUnchecked("player"));
 
 				String content = MonumentaRedisSyncAPI.getPlayerContentData(player).getId();
-				callee.sendMessage(content.isEmpty() ? "content not set" : content);
+				callee.sendMessage(Component.text("Player's content is ", NamedTextColor.BLUE)
+					.append(Component.text(content.isEmpty() ? "not set" : content, NamedTextColor.GREEN)));
 			})
 			.register();
 	}
