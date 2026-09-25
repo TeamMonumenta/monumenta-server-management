@@ -283,7 +283,6 @@ public class WorldManagementListener implements Listener {
 			}
 		} catch (Exception ex) {
 			MMLog.severe("Attempted to sort " + player.getName() + " and " + others.size() + " others before WorldManagementPlugin initialized its listener", ex);
-			return;
 		}
 	}
 
