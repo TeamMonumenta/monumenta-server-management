@@ -8,6 +8,7 @@ dependencies {
 	compileOnly(libs.monumenta.common)
 	compileOnly(project(":network-relay"))
 	compileOnly(libs.commandapi)
+	compileOnly(libs.brigadier)
 
 	// velocity dependencies
 	compileOnly(libs.velocity)

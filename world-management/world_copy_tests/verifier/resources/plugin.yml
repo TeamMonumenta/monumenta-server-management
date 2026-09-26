@@ -1,0 +1,5 @@
+name: WorldLoadVerifier
+version: 1.0.0
+main: com.playmonumenta.worldcopytests.WorldLoadVerifier
+api-version: '1.20'
+description: Loads the worlds named in MONUMENTA_WORLD_LOAD_VERIFY and reports chunk/entity counts.

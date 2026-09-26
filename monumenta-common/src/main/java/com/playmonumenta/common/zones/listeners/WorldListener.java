@@ -4,6 +4,7 @@ import com.playmonumenta.common.MonumentaCommonPlugin;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.event.world.WorldUnloadEvent;
 
@@ -22,5 +23,10 @@ public class WorldListener implements Listener {
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	public void worldUnloadEvent(WorldUnloadEvent event) {
 		mPlugin.mZoneManager.onUnloadWorld(event.getWorld());
+	}
+
+	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+	public void playerQuitEvent(PlayerQuitEvent event) {
+		mPlugin.mZoneManager.unregisterPlayer(event.getPlayer());
 	}
 }
