@@ -850,37 +850,25 @@ public class DataEventListener implements Listener {
 
 		// The player object might not be available. Attempt to get their name anyway.
 		UUID playerId = event.getPlayerId();
-		String playerName = MonumentaRedisSyncAPI.cachedUuidToName(playerId);
-		String playerNameNonNull = playerName == null ? playerId.toString() : playerName;
+		String playerNameNullable = MonumentaRedisSyncAPI.cachedUuidToName(playerId);
+		String playerName = playerNameNullable == null ? playerId.toString() : playerNameNullable;
 
 		if (isPlayerTransferring(playerId)) {
-			MMLog.debug("Ignoring ServerStatsDataLoadEvent for player:" + playerNameNonNull);
+			MMLog.debug("Ignoring ServerStatsDataLoadEvent for player:" + playerName);
 			return;
-		}
-
-		List<CompletableFuture<?>> futures = mPendingSaves.remove(playerId);
-		if (futures == null) {
-			futures = new ArrayList<>();
-		} else {
-			futures.removeIf(Future::isDone);
 		}
 
 		/* Execute the stats as a multi() batch */
 		/* Stats */
-		MMLog.debug("Saving stats data for player=" + playerName);
+		MMLog.debug("Saving stats data for player=" + playerNameNullable);
 		MMLog.trace(() -> "Data:" + event.getJsonData());
 		String statsPath = MonumentaRedisSyncAPI.getRedisStatsPath(playerId);
 		String statsJsonData = event.getJsonData();
-		futures.add(RedisAPI.multi(commands -> {
+		/* Don't block - store the pending futures for completion later */
+		trackPendingSave(playerId, RedisAPI.multi(commands -> {
 			commands.lpush(statsPath, statsJsonData);
 			commands.ltrim(statsPath, 0, BukkitConfigAPI.getHistoryAmount());
-		}).exceptionally(ex -> {
-			MMLog.severe("Stats saving for player=" + playerName + " failed", ex);
-			return null;
-		}));
-
-		/* Don't block - store the pending futures for completion later */
-		mPendingSaves.put(playerId, futures);
+		}), () -> "Stats saving for player=" + playerNameNullable + " failed");
 	}
 
 	/* ******************* Transferring Restriction Event Handlers ******************* */
