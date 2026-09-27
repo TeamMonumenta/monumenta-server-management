@@ -185,24 +185,7 @@ public class WorldManagementListener implements Listener {
 			WorldManagementPlugin.isSortByContent() && contentData != null && contentData.getId().equals(info.getContentName()) &&
 			(expectedContentWorld == null || expectedContentWorld.getName().equals(player.getWorld().getName()))
 		) {
-			// Player is joining the content they're assigned to;
-			// check for any post-arrival data, apply it, then clear temporary data
-
-			// Player has arrived; location data is no longer relevant
-			contentData.setReturnLocation(null);
-			contentData.setArrivalLocation(null);
-
-			// Command to run on arrival
-			NamespacedKey mcfunctionOnArrival = contentData.getMcfunctionOnArrival();
-			if (mcfunctionOnArrival != null) {
-				MMLog.debug("Running content mcfunctionOnArrival command on player=" + player.getName() + " thread=" + Thread.currentThread().getName());
-				Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "execute as " + player.getUniqueId() + " at @s run function " + mcfunctionOnArrival.asString());
-
-				// Command has been run, clear it
-				contentData.setMcfunctionOnArrival(null);
-			}
-
-			MonumentaRedisSyncAPI.savePlayerContent(player.getUniqueId(), contentData);
+			processEphemeralContentData(player, contentData);
 		}
 
 		String instanceObjective = info.getInstanceObjective();
@@ -317,6 +300,27 @@ public class WorldManagementListener implements Listener {
 		} catch (Exception ex) {
 			MMLog.severe("Attempted to sort " + player.getName() + " and " + others.size() + " others before WorldManagementPlugin initialized its listener", ex);
 		}
+	}
+
+	protected void processEphemeralContentData(Player player, ContentData contentData) {
+		// Player is joining the content they're assigned to;
+		// check for any post-arrival data, apply it, then clear temporary data
+
+		// Player has arrived; location data is no longer relevant
+		contentData.setReturnLocation(null);
+		contentData.setArrivalLocation(null);
+
+		// Command to run on arrival
+		NamespacedKey mcfunctionOnArrival = contentData.getMcfunctionOnArrival();
+		if (mcfunctionOnArrival != null) {
+			MMLog.debug("Running content mcfunctionOnArrival command on player=" + player.getName() + " thread=" + Thread.currentThread().getName());
+			Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "execute as " + player.getUniqueId() + " at @s run function " + mcfunctionOnArrival.asString());
+
+			// Command has been run, clear it
+			contentData.setMcfunctionOnArrival(null);
+		}
+
+		MonumentaRedisSyncAPI.savePlayerContent(player.getUniqueId(), contentData);
 	}
 
 	protected void reloadConfig() {

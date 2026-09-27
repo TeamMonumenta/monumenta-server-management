@@ -1,6 +1,7 @@
 package com.playmonumenta.worlds.paper;
 
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
+import com.playmonumenta.redissync.data.ContentData;
 import com.playmonumenta.worlds.common.MMLog;
 import com.playmonumenta.worlds.common.utils.FileUtils;
 import java.io.File;
@@ -16,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.World.Environment;
 import org.bukkit.WorldCreator;
@@ -110,6 +112,22 @@ public class MonumentaWorldManagementAPI {
 
 		// Move the player to that world at their last position (or world spawn)
 		MonumentaRedisSyncAPI.getPlayerWorldData(player, newWorld).applyToPlayer(player);
+
+		ContentInfo info = WorldManagementPlugin.getContentInfo(player);
+		ContentData contentData = MonumentaRedisSyncAPI.getPlayerContentData(player);
+		World expectedContentWorld;
+		try {
+			expectedContentWorld = WorldManagementListener.getInstance().getSortWorld(player, info);
+		} catch (Exception ignored) {
+			expectedContentWorld = null;
+		}
+		if (
+			WorldManagementPlugin.isSortByContent() && contentData != null && info != null &&
+			contentData.getId().equals(info.getContentName()) &&
+			(expectedContentWorld == null || expectedContentWorld.getName().equals(newWorld.getName()))
+		) {
+			WorldManagementListener.getInstance().processEphemeralContentData(player, contentData);
+		}
 	}
 
 	/**
