@@ -17,6 +17,7 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -172,6 +173,38 @@ public class WorldManagementListener implements Listener {
 		if (info == null) {
 			return;
 		}
+
+		ContentData contentData = MonumentaRedisSyncAPI.getPlayerContentData(player);
+		World expectedContentWorld;
+		try {
+			expectedContentWorld = getSortWorld(player, info);
+		} catch (Exception ignored) {
+			expectedContentWorld = null;
+		}
+		if (
+			WorldManagementPlugin.isSortByContent() && contentData != null && contentData.getId().equals(info.getContentName()) &&
+			(expectedContentWorld == null || expectedContentWorld.getName().equals(player.getWorld().getName()))
+		) {
+			// Player is joining the content they're assigned to;
+			// check for any post-arrival data, apply it, then clear temporary data
+
+			// Player has arrived; location data is no longer relevant
+			contentData.setReturnLocation(null);
+			contentData.setArrivalLocation(null);
+
+			// Command to run on arrival
+			NamespacedKey mcfunctionOnArrival = contentData.getMcfunctionOnArrival();
+			if (mcfunctionOnArrival != null) {
+				MMLog.debug("Running content mcfunctionOnArrival command on player=" + player.getName() + " thread=" + Thread.currentThread().getName());
+				Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "execute as " + player.getUniqueId() + " at @s run function " + mcfunctionOnArrival.asString());
+
+				// Command has been run, clear it
+				contentData.setMcfunctionOnArrival(null);
+			}
+
+			MonumentaRedisSyncAPI.savePlayerContent(player.getUniqueId(), contentData);
+		}
+
 		String instanceObjective = info.getInstanceObjective();
 		if (instanceObjective.isEmpty()) {
 			return;
