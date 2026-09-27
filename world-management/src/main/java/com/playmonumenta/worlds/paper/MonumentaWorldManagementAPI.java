@@ -17,7 +17,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
-import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.World.Environment;
 import org.bukkit.WorldCreator;
@@ -99,9 +98,11 @@ public class MonumentaWorldManagementAPI {
 	 * @throws Exception If the world management listener is null (not initialized)
 	 */
 	public static void sortWorld(Player player) throws Exception {
-		WorldManagementListener listener = WorldManagementListener.getInstance();
-		if (listener == null) {
-			throw new Exception("WorldManagementListener is null");
+		WorldManagementListener listener;
+		try {
+			listener = WorldManagementListener.getInstance();
+		} catch (RuntimeException ex) {
+			throw new Exception("WorldManagementListener is not initialized", ex);
 		}
 
 		// Important - need to save the player's location data on the existing world
@@ -117,7 +118,7 @@ public class MonumentaWorldManagementAPI {
 		ContentData contentData = MonumentaRedisSyncAPI.getPlayerContentData(player);
 		World expectedContentWorld;
 		try {
-			expectedContentWorld = WorldManagementListener.getInstance().getSortWorld(player, info);
+			expectedContentWorld = listener.getSortWorld(player, info);
 		} catch (Exception ignored) {
 			expectedContentWorld = null;
 		}
@@ -126,7 +127,7 @@ public class MonumentaWorldManagementAPI {
 			contentData.getId().equals(info.getContentName()) &&
 			(expectedContentWorld == null || expectedContentWorld.getName().equals(newWorld.getName()))
 		) {
-			WorldManagementListener.getInstance().processEphemeralContentData(player, contentData);
+			listener.processEphemeralContentData(player, contentData);
 		}
 	}
 
@@ -191,9 +192,11 @@ public class MonumentaWorldManagementAPI {
 
 	public static CompletableFuture<Void> unloadWorld(String worldName) {
 		CompletableFuture<Void> future = new CompletableFuture<>();
-		WorldManagementListener listener = WorldManagementListener.getInstance();
-		if (listener == null) {
-			future.completeExceptionally(new Exception("WorldManagementListener is null"));
+		WorldManagementListener listener;
+		try {
+			listener = WorldManagementListener.getInstance();
+		} catch (RuntimeException ex) {
+			future.completeExceptionally(new Exception("WorldManagementListener is not initialized", ex));
 			return future;
 		}
 

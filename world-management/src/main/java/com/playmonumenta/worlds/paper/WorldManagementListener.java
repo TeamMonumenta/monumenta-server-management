@@ -46,8 +46,12 @@ public class WorldManagementListener implements Listener {
 		reloadConfig();
 	}
 
-	protected static @Nullable WorldManagementListener getInstance() {
-		return INSTANCE;
+	protected static WorldManagementListener getInstance() {
+		WorldManagementListener instance = INSTANCE;
+		if (instance == null) {
+			throw new RuntimeException("Attempted to get WorldManagementListener instance before initialization");
+		}
+		return instance;
 	}
 
 	/*
