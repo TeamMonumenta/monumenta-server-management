@@ -187,7 +187,7 @@ public class WorldManagementPlugin extends JavaPlugin {
 		// Eventually need to sort the player's shard if this does not match
 		ContentInfo info;
 		if (isSortByContent()) {
-			info = mContentInfoMap.get(MonumentaRedisSyncAPI.getPlayerContentData(player).getId());
+			info = getContentInfo(MonumentaRedisSyncAPI.getPlayerContentData(player).getId());
 			if (info != null) {
 				return info;
 			}

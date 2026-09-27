@@ -326,18 +326,35 @@ public class WorldManagementListener implements Listener {
 	}
 
 	/**
-	 * Gets the world where a player should be sorted to based on their instance score.
-	 * <p>
-	 * Throws an exception if score is negative or the world fails to load. Will trigger instance pregeneration if applicable.
+	 * Gets the world where a player should be sorted to based on their content and instance score.
 	 * <p>
 	 * Will not actually put the player on this world - need to do this and then also set their location data.
 	 * <p>
-	 * XXX: This should only be called as a precursor to moving the player to this world immediately afterwards on this same tick, otherwise the join/rejoin functions will be called incorrectly!
+	 * XXX: This should only be called as a precursor to moving the player to this world immediately afterward on this same tick, otherwise the join/rejoin functions will be called incorrectly!
 	 * <p>
 	 * Must be called from the main thread
+	 * @param player The player whose sorted world we wish to identify
+	 * @return The world the player should be sorted to
+	 * @throws Exception The player's score is negative, the world failed to load, or the plugin hasn't started. Will trigger instance pregeneration if applicable.
 	 */
 	protected World getSortWorld(Player player) throws Exception {
-		ContentInfo info = WorldManagementPlugin.getContentInfo(player);
+		return getSortWorld(player, WorldManagementPlugin.getContentInfo(player));
+	}
+
+	/**
+	 * Gets the world where a player should be sorted to for specific content based on their instance score.
+	 * <p>
+	 * Will not actually put the player on this world - need to do this and then also set their location data.
+	 * <p>
+	 * XXX: This should only be called as a precursor to moving the player to this world immediately afterward on this same tick, otherwise the join/rejoin functions will be called incorrectly!
+	 * <p>
+	 * Must be called from the main thread
+	 * @param player The player whose sorted world we wish to identify
+	 * @param info The specific content info to check against, which may not be their current content
+	 * @return The world the player should be sorted to
+	 * @throws Exception The player's score is negative, the world failed to load, or the plugin hasn't started. Will trigger instance pregeneration if applicable.
+	 */
+	protected World getSortWorld(Player player, @Nullable ContentInfo info) throws Exception {
 		if (info == null) {
 			throw new Exception("Tried to get sort world for player but no instancing content info exists");
 		}
