@@ -134,13 +134,18 @@ public class MonumentaWorldManagementAPI {
 	/**
 	 * Gets the specified world, loading and optionally creating it if needed.
 	 * <p>
-	 * Will always return a non-null world, or throw an exception if the request is not possible
+	 * Will always return a non-null world, or throw an exception if the request is not possible.
 	 * <p>
-	 * If world is already loaded will return it (fast)
-	 * If world already exists but is not loaded, will load that world (slow, maybe a few ticks on good hardware)
-	 * If world does not exist and templateName is not null, will rename a pregenerated world to that name and load it
+	 * If world is already loaded will return it (fast).
+	 * If world already exists but is not loaded, will load that world (slow, maybe a few ticks on good hardware).
+	 * If world does not exist and templateName is not null, will rename a pregenerated world to that name and load it.
 	 * <p>
-	 * Must be called from the main thread
+	 * Must be called from the main thread.
+	 *
+	 * @param worldName    The world name to ensure is loaded
+	 * @param templateName If not null, the template to use to create worldName if it does not exist
+	 * @return The loaded world
+	 * @throws Exception If the world could not be loaded or generated
 	 */
 	public static World ensureWorldLoaded(String worldName, @Nullable String templateName) throws Exception {
 		WorldManagementPlugin plugin = WorldManagementPlugin.getInstance();
@@ -206,7 +211,7 @@ public class MonumentaWorldManagementAPI {
 			return future;
 		}
 
-		if (Bukkit.getWorlds().get(0).equals(world)) {
+		if (Bukkit.getWorlds().getFirst().equals(world)) {
 			future.completeExceptionally(new Exception("Can't unload main world '" + worldName + "'"));
 			return future;
 		}
