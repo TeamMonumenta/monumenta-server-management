@@ -75,12 +75,12 @@ public class WorldManagementListener implements Listener {
 		}
 
 		String worldName = info.getWorldName(player);
-		String templateName = info.getVariant(player);
 		if (worldName == null) {
 			player.sendMessage(Component.text("You respawned on an instanced world without an instance assigned to you. Unless you are an operator, this is probably a bug", NamedTextColor.RED));
 			return;
 		}
 
+		String templateName = info.getVariant(player);
 		try {
 			World world = MonumentaWorldManagementAPI.ensureWorldLoaded(worldName, templateName);
 
@@ -116,6 +116,7 @@ public class WorldManagementListener implements Listener {
 
 		World sortWorld = null;
 		if (!WorldManagementPlugin.isSortWorldByScoreOnJoin()) {
+			MMLog.debug("playerJoinSetWorldEvent: player=" + player.getName() + " Not attempting to sort the player by world, this is disabled on join");
 			String lastSavedWorldName = event.getLastSavedWorldName();
 
 			if (lastSavedWorldName != null) {
@@ -130,9 +131,11 @@ public class WorldManagementListener implements Listener {
 				}
 			}
 		} else {
+			MMLog.debug("playerJoinSetWorldEvent: player=" + player.getName() + " Attempting to sort the player by world");
 			try {
 				sortWorld = getSortWorld(player);
 				event.setWorld(sortWorld);
+				MMLog.debug("playerJoinSetWorldEvent: player=" + player.getName() + " sorted the player by score into " + sortWorld.getName());
 			} catch (Exception ex) {
 				MMLog.warning("Failed to set world for player " + player.getName(), ex);
 			}

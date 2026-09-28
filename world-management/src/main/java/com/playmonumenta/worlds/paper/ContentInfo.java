@@ -123,7 +123,7 @@ public class ContentInfo {
 			score = 0;
 			variantTemplate = mVariantTemplates.get(0);
 		}
-		if (variantTemplate == null) {
+		if (variantTemplate == null && !mVariantTemplates.isEmpty()) {
 			MMLog.severe("No template world for score " + score);
 		}
 		return variantTemplate;
