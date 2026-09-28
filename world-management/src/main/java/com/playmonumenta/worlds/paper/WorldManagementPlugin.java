@@ -183,17 +183,13 @@ public class WorldManagementPlugin extends JavaPlugin {
 	}
 
 	public static @Nullable ContentInfo getContentInfo(Player player) {
-		// TODO: If the content is not available on the current shard, use the first entry
+		// TODO: If the content is not available on the current shard, and content is enabled, return null
 		// Eventually need to sort the player's shard if this does not match
-		ContentInfo info;
 		if (isSortByContent()) {
-			info = getContentInfo(MonumentaRedisSyncAPI.getPlayerContentData(player).getId());
-			if (info != null) {
-				return info;
-			}
-		} else {
-			info = null;
+			return getContentInfo(MonumentaRedisSyncAPI.getPlayerContentData(player).getId());
 		}
+
+		ContentInfo info = null;
 		for (ContentInfo contentInfo : mContentInfoMap.values()) {
 			info = contentInfo;
 			break;
