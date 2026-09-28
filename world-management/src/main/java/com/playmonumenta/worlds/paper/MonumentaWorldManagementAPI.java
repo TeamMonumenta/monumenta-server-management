@@ -105,14 +105,14 @@ public class MonumentaWorldManagementAPI {
 			throw new Exception("WorldManagementListener is not initialized", ex);
 		}
 
+		// Remember the player's previous world for later
+		World oldWorld = player.getWorld();
+
 		// Important - need to save the player's location data on the existing world
 		player.saveData();
 
 		// Figure out what world the player would sort to
 		World newWorld = listener.getSortWorld(player);
-
-		// Move the player to that world at their last position (or world spawn)
-		MonumentaRedisSyncAPI.getPlayerWorldData(player, newWorld).applyToPlayer(player);
 
 		ContentInfo info = WorldManagementPlugin.getContentInfo(player);
 		ContentData contentData = MonumentaRedisSyncAPI.getPlayerContentData(player);
@@ -122,13 +122,30 @@ public class MonumentaWorldManagementAPI {
 		} catch (Exception ignored) {
 			expectedContentWorld = null;
 		}
-		if (
+		boolean processContentData = (
 			WorldManagementPlugin.isSortByContent() && contentData != null && info != null &&
 			contentData.getId().equals(info.getContentName()) &&
 			(expectedContentWorld == null || expectedContentWorld.getName().equals(newWorld.getName()))
-		) {
-			listener.processEphemeralContentData(player, contentData);
+		);
+
+		CompletableFuture<Void> preprocessArrivalDataFuture;
+		if (processContentData) {
+			preprocessArrivalDataFuture = WorldManagementListener.getInstance().preprocessArrivalContentData(player, contentData, newWorld.getName(), true);
+		} else {
+			preprocessArrivalDataFuture = CompletableFuture.completedFuture(null);
 		}
+		preprocessArrivalDataFuture.whenComplete((ignored, ex) -> {
+			if (ex != null) {
+				MMLog.severe("Unable to set world arrival data for " + player.getName() + " on " + newWorld.getName(), ex);
+			}
+
+			// Move the player to that world at their last position (or world spawn)
+			MonumentaRedisSyncAPI.getPlayerWorldData(player, newWorld).applyToPlayer(player);
+
+			if (processContentData) {
+				listener.processEphemeralContentData(player, contentData, oldWorld.getName());
+			}
+		});
 	}
 
 	/**

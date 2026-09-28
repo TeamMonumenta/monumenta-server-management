@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.data.ContentData;
+import com.playmonumenta.redissync.data.OptionalLocation;
 import com.playmonumenta.redissync.event.PlayerContentChangeRequestEvent;
 import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -166,6 +168,7 @@ public class WorldManagementListener implements Listener {
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
 	public void playerJoinEvent(PlayerJoinEvent event) {
 		Player player = event.getPlayer();
+		World oldWorld = player.getWorld();
 		final var uuid = player.getUniqueId();
 		// FIXME: replace with configuration phase aware code
 		Bukkit.getScheduler().runTask(mPlugin, () -> {
@@ -189,7 +192,7 @@ public class WorldManagementListener implements Listener {
 			WorldManagementPlugin.isSortByContent() && contentData != null && contentData.getId().equals(info.getContentName()) &&
 			(expectedContentWorld == null || expectedContentWorld.getName().equals(player.getWorld().getName()))
 		) {
-			processEphemeralContentData(player, contentData);
+			processEphemeralContentData(player, contentData, oldWorld.getName());
 		}
 
 		String instanceObjective = info.getInstanceObjective();
@@ -306,13 +309,46 @@ public class WorldManagementListener implements Listener {
 		}
 	}
 
-	protected void processEphemeralContentData(Player player, ContentData contentData) {
+	/**
+	 * Process arrival location, and any other data that must be set before sending the player to that location
+	 * @param player       The player being moved
+	 * @param contentData  The content data matching that world
+	 * @param arrivalWorld The world name that was determined
+	 * @return A future indicating the application of the arrival location, and any other pre-teleport data
+	 */
+	@SuppressWarnings("SameParameterValue") // isLocalWorld will be false when handling other shards later
+	protected CompletableFuture<Void> preprocessArrivalContentData(Player player, ContentData contentData, String arrivalWorld, boolean isLocalWorld) {
+		OptionalLocation arrivalLocation = contentData.getArrivalLocation();
+		if (arrivalLocation == null) {
+			return CompletableFuture.completedFuture(null);
+		}
+		CompletableFuture<Void> future = MonumentaRedisSyncAPI.setPlayerLocationOnWorld(
+			player, arrivalWorld, arrivalLocation.positionBukkit(), arrivalLocation.yaw(), arrivalLocation.pitch()
+		);
+		if (isLocalWorld) {
+			// No need to wait for completion - at least in this case, since it's mirrored locally
+			contentData.setArrivalLocation(null);
+			return CompletableFuture.completedFuture(null);
+		}
+
+		// Remote world, need to wait for redis to accept the data first
+		future.thenAccept(ignored -> contentData.setArrivalLocation(null));
+		return future;
+	}
+
+	protected void processEphemeralContentData(Player player, ContentData contentData, String returnWorld) {
 		// Player is joining the content they're assigned to;
 		// check for any post-arrival data, apply it, then clear temporary data
 
-		// Player has arrived; location data is no longer relevant
+		// Player has already arrived; process location data and clear it
+		OptionalLocation returnLocation = contentData.getReturnLocation();
+		if (!returnWorld.equals(player.getWorld().getName()) && returnLocation != null) {
+			// The player just left - no need to delay on this
+			MonumentaRedisSyncAPI.setPlayerLocationOnWorld(
+				player, returnWorld, returnLocation.positionBukkit(), returnLocation.yaw(), returnLocation.pitch()
+			);
+		}
 		contentData.setReturnLocation(null);
-		contentData.setArrivalLocation(null);
 
 		// Command to run on arrival
 		NamespacedKey mcfunctionOnArrival = contentData.getMcfunctionOnArrival();
