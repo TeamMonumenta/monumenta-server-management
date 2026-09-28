@@ -599,19 +599,21 @@ public class DataEventListener implements Listener {
 			playerWorld = worldEvent.getWorld();
 			MMLog.trace("After PlayerJoinSetWorldEvent for player '" + playerName + "' got world={" + playerWorld.getUID() + ": " + playerWorld.getName() + "}");
 
-			final ReadWriteNBT worldShardDataNBT;
+			ReadWriteNBT worldShardDataNBT = NBT.createNBTObject();
 			if (shardData == null || shardData.isEmpty()) {
 				MMLog.trace("No shard data for player '" + playerName + "'");
-				worldShardDataNBT = NBT.createNBTObject();
 			} else {
 				/* Look up in the shard data first the "world" part - data from this world about where the player should be */
 				String worldShardData = shardData.get(MonumentaRedisSyncAPI.getRedisPerShardDataWorldKey(playerWorld));
 				if (worldShardData == null || worldShardData.isEmpty()) {
 					MMLog.trace("No world shard data for player '" + playerName + "', using default");
-					worldShardDataNBT = NBT.createNBTObject();
 				} else {
 					MMLog.trace("Found world shard data for player '" + playerName + "': '" + worldShardData + "'");
-					worldShardDataNBT = NBT.parseNBT(worldShardData);
+					try {
+						worldShardDataNBT = NBT.parseNBT(worldShardData);
+					} catch (Exception e) {
+						MMLog.warning("Error parsing world shard data for player '" + playerName + "'");
+					}
 				}
 			}
 
