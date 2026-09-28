@@ -15,8 +15,10 @@ import dev.jorel.commandapi.arguments.GreedyStringArgument;
 import dev.jorel.commandapi.arguments.StringArgument;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import dev.jorel.commandapi.executors.CommandArguments;
+import dev.jorel.commandapi.wrappers.NativeProxyCommandSender;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -38,17 +40,15 @@ public class ContentCommand {
 			.withPermission(PERMISSION)
 			.withArguments(
 				new StringArgument("content")
-					.replaceSuggestions(ArgumentSuggestions.stringCollection(info -> MonumentaRedisSyncAPI.availableContentIds())),
-				new EntitySelectorArgument.OnePlayer("player"),
-				new EntitySelectorArgument.ManyPlayers("others")
+					.replaceSuggestions(ArgumentSuggestions.stringCollection(info -> MonumentaRedisSyncAPI.availableContentIds()))
 			)
 			.withOptionalArguments(
+				new EntitySelectorArgument.OnePlayer("player"),
+				new EntitySelectorArgument.ManyPlayers("others"),
 				new GreedyStringArgument("optionals")
 					.replaceSuggestions(ContentCommand::optionalSuggestions)
 			)
-			.executesNative((sender, args) -> {
-				execute(args);
-			})
+			.executesNative(ContentCommand::execute)
 			.register();
 
 		new CommandAPICommand("contentdebug")
@@ -65,11 +65,22 @@ public class ContentCommand {
 			.register();
 	}
 
-	private static void execute(CommandArguments args) throws WrapperCommandSyntaxException {
+	private static void execute(NativeProxyCommandSender sender, CommandArguments args) throws WrapperCommandSyntaxException {
 		String content = Objects.requireNonNull(args.getUnchecked("content"));
-		Player player = Objects.requireNonNull(args.getUnchecked("player"));
-		Collection<Player> others = Objects.requireNonNull(args.getUnchecked("others"));
+		Player player = args.getUnchecked("player");
+		Collection<Player> others = args.getUnchecked("others");
 		ContentOptionals optionals = parseOptionals(args.getUnchecked("optionals"));
+
+		if (player == null) {
+			if (!(sender.getCallee() instanceof Player callee)) {
+				throw CommandAPI.failWithString("Player must be specified, or command must be run as a player");
+			}
+			player = callee;
+		}
+
+		if (others == null) {
+			others = List.of();
+		}
 
 		ContentData data = new ContentData(content);
 		if (optionals != null) {
