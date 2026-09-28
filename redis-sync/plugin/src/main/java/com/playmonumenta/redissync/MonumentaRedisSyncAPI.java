@@ -734,7 +734,7 @@ public class MonumentaRedisSyncAPI {
 		CompletableFuture<Void> future = new CompletableFuture<>();
 
 		String shardDataPath = getRedisPerShardDataPath(player);
-		String worldKey = MonumentaRedisSyncAPI.getRedisPerShardDataWorldKey(player.getWorld());
+		String worldKey = getRedisPerShardDataWorldKey(player.getWorld());
 		// Also update the local sharddata cache
 		Map<String, String> shardDataMap = DataEventListener.getPlayerShardData(player.getUniqueId());
 		JsonObject worldShardDataJson;
