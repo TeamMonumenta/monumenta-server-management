@@ -13,6 +13,9 @@ import com.playmonumenta.redissync.event.PlayerContentChangeRequestEvent;
 import com.playmonumenta.redissync.event.UpdateAvailableContentIdsEvent;
 import com.playmonumenta.redissync.utils.MMLog;
 import com.playmonumenta.redissync.utils.Trie;
+import de.tr7zw.nbtapi.NBT;
+import de.tr7zw.nbtapi.iface.ReadWriteNBT;
+import de.tr7zw.nbtapi.iface.ReadWriteNBTList;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
 import dev.jorel.commandapi.wrappers.Rotation;
 import io.lettuce.core.KeyValue;
@@ -946,10 +949,10 @@ public class MonumentaRedisSyncAPI {
 		private final boolean mSpawnForced; // {"SpawnForced":true}
 		private final boolean mFlying; // {"flying":false}
 		private final boolean mFallFlying; // {"FallFlying":false}
-		private final float mFallDistance; // {"FallDistance":0.0}
+		private final double mFallDistance; // {"FallDistance":0.0}
 		private final boolean mOnGround; // {"OnGround":true}
 
-		private PlayerWorldData(Location spawnLoc, Location playerLoc, Vector motion, boolean spawnForced, boolean flying, boolean fallFlying, float fallDistance, boolean onGround) {
+		private PlayerWorldData(Location spawnLoc, Location playerLoc, Vector motion, boolean spawnForced, boolean flying, boolean fallFlying, double fallDistance, boolean onGround) {
 			mSpawnLoc = spawnLoc;
 			mPlayerLoc = playerLoc;
 			mMotion = motion;
@@ -989,11 +992,11 @@ public class MonumentaRedisSyncAPI {
 			player.setVelocity(mMotion);
 			player.setFlying(mFlying && player.getAllowFlight());
 			player.setGliding(mFallFlying);
-			player.setFallDistance(mFallDistance);
-			player.setBedSpawnLocation(mSpawnLoc, mSpawnForced);
+			player.setFallDistance((float) mFallDistance);
+			player.setRespawnLocation(mSpawnLoc, mSpawnForced);
 		}
 
-		private static PlayerWorldData fromJson(@Nullable String jsonStr, World world) {
+		private static PlayerWorldData fromSNBT(@Nullable String nbtStr, World world) {
 			// Defaults to world spawn
 			Location spawnLoc = world.getSpawnLocation();
 			Location playerLoc = spawnLoc.clone();
@@ -1001,53 +1004,58 @@ public class MonumentaRedisSyncAPI {
 			boolean spawnForced = true;
 			boolean flying = false;
 			boolean fallFlying = false;
-			float fallDistance = 0;
+			double fallDistance = 0;
 			boolean onGround = true;
 
-			if (jsonStr != null && !jsonStr.isEmpty()) {
-				try {
-					JsonObject obj = new Gson().fromJson(jsonStr, JsonObject.class);
-					if (obj.has("SpawnX")) {
-						spawnLoc.setX(obj.get("SpawnX").getAsDouble());
+			if (nbtStr != null && !nbtStr.isEmpty()) {
+				ReadWriteNBT nbt = NBT.parseNBT(nbtStr);
+				ReadWriteNBT respawn = nbt.getCompound("respawn");
+				if (respawn != null) {
+					int[] pos = respawn.getIntArray("pos");
+					if (pos != null) {
+						spawnLoc.setX(pos[0]);
+						spawnLoc.setY(pos[1]);
+						spawnLoc.setZ(pos[2]);
 					}
-					if (obj.has("SpawnY")) {
-						spawnLoc.setY(obj.get("SpawnY").getAsDouble());
+					spawnLoc.setYaw(respawn.getFloat("yaw"));
+					spawnLoc.setPitch(respawn.getFloat("pitch"));
+					spawnForced = respawn.getBoolean("forced");
+				}
+				if (nbt.hasTag("Pos")) {
+					ReadWriteNBTList<Double> pos = nbt.getDoubleList("Pos");
+					if (pos != null) {
+						playerLoc.setX(pos.get(0));
+						playerLoc.setY(pos.get(1));
+						playerLoc.setZ(pos.get(2));
 					}
-					if (obj.has("SpawnZ")) {
-						spawnLoc.setZ(obj.get("SpawnZ").getAsDouble());
+				}
+				if (nbt.hasTag("Rotation")) {
+					ReadWriteNBTList<Float> rotation = nbt.getFloatList("Rotation");
+					if (rotation != null) {
+						playerLoc.setYaw(rotation.get(0));
+						playerLoc.setPitch(rotation.get(1));
 					}
-					if (obj.has("Pos")) {
-						JsonArray arr = obj.get("Pos").getAsJsonArray();
-						playerLoc.setX(arr.get(0).getAsDouble());
-						playerLoc.setY(arr.get(1).getAsDouble());
-						playerLoc.setZ(arr.get(2).getAsDouble());
+				}
+				if (nbt.hasTag("Motion")) {
+					ReadWriteNBTList<Double> motionList = nbt.getDoubleList("Motion");
+					if (motionList != null) {
+						motion = new Vector(motionList.get(0), motionList.get(1), motionList.get(2));
 					}
-					if (obj.has("Rotation")) {
-						JsonArray arr = obj.get("Rotation").getAsJsonArray();
-						playerLoc.setYaw(arr.get(0).getAsFloat());
-						playerLoc.setPitch(arr.get(1).getAsFloat());
+				}
+				ReadWriteNBT abilities = nbt.getCompound("abilities");
+				if (abilities != null) {
+					if (abilities.hasTag("flying")) {
+						flying = Byte.valueOf((byte) 1).equals(abilities.getByte("flying"));
 					}
-					if (obj.has("Motion")) {
-						JsonArray arr = obj.get("Motion").getAsJsonArray();
-						motion = new Vector(arr.get(0).getAsDouble(), arr.get(1).getAsDouble(), arr.get(2).getAsDouble());
-					}
-					if (obj.has("SpawnForced")) {
-						spawnForced = obj.get("SpawnForced").getAsBoolean();
-					}
-					if (obj.has("flying")) {
-						flying = obj.get("flying").getAsBoolean();
-					}
-					if (obj.has("FallFlying")) {
-						fallFlying = obj.get("FallFlying").getAsBoolean();
-					}
-					if (obj.has("FallDistance")) {
-						fallDistance = obj.get("FallDistance").getAsFloat();
-					}
-					if (obj.has("OnGround")) {
-						onGround = obj.get("OnGround").getAsBoolean();
-					}
-				} catch (Exception ex) {
-					MMLog.severe("Failed to parse shard data", ex);
+				}
+				if (nbt.hasTag("FallFlying")) {
+					fallFlying = nbt.getBoolean("FallFlying");
+				}
+				if (nbt.hasTag("fall_distance")) {
+					fallDistance = nbt.getDouble("fall_distance");
+				}
+				if (nbt.hasTag("OnGround")) {
+					onGround = nbt.getBoolean("OnGround");
 				}
 			}
 
@@ -1068,15 +1076,15 @@ public class MonumentaRedisSyncAPI {
 	public static PlayerWorldData getPlayerWorldData(Player player, World world) {
 		Map<String, String> shardData = DataEventListener.getPlayerShardData(player.getUniqueId());
 		if (shardData == null || shardData.isEmpty()) {
-			return PlayerWorldData.fromJson(null, world);
+			return PlayerWorldData.fromSNBT(null, world);
 		}
 
 		String worldShardData = shardData.get(getRedisPerShardDataWorldKey(world));
 		if (worldShardData == null || worldShardData.isEmpty()) {
-			return PlayerWorldData.fromJson(null, world);
+			return PlayerWorldData.fromSNBT(null, world);
 		}
 
-		return PlayerWorldData.fromJson(worldShardData, world);
+		return PlayerWorldData.fromSNBT(worldShardData, world);
 	}
 
 	/**
@@ -1188,7 +1196,7 @@ public class MonumentaRedisSyncAPI {
 				history = new String(historyBytes, StandardCharsets.UTF_8);
 			}
 
-			return new RedisPlayerData(uuid, mrs.getVersionAdapter().retrieveSaveData(data, new JsonObject()), advancements, scores, pluginData, content, history);
+			return new RedisPlayerData(uuid, mrs.getVersionAdapter().retrieveSaveData(data, NBT.createNBTObject()), advancements, scores, pluginData, content, history);
 		} catch (Exception e) {
 			MMLog.severe("Failed to parse player data", e);
 			return null;

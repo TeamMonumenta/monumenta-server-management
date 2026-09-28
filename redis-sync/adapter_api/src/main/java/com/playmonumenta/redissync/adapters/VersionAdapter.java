@@ -1,6 +1,7 @@
 package com.playmonumenta.redissync.adapters;
 
 import com.google.gson.JsonObject;
+import de.tr7zw.nbtapi.iface.ReadableNBT;
 import java.io.IOException;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -22,9 +23,9 @@ public interface VersionAdapter {
 
 	class SaveData {
 		private final byte[] mData;
-		private final @Nullable String mShardData;
+		private final @Nullable ReadableNBT mShardData;
 
-		protected SaveData(byte[] data, @Nullable String shardData) {
+		protected SaveData(byte[] data, @Nullable ReadableNBT shardData) {
 			mData = data;
 			mShardData = shardData;
 		}
@@ -33,7 +34,7 @@ public interface VersionAdapter {
 			return mData;
 		}
 
-		public @Nullable String getShardData() {
+		public @Nullable ReadableNBT getShardData() {
 			return mShardData;
 		}
 	}
@@ -42,7 +43,7 @@ public interface VersionAdapter {
 
 	void resetPlayerScores(String playerName, Scoreboard scoreboard);
 
-	Object retrieveSaveData(byte[] data, JsonObject shardData) throws IOException;
+	Object retrieveSaveData(byte[] data, ReadableNBT shardData) throws IOException;
 
 	SaveData extractSaveData(Object nbtObj, @Nullable ReturnParams returnParams) throws IOException;
 

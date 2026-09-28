@@ -1,15 +1,14 @@
 package com.playmonumenta.redissync;
 
+import com.destroystokyo.paper.profile.PlayerProfile;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
+import com.playmonumenta.common.event.PlayerTransferFailEvent;
 import com.playmonumenta.papermixins.paperapi.v1.event.PlayerAdvancementDataLoadEvent;
 import com.playmonumenta.papermixins.paperapi.v1.event.PlayerAdvancementDataSaveEvent;
 import com.playmonumenta.papermixins.paperapi.v1.event.PlayerDataLoadEvent;
 import com.playmonumenta.papermixins.paperapi.v1.event.PlayerDataSaveEvent;
-import com.destroystokyo.paper.profile.PlayerProfile;
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonSyntaxException;
-import com.playmonumenta.common.event.PlayerTransferFailEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.adapters.VersionAdapter.ReturnParams;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
@@ -19,6 +18,9 @@ import com.playmonumenta.redissync.event.PlayerSaveEvent;
 import com.playmonumenta.redissync.event.UpdateAvailableContentIdsEvent;
 import com.playmonumenta.redissync.utils.MMLog;
 import com.playmonumenta.redissync.utils.ScoreboardUtils;
+import de.tr7zw.nbtapi.NBT;
+import de.tr7zw.nbtapi.iface.ReadWriteNBT;
+import de.tr7zw.nbtapi.iface.ReadWriteNBTList;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.output.KeyValueStreamingChannel;
 import io.papermc.paper.event.server.ServerResourcesReloadedEvent;
@@ -597,45 +599,45 @@ public class DataEventListener implements Listener {
 			playerWorld = worldEvent.getWorld();
 			MMLog.trace("After PlayerJoinSetWorldEvent for player '" + playerName + "' got world={" + playerWorld.getUID() + ": " + playerWorld.getName() + "}");
 
-			final JsonObject worldShardDataJson;
+			final ReadWriteNBT worldShardDataNBT;
 			if (shardData == null || shardData.isEmpty()) {
 				MMLog.trace("No shard data for player '" + playerName + "'");
-				worldShardDataJson = new JsonObject();
+				worldShardDataNBT = NBT.createNBTObject();
 			} else {
 				/* Look up in the shard data first the "world" part - data from this world about where the player should be */
 				String worldShardData = shardData.get(MonumentaRedisSyncAPI.getRedisPerShardDataWorldKey(playerWorld));
 				if (worldShardData == null || worldShardData.isEmpty()) {
 					MMLog.trace("No world shard data for player '" + playerName + "', using default");
-					worldShardDataJson = new JsonObject();
+					worldShardDataNBT = NBT.createNBTObject();
 				} else {
 					MMLog.trace("Found world shard data for player '" + playerName + "': '" + worldShardData + "'");
-					worldShardDataJson = mGson.fromJson(worldShardData, JsonObject.class);
+					worldShardDataNBT = NBT.parseNBT(worldShardData);
 				}
 			}
 
 			/* At this point shardDataJson is a JSON object, possibly empty or containing this world's last saved data elements */
 
-			if (!worldShardDataJson.has("Pos")) {
+			if (!worldShardDataNBT.hasTag("Pos")) {
 				// No position data, put player at world spawn
 				Location spawn = playerWorld.getSpawnLocation();
 
-				JsonArray pos = new JsonArray();
+				worldShardDataNBT.removeKey("Pos");
+				ReadWriteNBTList<Double> pos = worldShardDataNBT.getDoubleList("Pos");
 				pos.add(spawn.getX());
 				pos.add(spawn.getY());
 				pos.add(spawn.getZ());
-				worldShardDataJson.add("Pos", pos);
 
-				JsonArray rotation = new JsonArray();
+				worldShardDataNBT.removeKey("Rotation");
+				ReadWriteNBTList<Float> rotation = worldShardDataNBT.getFloatList("Rotation");
 				rotation.add(spawn.getYaw());
 				rotation.add(spawn.getPitch());
-				worldShardDataJson.add("Rotation", rotation);
 			}
 
-			worldShardDataJson.addProperty("world", playerWorld.getName());
+			worldShardDataNBT.setString("world", playerWorld.getName());
 
 			/* At this point shardDataJson contains at minimum the world the player should be attached to and the location/rotation */
 
-			Object nbtTagCompound = mAdapter.retrieveSaveData(data, worldShardDataJson);
+			Object nbtTagCompound = mAdapter.retrieveSaveData(data, worldShardDataNBT);
 			event.setData(nbtTagCompound);
 
 			MMLog.debug(() -> "Processing PlayerDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
@@ -746,12 +748,13 @@ public class DataEventListener implements Listener {
 			String worldKey = MonumentaRedisSyncAPI.getRedisPerShardDataWorldKey(player.getWorld());
 			// Also update the local sharddata cache
 			Map<String, String> shardDataMap = mShardData.get(playerId);
+			String shardData = data.getShardData() == null ? null : data.getShardData().toString();
 			if (shardDataMap == null) {
 				MMLog.warning("BUG! There was no player entry in the mShardData map for uuid=" + playerId + " name=" + playerName + ". This is not a fatal error, but player locations are likely wrong in some corner cases...");
 			} else {
-				shardDataMap.put(worldKey, data.getShardData());
+				shardDataMap.put(worldKey, shardData);
 			}
-			MMLog.trace("sharddata (world): " + worldKey + "=" + data.getShardData());
+			MMLog.trace("sharddata (world): " + worldKey + "=" + shardData);
 
 			// Save the data for this shard indicating which world the player is currently on
 			JsonObject overallShardData = new JsonObject();
@@ -787,7 +790,7 @@ public class DataEventListener implements Listener {
 			String scorePath = MonumentaRedisSyncAPI.getRedisScoresPath(player);
 
 			trackPendingSave(playerId, RedisAPI.multi(commands -> {
-				commands.hset(shardDataPath, worldKey, data.getShardData());
+				commands.hset(shardDataPath, worldKey, shardData);
 				commands.hset(shardDataPath, BukkitConfigAPI.getShardName(), overallShardDataStr);
 				commands.lpush(histPath, history);
 				commands.ltrim(histPath, 0, BukkitConfigAPI.getHistoryAmount());

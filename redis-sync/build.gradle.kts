@@ -10,6 +10,7 @@ tasks.withType<JavaCompile> {
 }
 
 val mixinapi = libs.mixinapi
+val nbtapi = libs.nbtapi
 
 monumenta {
 	id("MonumentaRedisSync")
@@ -17,19 +18,19 @@ monumenta {
 	pluginProject("redissync")
 	paper(
 		"com.playmonumenta.redissync.MonumentaRedisSync", BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
-        "1.20", "1.20-R0.1-SNAPSHOT",
+        "26.1.2", "26.1.2.build.+",
 		depends = listOf("CommandAPI", "MonumentaCommon", "MonumentaNetworkRelay"),
 	)
 
-	versionAdapterApi("adapter_api", paper = "1.18.2-R0.1-SNAPSHOT")
-	versionAdapter("adapter_v1_20_R3", "1.20.4-R0.1-SNAPSHOT") {
+	versionAdapterApi("adapter_api", paper = "26.1.2.build.+") {
 		dependencies {
-			compileOnly(mixinapi)
+			compileOnly(nbtapi)
 		}
 	}
 	versionAdapter("adapter_26_1_2", "26.1.2.build.+") {
 		dependencies {
 			compileOnly(mixinapi)
+			compileOnly(nbtapi)
 		}
 	}
 	gitPrefix("redis-sync/")

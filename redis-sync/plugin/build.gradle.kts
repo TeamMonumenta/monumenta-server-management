@@ -9,6 +9,7 @@ dependencies {
 	compileOnly(project(":network-relay"))
 	compileOnly(libs.commandapi)
 	compileOnly(libs.brigadier)
+	compileOnly(libs.nbtapi)
 
 	// velocity dependencies
 	compileOnly(libs.velocity)
