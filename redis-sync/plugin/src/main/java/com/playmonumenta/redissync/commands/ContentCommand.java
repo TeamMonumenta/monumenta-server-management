@@ -126,17 +126,17 @@ public class ContentCommand {
 			// location/rotation suggestion logic
 			if (info.sender() instanceof Entity sender) {
 				Location location = sender.getLocation();
-				int suggestion = switch (state.count) {
-					case 0 -> location.getBlockX();
-					case 1 -> location.getBlockY();
-					case 2 -> location.getBlockZ();
+				double suggestion = switch (state.count) {
+					case 0 -> Math.round(location.getX() * 2.0) / 2.0;
+					case 1 -> Math.round(location.getY() * 2.0) / 2.0;
+					case 2 -> Math.round(location.getZ() * 2.0) / 2.0;
 					case 3 -> Math.round(location.getYaw() / 45) * 45;
 					case 4 -> Math.round(location.getPitch() / 45) * 45;
 					default -> 0;
 				};
-				builder.suggest(suggestion);
+				builder.suggest(state.count > 2 ? Integer.toString((int) suggestion) : Double.toString(suggestion));
 			} else {
-				builder.suggest(0);
+				builder.suggest("0");
 			}
 		}
 
@@ -187,6 +187,10 @@ public class ContentCommand {
 				while (state.count < 5 && state.index < tokens.length) {
 					try {
 						values[state.count] = Double.parseDouble(tokens[state.index]);
+						// x and z round up by 0.5 if integer values, otherwise parse as usual
+						if ((state.count == 0 || state.count == 2) && !tokens[state.index].contains(".")) {
+							values[state.count] += 0.5;
+						}
 						state.count++;
 						state.index++;
 					} catch (NumberFormatException e) {
