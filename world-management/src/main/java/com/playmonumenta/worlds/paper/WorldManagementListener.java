@@ -74,40 +74,35 @@ public class WorldManagementListener implements Listener {
 			return;
 		}
 
-		int score = ScoreboardUtils.getScoreboardValue(player, info.getInstanceObjective()).orElse(0);
-		if (score <= 0) {
+		String worldName = info.getWorldName(player);
+		String templateName = info.getVariant(player);
+		if (worldName == null) {
 			player.sendMessage(Component.text("You respawned on an instanced world without an instance assigned to you. Unless you are an operator, this is probably a bug", NamedTextColor.RED));
-		} else {
-			try {
-				/* World should already be loaded, just need to grab it */
-				String templateName;
-				if (WorldManagementPlugin.allowInstanceAutocreation()) {
-					templateName = info.getVariant(player);
-				} else {
-					templateName = null;
-				}
-				World world = MonumentaWorldManagementAPI.ensureWorldLoaded(info.getBaseWorldName() + score, templateName);
+			return;
+		}
 
-				// RESPAWN: The player is respawning in this world after having (probably) died there
-				if (info.getRespawnInstanceCommand() != null) {
-					Bukkit.getScheduler().runTaskLater(mPlugin, () -> {
-						// Note that this will run after the player has been moved to the correct world, since it runs a tick later
-						if (Bukkit.getOnlinePlayers().contains(player)) {
-							MMLog.debug("Running respawn command on player=" + player.getName() + " thread=" + Thread.currentThread().getName());
-							Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "execute as " + player.getUniqueId() + " at @s run " + info.getRespawnInstanceCommand());
-						}
-					}, 1);
-				}
+		try {
+			World world = MonumentaWorldManagementAPI.ensureWorldLoaded(worldName, templateName);
 
-				if (!event.getRespawnLocation().getWorld().equals(world)) {
-					/* Modify the event so the player respawns on this same world at spawn */
-					event.setRespawnLocation(world.getSpawnLocation());
-				}
-			} catch (Exception ex) {
-				String msg = "Failed to load your assigned world instance " + score + ": " + ex.getMessage();
-				player.sendMessage(msg);
-				MMLog.warning(msg, ex);
+			// RESPAWN: The player is respawning in this world after having (probably) died there
+			if (info.getRespawnInstanceCommand() != null) {
+				Bukkit.getScheduler().runTaskLater(mPlugin, () -> {
+					// Note that this will run after the player has been moved to the correct world, since it runs a tick later
+					if (Bukkit.getOnlinePlayers().contains(player)) {
+						MMLog.debug("Running respawn command on player=" + player.getName() + " thread=" + Thread.currentThread().getName());
+						Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "execute as " + player.getUniqueId() + " at @s run " + info.getRespawnInstanceCommand());
+					}
+				}, 1);
 			}
+
+			if (!event.getRespawnLocation().getWorld().equals(world)) {
+				/* Modify the event so the player respawns on this same world at spawn */
+				event.setRespawnLocation(world.getSpawnLocation());
+			}
+		} catch (Exception ex) {
+			String msg = "Failed to load your assigned world instance " + worldName + ": " + ex.getMessage();
+			player.sendMessage(msg);
+			MMLog.warning(msg, ex);
 		}
 	}
 
@@ -456,8 +451,9 @@ public class WorldManagementListener implements Listener {
 			throw new Exception("Tried to get sort world for player but no instancing content info exists");
 		}
 
+		String worldName = info.getWorldName(player);
 		int score = ScoreboardUtils.getScoreboardValue(player, info.getInstanceObjective()).orElse(0);
-		if (score == 0) {
+		if (worldName == null) {
 			List<World> worlds = Bukkit.getWorlds();
 			if (worlds.isEmpty()) {
 				throw new Exception("There are no loaded worlds; has the server started?");
@@ -474,6 +470,6 @@ public class WorldManagementListener implements Listener {
 			templateName = null;
 		}
 
-		return MonumentaWorldManagementAPI.ensureWorldLoaded(info.getBaseWorldName() + score, templateName);
+		return MonumentaWorldManagementAPI.ensureWorldLoaded(worldName, templateName);
 	}
 }

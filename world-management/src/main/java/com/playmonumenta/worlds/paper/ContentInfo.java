@@ -24,7 +24,7 @@ public class ContentInfo {
 	protected ContentInfo(WorldManagementPlugin plugin, String contentName, ConfigurationSection config) {
 		mContentName = contentName;
 
-		mInstanceObjective = config.getString("instance-objective", "Instance");
+		mInstanceObjective = config.getString("instance-objective", "");
 		plugin.printConfig("    instance-objective", mInstanceObjective);
 
 		mBaseWorldName = config.getString("base-world-name", "instance");
@@ -74,6 +74,20 @@ public class ContentInfo {
 
 	public String getBaseWorldName() {
 		return mBaseWorldName;
+	}
+
+	public @Nullable String getWorldName(Player player) {
+		MMLog.debug(() -> "instanceObjective is null for " + getContentName() + ", using base name instead");
+		if (getInstanceObjective().isEmpty()) {
+			return getBaseWorldName();
+		} else {
+			int score = ScoreboardUtils.getScoreboardValue(player, getInstanceObjective()).orElse(0);
+			if (score <= 0) {
+				return null;
+			} else {
+				return getBaseWorldName() + score;
+			}
+		}
 	}
 
 	public @Nullable String getJoinInstanceCommand() {
