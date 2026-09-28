@@ -119,6 +119,7 @@ public class WorldManagementListener implements Listener {
 		Player player = event.getPlayer();
 		MMLog.debug("playerJoinSetWorldEvent: player=" + player.getName() + " thread=" + Thread.currentThread().getName());
 
+		World sortWorld = null;
 		if (!WorldManagementPlugin.isSortWorldByScoreOnJoin()) {
 			String lastSavedWorldName = event.getLastSavedWorldName();
 
@@ -135,10 +136,28 @@ public class WorldManagementListener implements Listener {
 			}
 		} else {
 			try {
-				event.setWorld(getSortWorld(player));
+				sortWorld = getSortWorld(player);
+				event.setWorld(sortWorld);
 			} catch (Exception ex) {
 				MMLog.warning("Failed to set world for player " + player.getName(), ex);
 			}
+		}
+
+		ContentInfo info = WorldManagementPlugin.getContentInfo(player);
+		ContentData contentData = MonumentaRedisSyncAPI.getPlayerContentData(player);
+		World expectedContentWorld;
+		try {
+			expectedContentWorld = getSortWorld(player, info);
+		} catch (Exception ignored) {
+			expectedContentWorld = null;
+		}
+		if (
+			WorldManagementPlugin.isSortByContent() && contentData != null && info != null &&
+			contentData.getId().equals(info.getContentName()) &&
+			sortWorld != null && expectedContentWorld != null &&
+			expectedContentWorld.getName().equals(sortWorld.getName())
+		) {
+			preprocessArrivalContentData(player, contentData, sortWorld.getName(), true);
 		}
 
 		if (WorldManagementPlugin.getNotifyWorldPermission() != null && player.hasPermission(WorldManagementPlugin.getNotifyWorldPermission())) {
@@ -188,10 +207,11 @@ public class WorldManagementListener implements Listener {
 		} catch (Exception ignored) {
 			expectedContentWorld = null;
 		}
-		if (
+		boolean processContentData = (
 			WorldManagementPlugin.isSortByContent() && contentData != null && contentData.getId().equals(info.getContentName()) &&
-			(expectedContentWorld == null || expectedContentWorld.getName().equals(player.getWorld().getName()))
-		) {
+			expectedContentWorld != null && expectedContentWorld.getName().equals(player.getWorld().getName())
+		);
+		if (processContentData) {
 			processEphemeralContentData(player, contentData, oldWorld.getName());
 		}
 

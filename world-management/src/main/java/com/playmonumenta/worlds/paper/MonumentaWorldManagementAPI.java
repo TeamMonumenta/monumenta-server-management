@@ -125,7 +125,7 @@ public class MonumentaWorldManagementAPI {
 		boolean processContentData = (
 			WorldManagementPlugin.isSortByContent() && contentData != null && info != null &&
 			contentData.getId().equals(info.getContentName()) &&
-			(expectedContentWorld == null || expectedContentWorld.getName().equals(newWorld.getName()))
+			expectedContentWorld != null && expectedContentWorld.getName().equals(newWorld.getName())
 		);
 
 		CompletableFuture<Void> preprocessArrivalDataFuture;
