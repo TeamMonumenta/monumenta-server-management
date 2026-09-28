@@ -714,6 +714,83 @@ public class MonumentaRedisSyncAPI {
 		});
 	}
 
+	/**
+	 * Sets a player's location on a given world.
+	 *
+	 * @param player    the player whose location to set
+	 * @param worldName the name of the world
+	 * @param loc       a vector containing coordinates the player should be set to
+	 * @param yaw       the yaw the player should be set to
+	 * @param pitch     the pitch the player should be set to
+	 *
+	 * @return a completable future which is completed when the saving has finished
+	 */
+	public static CompletableFuture<Void> setPlayerLocationOnWorld(Player player, String worldName, Vector loc, double yaw, double pitch) {
+		if (BukkitConfigAPI.getSavingDisabled()) {
+			/* No data saved, no data loaded */
+			return CompletableFuture.completedFuture(null);
+		}
+
+		CompletableFuture<Void> future = new CompletableFuture<>();
+
+		String shardDataPath = getRedisPerShardDataPath(player);
+		String worldKey = getRedisPerShardDataWorldKey(worldName);
+		// Also update the local sharddata cache
+		Map<String, String> shardDataMap = DataEventListener.getPlayerShardData(player.getUniqueId());
+		JsonObject worldShardDataJson;
+		if (shardDataMap == null) {
+			worldShardDataJson = new JsonObject();
+		} else {
+			String worldShardData = shardDataMap.get(worldKey);
+			if (worldShardData == null) {
+				worldShardDataJson = new JsonObject();
+			} else {
+				worldShardDataJson = new Gson().fromJson(worldShardData, JsonObject.class);
+			}
+		}
+
+		JsonArray pos = new JsonArray();
+		pos.add(loc.getX());
+		pos.add(loc.getY());
+		pos.add(loc.getZ());
+		worldShardDataJson.add("Pos", pos);
+
+		JsonArray rotation = new JsonArray();
+		rotation.add(yaw);
+		rotation.add(pitch);
+		worldShardDataJson.add("Rotation", rotation);
+
+		String worldShardDataStr = worldShardDataJson.toString();
+
+		if (shardDataMap != null) {
+			shardDataMap.put(worldKey, worldShardDataStr);
+		}
+
+		RedisAPI.multi(commands -> {
+			commands.hset(shardDataPath, worldKey, worldShardDataStr);
+		}).whenComplete((unused, ex2) -> {
+			if (ex2 != null) {
+				MMLog.severe("Failed to save player data for player=" + player.getName(), ex2);
+				future.completeExceptionally(ex2);
+				return;
+			}
+			future.complete(null);
+		});
+		return future;
+	}
+
+	/**
+	 * Sets a player's world and location on a different shard.
+	 *
+	 * @param player    the player whose location to set
+	 * @param shard     the shard that the world is on
+	 * @param worldName the name of the world
+	 * @param loc       a vector containing coordinates the player should be set to
+	 * @param yaw       the yaw the player should be set to
+	 * @param pitch     the pitch the player should be set to
+	 *
+	 * @return a completable future which is completed when the saving has finished
+	 */
 	public static CompletableFuture<Void> setPlayerWorldAndLocationOnShard(Player player, String shard, String worldName, Vector loc, double yaw, double pitch) {
 		if (BukkitConfigAPI.getSavingDisabled()) {
 			/* No data saved, no data loaded */
