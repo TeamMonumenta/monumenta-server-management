@@ -113,20 +113,25 @@ public class MonumentaWorldManagementAPI {
 
 		// Figure out what world the player would sort to
 		World newWorld = listener.getSortWorld(player);
+		MMLog.debug("MonumentaWorldManagementAPI.sortWorld(Player " + player.getName() + "): newWorld = " + newWorld.getName());
 
 		ContentInfo info = WorldManagementPlugin.getContentInfo(player);
+		MMLog.debug("MonumentaWorldManagementAPI.sortWorld(Player " + player.getName() + "): info = " + (info == null ? "null" : info.getContentName()));
 		ContentData contentData = MonumentaRedisSyncAPI.getPlayerContentData(player);
+		MMLog.debug("MonumentaWorldManagementAPI.sortWorld(Player " + player.getName() + "): contentData = " + (contentData == null ? "null" : contentData.getId()));
 		World expectedContentWorld;
 		try {
 			expectedContentWorld = listener.getSortWorld(player, info);
 		} catch (Exception ignored) {
 			expectedContentWorld = null;
 		}
+		MMLog.debug("MonumentaWorldManagementAPI.sortWorld(Player " + player.getName() + "): expectedContentWorld = " + (expectedContentWorld == null ? "null" : expectedContentWorld.getName()));
 		boolean processContentData = (
 			WorldManagementPlugin.isSortByContent() && contentData != null && info != null &&
 			contentData.getId().equals(info.getContentName()) &&
 			expectedContentWorld != null && expectedContentWorld.getName().equals(newWorld.getName())
 		);
+		MMLog.debug("MonumentaWorldManagementAPI.sortWorld(Player " + player.getName() + "): processContentData = " + processContentData);
 
 		CompletableFuture<Void> preprocessArrivalDataFuture;
 		if (processContentData) {

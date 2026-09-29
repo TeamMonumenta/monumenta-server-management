@@ -77,14 +77,16 @@ public class ContentInfo {
 	}
 
 	public @Nullable String getWorldName(Player player) {
-		MMLog.debug(() -> "instanceObjective is null for " + getContentName() + ", using base name instead");
 		if (getInstanceObjective().isEmpty()) {
+			MMLog.debug(() -> "ContentInfo.getWorldName(Player) instanceObjective is null for " + getContentName() + ", using base name instead");
 			return getBaseWorldName();
 		} else {
 			int score = ScoreboardUtils.getScoreboardValue(player, getInstanceObjective()).orElse(0);
 			if (score <= 0) {
+				MMLog.debug(() -> "ContentInfo.getWorldName(Player) instanceObjective is " + score + " for " + getContentName() + ", returning null");
 				return null;
 			} else {
+				MMLog.debug(() -> "ContentInfo.getWorldName(Player) instanceObjective is " + score + " for " + getContentName() + ", returning " + getBaseWorldName() + score);
 				return getBaseWorldName() + score;
 			}
 		}
