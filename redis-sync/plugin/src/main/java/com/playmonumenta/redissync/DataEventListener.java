@@ -828,7 +828,7 @@ public class DataEventListener implements Listener {
 		}
 
 		ContentData contentData = getPlayerContentData(playerUUID);
-		String contentId = contentData == null ? "null" : contentData.getId();
+		String contentId = contentData == null || contentData.getId().isEmpty() ? "<not set>" : contentData.getId();
 
 		Bukkit.getScheduler().runTaskLater(MonumentaRedisSync.getInstance(), () -> {
 			Player player = Bukkit.getPlayer(playerUUID);
