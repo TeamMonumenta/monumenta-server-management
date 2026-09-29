@@ -2,6 +2,7 @@ package com.playmonumenta.redissync.commands;
 
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.playmonumenta.redissync.BukkitConfigAPI;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.data.ContentData;
 import com.playmonumenta.redissync.data.OptionalLocation;
@@ -76,19 +77,31 @@ public class ContentCommand {
 				throw CommandAPI.failWithString("Player must be specified, or command must be run as a player");
 			}
 			player = callee;
+		} else {
+			restrictedArgumentsCheck();
 		}
 
 		if (others == null) {
 			others = List.of();
+		} else {
+			restrictedArgumentsCheck();
 		}
 
 		ContentData data = new ContentData(content);
 		if (optionals != null) {
+			restrictedArgumentsCheck();
+
 			data.setReturnLocation(optionals.returnTo);
 			data.setArrivalLocation(optionals.arriveAt);
 			data.setMcfunctionOnArrival(optionals.onArrival);
 		}
 		MonumentaRedisSyncAPI.requestPlayerContentDataChange(player, others, data);
+	}
+
+	private static void restrictedArgumentsCheck() throws WrapperCommandSyntaxException {
+		if (BukkitConfigAPI.getContentArgumentsRestricted()) {
+			throw CommandAPI.failWithString("Optional arguments for /content are disabled on this shard.");
+		}
 	}
 
 	private static @Nullable ContentOptionals parseOptionals(@Nullable String input) throws WrapperCommandSyntaxException {
