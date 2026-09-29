@@ -149,7 +149,7 @@ public class G1Listener {
 					);
 
 					try {
-						MMLog.info("Recorded gc event: " + wrappedInfo);
+						MMLog.debug("Recorded gc event: " + wrappedInfo);
 					} catch (RuntimeException ignored) {
 						// Unable to get plugin instance this early
 					}
