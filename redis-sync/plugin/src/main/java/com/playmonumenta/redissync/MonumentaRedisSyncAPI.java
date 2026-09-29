@@ -1215,7 +1215,14 @@ public class MonumentaRedisSyncAPI {
 	 * @param contentData The content data to be saved for the player
 	 */
 	public static void savePlayerContent(UUID playerUUID, ContentData contentData) {
+		ContentData oldContent = DataEventListener.getPlayerContentData(playerUUID);
 		DataEventListener.setPlayerContentData(playerUUID, contentData);
+
+		String oldContentId = oldContent == null ? "null" : oldContent.getId();
+		String newContentId = contentData == null ? "null" : contentData.getId();
+		if (!oldContentId.equals(newContentId)) {
+			DataEventListener.notifyContentChange(playerUUID);
+		}
 	}
 
 	/** Future returns non-null if successfully loaded data, null on error */

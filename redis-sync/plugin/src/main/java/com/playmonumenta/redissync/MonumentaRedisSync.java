@@ -150,8 +150,15 @@ public class MonumentaRedisSync extends JavaPlugin {
 		int ticksPerPlayerAutosave = config.getInt("ticks_per_player_autosave", 6060);
 		boolean savingDisabled = config.getBoolean("saving_disabled", false);
 		boolean scoreboardCleanupEnabled = config.getBoolean("scoreboard_cleanup_enabled", true);
+		String notifyContentPermission = config.getString("notify_content_permission", "monumenta.redissync.contentnotify");
+		if (notifyContentPermission.equals("null") || notifyContentPermission.isEmpty()) {
+			notifyContentPermission = null;
+		}
 
-		new BukkitConfigAPI(getLogger(), redisHost, redisPort, serverDomain, shardName, historyAmount, ticksPerPlayerAutosave, savingDisabled, scoreboardCleanupEnabled);
+		new BukkitConfigAPI(
+			getLogger(), redisHost, redisPort, serverDomain, shardName, historyAmount, ticksPerPlayerAutosave,
+			savingDisabled, scoreboardCleanupEnabled, notifyContentPermission
+		);
 	}
 
 	/** @deprecated Use {@link MMLog} static methods instead. */

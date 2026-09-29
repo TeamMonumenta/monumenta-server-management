@@ -10,13 +10,18 @@ public class BukkitConfigAPI extends CommonConfig {
 	protected final int mTicksPerPlayerAutosave;
 	protected final boolean mSavingDisabled;
 	protected final boolean mScoreboardCleanupEnabled;
+	protected final @Nullable String mNotifyContentPermission;
 
-	BukkitConfigAPI(Logger logger, String redisHost, int redisPort, String serverDomain, String shardName, int historyAmount, int ticksPerPlayerAutosave, boolean savingDisabled, boolean scoreboardCleanupEnabled) {
+	BukkitConfigAPI(
+		Logger logger, String redisHost, int redisPort, String serverDomain, String shardName, int historyAmount,
+		int ticksPerPlayerAutosave, boolean savingDisabled, boolean scoreboardCleanupEnabled, @Nullable String notifyContentPermission
+	) {
 		super(redisHost, redisPort, serverDomain, shardName);
 		mHistoryAmount = historyAmount;
 		mTicksPerPlayerAutosave = ticksPerPlayerAutosave;
 		mSavingDisabled = savingDisabled;
 		mScoreboardCleanupEnabled = scoreboardCleanupEnabled;
+		mNotifyContentPermission = notifyContentPermission;
 
 		logger.info("Configuration:");
 		logger.info("  redis_host = " + (mRedisHost == null ? "null" : mRedisHost));
@@ -27,6 +32,7 @@ public class BukkitConfigAPI extends CommonConfig {
 		logger.info("  ticks_per_player_autosave = " + mTicksPerPlayerAutosave);
 		logger.info("  saving_disabled = " + mSavingDisabled);
 		logger.info("  scoreboard_cleanup_enabled = " + mScoreboardCleanupEnabled);
+		logger.info("  notify_content_permission = " + mNotifyContentPermission);
 
 		BUKKIT_INSTANCE = this;
 	}
@@ -53,5 +59,9 @@ public class BukkitConfigAPI extends CommonConfig {
 
 	public static boolean getScoreboardCleanupEnabled() {
 		return getBukkitInstance().mScoreboardCleanupEnabled;
+	}
+
+	public static @Nullable String getNotifyContentPermission() {
+		return getBukkitInstance().mNotifyContentPermission;
 	}
 }
