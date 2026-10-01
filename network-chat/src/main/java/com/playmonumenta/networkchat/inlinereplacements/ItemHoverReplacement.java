@@ -71,7 +71,7 @@ public class ItemHoverReplacement extends InlineReplacement {
 
 				if (item.hasItemMeta()) {
 					ItemMeta meta = item.getItemMeta();
-					if (!meta.hasItemFlag(ItemFlag.HIDE_POTION_EFFECTS)) {
+					if (!meta.hasItemFlag(ItemFlag.HIDE_ADDITIONAL_TOOLTIP)) {
 						if (meta instanceof BookMeta bookMeta) {
 							Component author = bookMeta.author();
 							if (bookMeta.hasAuthor() && author != null) {
@@ -124,7 +124,12 @@ public class ItemHoverReplacement extends InlineReplacement {
 								case LEGS -> "item.modifiers.legs";
 								case CHEST -> "item.modifiers.chest";
 								case HEAD -> "item.modifiers.head";
+								case BODY, SADDLE -> null;
 							};
+
+							if (whenInSlotTranslatable == null) {
+								continue;
+							}
 
 							lines.add(Component.empty());
 							lines.add(Component.translatable(whenInSlotTranslatable, NamedTextColor.GRAY));

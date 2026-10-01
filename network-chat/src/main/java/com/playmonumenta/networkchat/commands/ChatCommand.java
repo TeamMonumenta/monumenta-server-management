@@ -1,9 +1,7 @@
 package com.playmonumenta.networkchat.commands;
 
-import com.playmonumenta.networkchat.NetworkChatPlugin;
 import com.playmonumenta.networkchat.commands.chat.ChatChannelCommand;
 import com.playmonumenta.networkchat.commands.chat.ChatGuiCommand;
-import com.playmonumenta.networkchat.commands.chat.ChatHelpCommand;
 import com.playmonumenta.networkchat.commands.chat.ChatJoinCommand;
 import com.playmonumenta.networkchat.commands.chat.ChatLeaveCommand;
 import com.playmonumenta.networkchat.commands.chat.ChatListPlayersCommand;
@@ -18,9 +16,7 @@ import com.playmonumenta.networkrelay.RemotePlayerAPI;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.arguments.ArgumentSuggestions;
-import java.util.zip.ZipFile;
 import org.bukkit.command.CommandSender;
-import org.jetbrains.annotations.Nullable;
 
 public class ChatCommand {
 	public static final String COMMAND = "chat";
@@ -36,8 +32,7 @@ public class ChatCommand {
 	public static final ArgumentSuggestions<CommandSender> SUGGESTIONS_VISIBLE_PLAYER_NAMES
 		= ArgumentSuggestions.strings(info -> RemotePlayerAPI.getVisiblePlayerNames().toArray(new String[0]));
 
-	public static void register(NetworkChatPlugin plugin, final @Nullable ZipFile zip) {
-		ChatHelpCommand.register(plugin, zip);
+	public static void register() {
 		ChatNewCommand.register();
 		ChatChannelCommand.register();
 		ChatGuiCommand.register();

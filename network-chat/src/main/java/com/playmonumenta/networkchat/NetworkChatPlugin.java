@@ -10,7 +10,7 @@ import com.playmonumenta.networkchat.channel.ChannelParty;
 import com.playmonumenta.networkchat.channel.ChannelTeam;
 import com.playmonumenta.networkchat.channel.ChannelWhisper;
 import com.playmonumenta.networkchat.channel.ChannelWorld;
-import com.playmonumenta.networkchat.commands.ChatCommand;
+import com.playmonumenta.networkchat.commands.chat.ChatHelpCommand;
 import com.playmonumenta.networkchat.inlinereplacements.ReplacementsManager;
 import com.playmonumenta.networkchat.utils.MMLog;
 import com.playmonumenta.networkchat.utils.MessagingUtils;
@@ -111,7 +111,7 @@ public class NetworkChatPlugin extends JavaPlugin implements Listener {
 		} catch (IOException ex) {
 			MMLog.severe("Could not load help data from plugin", ex);
 		}
-		ChatCommand.register(this, zip);
+		ChatHelpCommand.register(this, zip);
 	}
 
 	@Override
