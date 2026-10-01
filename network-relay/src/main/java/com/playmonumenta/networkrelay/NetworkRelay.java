@@ -1,11 +1,6 @@
 package com.playmonumenta.networkrelay;
 
 import com.playmonumenta.networkrelay.commands.BroadcastCommand;
-import com.playmonumenta.networkrelay.commands.DebugHeartbeatCommand;
-import com.playmonumenta.networkrelay.commands.ListShardsCommand;
-import com.playmonumenta.networkrelay.commands.RemotePlayerAPICommand;
-import com.playmonumenta.networkrelay.commands.SendCommand;
-import com.playmonumenta.networkrelay.commands.WhereIsCommand;
 import com.playmonumenta.networkrelay.config.BukkitConfig;
 import com.playmonumenta.networkrelay.shardhealth.ShardHealthManager;
 import com.playmonumenta.networkrelay.util.MMLog;
@@ -18,19 +13,16 @@ import org.jetbrains.annotations.Nullable;
 public class NetworkRelay extends JavaPlugin {
 	private static @Nullable NetworkRelay INSTANCE = null;
 	private @Nullable RabbitMQManager mRabbitMQManager = null;
-	private @Nullable BroadcastCommand mBroadcastCommand = null;
+	private final @Nullable BroadcastCommand mBroadcastCommand;
+
+	public NetworkRelay(@Nullable BroadcastCommand broadcastCommand) {
+		mBroadcastCommand = broadcastCommand;
+	}
 
 	@Override
 	public void onLoad() {
 		MMLog.init(getName());
 		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
-		mBroadcastCommand = new BroadcastCommand();
-		new SendCommand();
-		DebugHeartbeatCommand.registerCommands();
-		ListShardsCommand.register();
-		RemotePlayerAPICommand.register();
-		WhereIsCommand.register();
-		ShardHealthManager.init();
 	}
 
 	@Override

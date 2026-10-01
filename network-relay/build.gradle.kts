@@ -49,7 +49,8 @@ monumenta {
 		softDepends = listOf(
 			"PlaceholderAPI",
 			"ViaVersion"
-		)
+		),
+		bootstrapper = "com.playmonumenta.networkrelay.NetworkRelayBootstrap",
 	)
 	gitPrefix("network-relay/")
 }
