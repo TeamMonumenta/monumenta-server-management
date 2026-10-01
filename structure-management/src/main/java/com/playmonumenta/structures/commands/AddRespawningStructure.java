@@ -1,5 +1,6 @@
 package com.playmonumenta.structures.commands;
 
+import com.playmonumenta.structures.StructuresPlugin;
 import com.playmonumenta.structures.managers.RespawnManager;
 import com.playmonumenta.structures.utils.CommandUtils;
 import com.playmonumenta.structures.utils.MessagingUtils;
@@ -18,7 +19,7 @@ import org.bukkit.plugin.Plugin;
 
 public class AddRespawningStructure {
 	@SuppressWarnings("DataFlowIssue")
-	public static void register(Plugin plugin) {
+	public static void register() {
 		final String command = "addrespawningstructure";
 		final CommandPermission perms = CommandPermission.fromString("monumenta.structures");
 
@@ -38,7 +39,7 @@ public class AddRespawningStructure {
 				.withArguments(respawnTimeArg)
 				.withArguments(nameArg)
 				.executes((sender, args) -> {
-					add(sender, plugin, args.getByArgument(labelArg), args.getByArgument(pathArg), args.getByArgument(locationArg), args.getByArgument(radiusArg), args.getByArgument(respawnTimeArg), args.getByArgument(nameArg));
+					add(sender, StructuresPlugin.getInstance(), args.getByArgument(labelArg), args.getByArgument(pathArg), args.getByArgument(locationArg), args.getByArgument(radiusArg), args.getByArgument(respawnTimeArg), args.getByArgument(nameArg));
 				})
 				.register();
 	}

@@ -7,11 +7,11 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 
 public class ReloadStructures {
-	public static void register(StructuresPlugin plugin) {
+	public static void register() {
 		new CommandAPICommand("reloadstructures")
 				.withPermission(CommandPermission.fromString("monumenta.structures"))
 				.executes((sender, args) -> {
-					plugin.reloadConfig();
+					StructuresPlugin.getInstance().reloadConfig();
 					sender.sendMessage(Component.text("Structures reloaded", NamedTextColor.GREEN));
 				})
 				.register();

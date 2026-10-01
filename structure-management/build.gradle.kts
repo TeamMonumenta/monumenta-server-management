@@ -34,7 +34,8 @@ monumenta {
     paper(
         "com.playmonumenta.structures.StructuresPlugin", BukkitPluginYaml.PluginLoadOrder.POSTWORLD,
         "1.20", "1.20-R0.1-SNAPSHOT",
-        depends = listOf("CommandAPI", "MonumentaCommon", "FastAsyncWorldEdit", "ScriptedQuests")
+        depends = listOf("CommandAPI", "MonumentaCommon", "FastAsyncWorldEdit", "ScriptedQuests"),
+		bootstrapper = "com.playmonumenta.structures.StructuresBootstrap"
     )
 	gitPrefix("structure-management/")
 }

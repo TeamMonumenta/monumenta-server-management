@@ -1,5 +1,6 @@
 package com.playmonumenta.structures.commands;
 
+import com.playmonumenta.structures.StructuresPlugin;
 import com.playmonumenta.structures.managers.RespawnManager;
 import com.playmonumenta.structures.utils.CommandUtils;
 import com.playmonumenta.structures.utils.MessagingUtils;
@@ -14,7 +15,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 
 public class ActivateSpecialStructure {
-	public static void register(Plugin plugin) {
+	public static void register() {
 		final String command = "activatespecialstructure";
 		final CommandPermission perms = CommandPermission.fromString("monumenta.structures");
 
@@ -26,7 +27,7 @@ public class ActivateSpecialStructure {
 				.withArguments(labelArg)
 				.withArguments(pathArg)
 				.executes((sender, args) -> {
-					activate(sender, plugin, args.getByArgument(labelArg), args.getByArgument(pathArg));
+					activate(sender, StructuresPlugin.getInstance(), args.getByArgument(labelArg), args.getByArgument(pathArg));
 				})
 				.register();
 	}

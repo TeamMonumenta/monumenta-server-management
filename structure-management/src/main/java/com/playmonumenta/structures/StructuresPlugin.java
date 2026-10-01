@@ -1,19 +1,5 @@
 package com.playmonumenta.structures;
 
-import com.playmonumenta.structures.commands.ActivateSpecialStructure;
-import com.playmonumenta.structures.commands.AddRespawningStructure;
-import com.playmonumenta.structures.commands.CompassRespawn;
-import com.playmonumenta.structures.commands.ForceConquerRespawn;
-import com.playmonumenta.structures.commands.ForceloadLazy;
-import com.playmonumenta.structures.commands.ListRespawningStructures;
-import com.playmonumenta.structures.commands.LoadStructure;
-import com.playmonumenta.structures.commands.ReloadStructures;
-import com.playmonumenta.structures.commands.RemoveRespawningStructure;
-import com.playmonumenta.structures.commands.RespawnStructure;
-import com.playmonumenta.structures.commands.SaveStructure;
-import com.playmonumenta.structures.commands.SetPostRespawnCommand;
-import com.playmonumenta.structures.commands.SetRespawnTimer;
-import com.playmonumenta.structures.commands.SetSpawnerBreakTrigger;
 import com.playmonumenta.structures.managers.EventListener;
 import com.playmonumenta.structures.managers.RespawnManager;
 import com.playmonumenta.structures.utils.CommandUtils;
@@ -37,21 +23,6 @@ public class StructuresPlugin extends JavaPlugin implements Executor {
 	public void onLoad() {
 		MMLog.init(getName());
 		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
-
-		ActivateSpecialStructure.register(this);
-		AddRespawningStructure.register(this);
-		CompassRespawn.register();
-		ForceConquerRespawn.register();
-		ForceloadLazy.register();
-		ListRespawningStructures.register();
-		LoadStructure.register();
-		ReloadStructures.register(this);
-		RemoveRespawningStructure.register();
-		RespawnStructure.register();
-		SaveStructure.register();
-		SetPostRespawnCommand.register();
-		SetRespawnTimer.register();
-		SetSpawnerBreakTrigger.register();
 	}
 
 	@Override
