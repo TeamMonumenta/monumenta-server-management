@@ -1,8 +1,5 @@
 package com.playmonumenta.common;
 
-import com.playmonumenta.common.commands.GetDateCommand;
-import com.playmonumenta.common.commands.RefreshTimeCommand;
-import com.playmonumenta.common.commands.TimeWarpCommand;
 import com.playmonumenta.common.managers.TimeWarpManager;
 import com.playmonumenta.common.utils.DateUtils;
 import com.playmonumenta.common.zones.ZoneManager;
@@ -52,11 +49,6 @@ public class MonumentaCommonPlugin extends JavaPlugin {
 		DebugZones.register();
 		TestZone.register();
 		ShowZones.register(this);
-
-		// Time registration
-		TimeWarpCommand.register();
-		GetDateCommand.register();
-		RefreshTimeCommand.register();
 	}
 
 	@Override

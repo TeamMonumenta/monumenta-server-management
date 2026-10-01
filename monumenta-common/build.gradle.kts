@@ -32,7 +32,8 @@ monumenta {
 		"1.20",
         "1.20-R0.1-SNAPSHOT",
 		depends = listOf("CommandAPI"),
-		softDepends = listOf("dynmap")
+		softDepends = listOf("dynmap"),
+		bootstrapper = "com.playmonumenta.common.MonumentaCommonBootstrap"
 	)
 	gitPrefix("monumenta-common/")
 }
