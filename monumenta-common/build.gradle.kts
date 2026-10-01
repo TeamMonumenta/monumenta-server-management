@@ -1,4 +1,4 @@
-import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
+import xyz.jpenilla.resourcefactory.bukkit.BukkitPluginYaml
 
 plugins {
 	alias(libs.plugins.gradle.config)
@@ -28,7 +28,7 @@ monumenta {
 	name("MonumentaCommon")
 	paper(
 		"com.playmonumenta.common.MonumentaCommonPlugin",
-		BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
+		BukkitPluginYaml.PluginLoadOrder.POSTWORLD,
 		"1.20",
         "1.20-R0.1-SNAPSHOT",
 		depends = listOf("CommandAPI"),

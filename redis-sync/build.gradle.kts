@@ -1,4 +1,4 @@
-import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
+import xyz.jpenilla.resourcefactory.bukkit.BukkitPluginYaml
 
 plugins {
 	alias(libs.plugins.gradle.config)
@@ -17,7 +17,7 @@ monumenta {
 	name("MonumentaRedisSync")
 	pluginProject("redissync")
 	paper(
-		"com.playmonumenta.redissync.MonumentaRedisSync", BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
+		"com.playmonumenta.redissync.MonumentaRedisSync", BukkitPluginYaml.PluginLoadOrder.POSTWORLD,
         "26.1.2", "26.1.2.build.+",
 		depends = listOf("CommandAPI", "MonumentaCommon", "MonumentaNetworkRelay"),
 	)

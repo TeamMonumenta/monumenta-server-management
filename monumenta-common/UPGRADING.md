@@ -127,7 +127,7 @@ allprojects {
 monumenta {
     paper(
         "com.example.myplugin.MyPlugin",
-        BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
+        BukkitPluginYaml.PluginLoadOrder.POSTWORLD,
         "1.20",
         depends = listOf("CommandAPI", "MonumentaCommon"),
         // ...

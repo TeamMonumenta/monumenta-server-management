@@ -4,8 +4,6 @@ import com.diffplug.gradle.spotless.SpotlessExtension
 import com.diffplug.spotless.LineEnding
 import com.playmonumenta.gradleconfig.ssh.easySetup
 import net.ltgt.gradle.errorprone.CheckSeverity
-import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
-import net.minecrell.pluginyml.bungee.BungeePluginDescription
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.api.plugins.BasePluginExtension
@@ -19,6 +17,8 @@ import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.external.javadoc.StandardJavadocDocletOptions
 import org.gradle.jvm.tasks.Jar
+import xyz.jpenilla.resourcefactory.bukkit.BukkitPluginYaml
+import xyz.jpenilla.resourcefactory.paper.PaperPluginYaml
 import java.net.URI
 
 private fun setupProject(
@@ -320,13 +320,13 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
 
     override fun paper(
         main: String,
-        order: BukkitPluginDescription.PluginLoadOrder,
+        order: BukkitPluginYaml.PluginLoadOrder,
         apiVersion: String,
         apiJarVersion: String,
         authors: List<String>,
         depends: List<String>,
         softDepends: List<String>,
-        action: BukkitPluginDescription.() -> Unit
+        action: PaperPluginYaml.() -> Unit
     ) {
         if (isBukkitConfigured) {
             throw IllegalStateException("Bukkit can't be configured multiple times")
@@ -339,49 +339,19 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
         isBukkitConfigured = true
 
         deferActions {
-            pluginProject.applyPlugin("net.minecrell.plugin-yml.bukkit")
-            pluginProject.extensions.getByType(BukkitPluginDescription::class.java).let {
-                it.load = order
-                it.main = main
-                it.apiVersion = apiVersion
-                it.name = pluginId
-                it.authors = authors
-                it.depend = depends
-                it.softDepend = softDepends
+            pluginProject.applyPlugin("xyz.jpenilla.resource-factory-paper-convention")
+            pluginProject.extensions.getByType(PaperPluginYaml::class.java).let {
+                it.load.set(order)
+                it.main.set(main)
+                it.apiVersion.set(apiVersion)
+                it.name.set(pluginId)
+                it.authors.set(authors)
+	            depends.forEach { depend -> it.dependencies.server(depend, PaperPluginYaml.Load.BEFORE) }
+	            softDepends.forEach { depend -> it.dependencies.server(depend, PaperPluginYaml.Load.BEFORE, false) }
                 action(it)
             }
 
             pluginProject.addCompileOnly("io.papermc.paper:paper-api:$apiJarVersion")
-        }
-    }
-
-    override fun waterfall(
-        main: String,
-        apiVersion: String,
-        authors: List<String>,
-        depends: List<String>,
-        softDepends: List<String>
-    ) {
-        if (isBungeeConfigured) {
-            throw IllegalStateException("Bungee can't be configured multiple times")
-        }
-
-        if (this.pluginId == null) {
-            throw IllegalStateException("id(...) must be called first")
-        }
-
-        deferActions {
-            pluginProject.applyPlugin("net.minecrell.plugin-yml.bungee")
-            with(pluginProject.extensions.getByType(BungeePluginDescription::class.java)) {
-                this.main = main
-                this.name = pluginId
-                this.author = authors.joinToString(", ")
-                this.depends = setOf(*depends.toTypedArray())
-                this.softDepends = setOf(*softDepends.toTypedArray())
-                this.version = apiVersion
-            }
-
-            pluginProject.addCompileOnly("io.github.waterfallmc:waterfall-api:$apiVersion-R0.1-SNAPSHOT")
         }
     }
 

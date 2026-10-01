@@ -1,7 +1,8 @@
 package com.playmonumenta.gradleconfig
 
-import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
 import org.gradle.api.Project
+import xyz.jpenilla.resourcefactory.bukkit.BukkitPluginYaml
+import xyz.jpenilla.resourcefactory.paper.PaperPluginYaml
 
 interface MonumentaExtension {
     /**
@@ -85,28 +86,11 @@ interface MonumentaExtension {
      * @param softDepends The list of optional dependencies.
      */
     fun paper(
-        main: String, order: BukkitPluginDescription.PluginLoadOrder, apiVersion: String, apiJarVersion: String,
+        main: String, order: BukkitPluginYaml.PluginLoadOrder, apiVersion: String, apiJarVersion: String,
         authors: List<String> = listOf("Team Monumenta"),
         depends: List<String> = listOf(),
         softDepends: List<String> = listOf(),
-        action: BukkitPluginDescription.() -> Unit = {}
-    )
-
-    /**
-     * Builds the plugin project as a bungee/waterfall project, automagically generating yml files.
-     *
-     * @param main The main class.
-     * @param apiVersion The version of waterfall's API to use.
-     * @param authors The list of authors. Defaults to `"Team Monumenta"`
-     * @param depends The list of dependencies that are required for the plugin to start.
-     * @param softDepends The list of optional dependencies.
-     */
-    fun waterfall(
-        main: String,
-        apiVersion: String,
-        authors: List<String> = listOf("Team Monumenta"),
-        depends: List<String> = listOf(),
-        softDepends: List<String> = listOf()
+        action: PaperPluginYaml.() -> Unit = {}
     )
 
     fun versionAdapterApi(name: String, paper: String? = null, config: Project.() -> Unit = {})

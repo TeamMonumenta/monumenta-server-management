@@ -1,4 +1,4 @@
-import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
+import xyz.jpenilla.resourcefactory.bukkit.BukkitPluginYaml
 
 plugins {
 	alias(libs.plugins.gradle.config)
@@ -34,7 +34,7 @@ monumenta {
 	id("MonumentaNetworkChat")
 	name("MonumentaNetworkChat")
 	paper(
-		"com.playmonumenta.networkchat.NetworkChatPlugin", BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
+		"com.playmonumenta.networkchat.NetworkChatPlugin", BukkitPluginYaml.PluginLoadOrder.POSTWORLD,
         "1.19", "1.19-R0.1-SNAPSHOT",
 		depends = listOf(
 			"CommandAPI",

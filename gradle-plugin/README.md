@@ -94,7 +94,7 @@ monumenta {
     id("MyPlugin")
     name("MyPlugin")
     pluginProject(":MyPlugin")
-    paper("com.example.MyPlugin", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20")
+    paper("com.example.MyPlugin", BukkitPluginYaml.PluginLoadOrder.POSTWORLD, "1.20")
 }
 ```
 

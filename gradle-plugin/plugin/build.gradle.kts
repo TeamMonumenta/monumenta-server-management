@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "com.playmonumenta.gradle-config"
-version = "6.0.1"
+version = "6.0.2-local"
 
 repositories {
     mavenCentral()
@@ -25,7 +25,7 @@ dependencies {
     implementation(libs.junixsocket.core)
     implementation(libs.errorprone.plugin)
     implementation(libs.nullaway.plugin)
-    implementation(libs.plugin.yml)
+    implementation(libs.resource.factory)
     implementation(libs.shadow)
     implementation(libs.paperweight.userdev)
     implementation(libs.spotless)

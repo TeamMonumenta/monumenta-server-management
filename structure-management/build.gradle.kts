@@ -1,4 +1,4 @@
-import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
+import xyz.jpenilla.resourcefactory.bukkit.BukkitPluginYaml
 
 plugins {
 	alias(libs.plugins.gradle.config)
@@ -32,7 +32,7 @@ monumenta {
 	id("MonumentaStructureManagement")
 	name("MonumentaStructureManagement")
     paper(
-        "com.playmonumenta.structures.StructuresPlugin", BukkitPluginDescription.PluginLoadOrder.POSTWORLD,
+        "com.playmonumenta.structures.StructuresPlugin", BukkitPluginYaml.PluginLoadOrder.POSTWORLD,
         "1.20", "1.20-R0.1-SNAPSHOT",
         depends = listOf("CommandAPI", "MonumentaCommon", "FastAsyncWorldEdit", "ScriptedQuests")
     )
