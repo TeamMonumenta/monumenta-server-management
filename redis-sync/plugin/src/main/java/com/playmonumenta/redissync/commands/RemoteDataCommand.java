@@ -1,5 +1,6 @@
 package com.playmonumenta.redissync.commands;
 
+import com.playmonumenta.redissync.MonumentaRedisSync;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.RemoteDataAPI;
 import dev.jorel.commandapi.CommandAPI;
@@ -9,11 +10,10 @@ import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.TextArgument;
 import java.util.Map;
 import java.util.UUID;
-import org.bukkit.plugin.Plugin;
 
 public class RemoteDataCommand {
 	@SuppressWarnings("DataFlowIssue")
-	public static void register(Plugin plugin) {
+	public static void register() {
 		Argument<String> playerArg = new TextArgument("player").replaceSuggestions(MonumentaRedisSyncAPI.SUGGESTIONS_ALL_CACHED_PLAYER_NAMES);
 		TextArgument keyArg = new TextArgument("key");
 		TextArgument valueArg = new TextArgument("value");
@@ -39,7 +39,7 @@ public class RemoteDataCommand {
 						throw CommandAPI.failWithString("Got uuid '" + uuid + "' that matches no known player");
 					}
 
-					MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(plugin, RemoteDataAPI.getAll(finalUUID), (data, ex) -> {
+					MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(MonumentaRedisSync.getInstance(), RemoteDataAPI.getAll(finalUUID), (data, ex) -> {
 						if (ex != null) {
 							sender.sendMessage("remoteDataGetAll exception: " + ex.getMessage());
 						} else {
@@ -75,7 +75,7 @@ public class RemoteDataCommand {
 						throw CommandAPI.failWithString("Got uuid '" + uuid + "' that matches no known player");
 					}
 
-					MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(plugin, RemoteDataAPI.get(finalUUID, key), (data, ex) -> {
+					MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(MonumentaRedisSync.getInstance(), RemoteDataAPI.get(finalUUID, key), (data, ex) -> {
 						if (ex != null) {
 							sender.sendMessage("remoteDataGet exception: " + ex.getMessage());
 						} else {
@@ -110,7 +110,7 @@ public class RemoteDataCommand {
 						throw CommandAPI.failWithString("Got uuid '" + uuid + "' that matches no known player");
 					}
 
-					MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(plugin, RemoteDataAPI.set(finalUUID, key, value), (data, ex) -> {
+					MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(MonumentaRedisSync.getInstance(), RemoteDataAPI.set(finalUUID, key, value), (data, ex) -> {
 						if (ex != null) {
 							sender.sendMessage("remoteDataSet exception: " + ex.getMessage());
 						} else {
@@ -140,7 +140,7 @@ public class RemoteDataCommand {
 						throw CommandAPI.failWithString("Got uuid '" + uuid + "' that matches no known player");
 					}
 
-					MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(plugin, RemoteDataAPI.del(finalUUID, key), (data, ex) -> {
+					MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(MonumentaRedisSync.getInstance(), RemoteDataAPI.del(finalUUID, key), (data, ex) -> {
 						if (ex != null) {
 							sender.sendMessage("remoteDataDel exception: " + ex.getMessage());
 						} else {

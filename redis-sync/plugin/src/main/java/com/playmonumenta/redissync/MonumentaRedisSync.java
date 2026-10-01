@@ -1,17 +1,6 @@
 package com.playmonumenta.redissync;
 
 import com.playmonumenta.redissync.adapters.VersionAdapter;
-import com.playmonumenta.redissync.commands.ContentCommand;
-import com.playmonumenta.redissync.commands.PlayerHistory;
-import com.playmonumenta.redissync.commands.PlayerLoadFromPlayer;
-import com.playmonumenta.redissync.commands.PlayerRollback;
-import com.playmonumenta.redissync.commands.PlayerTransferHistory;
-import com.playmonumenta.redissync.commands.RboardCommand;
-import com.playmonumenta.redissync.commands.RemoteDataCommand;
-import com.playmonumenta.redissync.commands.SetLocationOnShardCommand;
-import com.playmonumenta.redissync.commands.Stash;
-import com.playmonumenta.redissync.commands.TransferServer;
-import com.playmonumenta.redissync.commands.UpgradeAllPlayers;
 import com.playmonumenta.redissync.utils.MMLog;
 import java.io.File;
 import java.lang.reflect.Method;
@@ -74,23 +63,6 @@ public class MonumentaRedisSync extends JavaPlugin {
 		com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
 
 		loadVersionAdapter();
-
-		/*
-		 * CommandAPI commands which register directly and are usable in functions
-		 *
-		 * These need to register immediately on load to prevent function loading errors
-		 */
-		TransferServer.register();
-		Stash.register();
-		PlayerHistory.register(this);
-		PlayerRollback.register();
-		PlayerLoadFromPlayer.register();
-		PlayerTransferHistory.register(this);
-		UpgradeAllPlayers.register(this);
-		RboardCommand.register(this);
-		RemoteDataCommand.register(this);
-		ContentCommand.register();
-		SetLocationOnShardCommand.register();
 	}
 
 	@Override

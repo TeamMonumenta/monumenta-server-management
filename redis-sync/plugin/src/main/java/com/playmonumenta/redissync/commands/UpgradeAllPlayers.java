@@ -15,7 +15,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitRunnable;
 
 public class UpgradeAllPlayers {
-	public static void register(MonumentaRedisSync plugin) {
+	public static void register() {
 		new CommandAPICommand("monumenta")
 			.withSubcommand(new CommandAPICommand("redissync")
 				.withSubcommand(new CommandAPICommand("upgradeallplayers")
@@ -24,7 +24,7 @@ public class UpgradeAllPlayers {
 					})
 					.executesConsole((console, args) -> {
 						try {
-							run(plugin);
+							run(MonumentaRedisSync.getInstance());
 						} catch (Exception ex) {
 							throw CommandAPI.failWithString(ex.getMessage());
 						}

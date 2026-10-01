@@ -1,5 +1,6 @@
 package com.playmonumenta.redissync.commands;
 
+import com.playmonumenta.redissync.MonumentaRedisSync;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.RBoardAPI;
 import com.playmonumenta.redissync.utils.ScoreboardUtils;
@@ -28,7 +29,6 @@ import net.kyori.adventure.text.JoinConfiguration;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.scoreboard.Objective;
 
 public class RboardCommand {
@@ -103,7 +103,7 @@ public class RboardCommand {
 	}
 
 	@SuppressWarnings("DataFlowIssue")
-	public static void register(Plugin plugin) {
+	public static void register() {
 		List<Argument<?>> arguments = new ArrayList<>(40);
 
 		ObjectiveArgument objectiveArg = new ObjectiveArgument("objective");
@@ -193,11 +193,11 @@ public class RboardCommand {
 
 		/* ******************* GetAll ******************* */
 		action = (sender, args, rboardName, scoreboardName)
-			-> MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(plugin,
+			-> MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(MonumentaRedisSync.getInstance(),
 			RBoardAPI.getAll(rboardName),
 			(Map<String, String> data, Throwable except) -> {
 				if (except != null) {
-					plugin.getLogger().log(Level.SEVERE, "rboard getall failed:" + except.getMessage(), except);
+					MonumentaRedisSync.getInstance().getLogger().log(Level.SEVERE, "rboard getall failed:" + except.getMessage(), except);
 				} else {
 					List<Component> entryComponents = new ArrayList<>();
 					for (Map.Entry<String, String> entry : data.entrySet()) {
@@ -226,11 +226,11 @@ public class RboardCommand {
 			for (int j = 0; j < args.count() - 2; j += 1) {
 				objects[j] = args.getByArgument(getObjectiveArgument(j)).getName();
 			}
-			MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(plugin,
+			MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(MonumentaRedisSync.getInstance(),
 				RBoardAPI.get(rboardName, objects),
 				(Map<String, String> data, Throwable except) -> {
 					if (except != null) {
-						plugin.getLogger().log(Level.SEVERE, "rboard get failed", except);
+						MonumentaRedisSync.getInstance().getLogger().log(Level.SEVERE, "rboard get failed", except);
 					} else {
 						for (Map.Entry<String, String> entry : data.entrySet()) {
 							ScoreboardUtils.setScoreboardValue(scoreboardName, entry.getKey(), Integer.parseInt(entry.getValue()));
@@ -254,11 +254,11 @@ public class RboardCommand {
 		/* ******************* AddAndGet ******************* */
 		action = (sender, args, rboardName, scoreboardName) -> {
 			Objective objective = args.getByArgument(objectiveArg);
-			MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(plugin,
+			MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(MonumentaRedisSync.getInstance(),
 				RBoardAPI.add(rboardName, objective.getName(), args.getByArgument(valueArg)),
 				(Long data, Throwable except) -> {
 					if (except != null) {
-						plugin.getLogger().log(Level.SEVERE, "rboard addandget failed", except);
+						MonumentaRedisSync.getInstance().getLogger().log(Level.SEVERE, "rboard addandget failed", except);
 					} else {
 						ScoreboardUtils.setScoreboardValue(scoreboardName, objective, data.intValue());
 						for (FunctionWrapper func : args.getByArgument(functionArg)) {
@@ -282,11 +282,11 @@ public class RboardCommand {
 			for (int j = 0; j < args.count() - 2; j += 1) {
 				objects[j] = args.getByArgument(getObjectiveArgument(j)).getName();
 			}
-			MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(plugin,
+			MonumentaRedisSyncAPI.runOnMainThreadWhenComplete(MonumentaRedisSync.getInstance(),
 				RBoardAPI.getAndReset(rboardName, objects),
 				(Map<String, String> data, Throwable except) -> {
 					if (except != null) {
-						plugin.getLogger().log(Level.SEVERE, "rboard getandreset failed", except);
+						MonumentaRedisSync.getInstance().getLogger().log(Level.SEVERE, "rboard getandreset failed", except);
 					} else {
 						for (Map.Entry<String, String> entry : data.entrySet()) {
 							ScoreboardUtils.setScoreboardValue(scoreboardName, entry.getKey(), Integer.parseInt(entry.getValue()));

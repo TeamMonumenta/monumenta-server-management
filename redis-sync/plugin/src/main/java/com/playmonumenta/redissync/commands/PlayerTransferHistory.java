@@ -20,7 +20,7 @@ import org.bukkit.Bukkit;
 
 public class PlayerTransferHistory {
 	@SuppressWarnings("DataFlowIssue")
-	public static void register(MonumentaRedisSync plugin) {
+	public static void register() {
 		for (ChronoUnit chronoUnit : ChronoUnit.values()) {
 			if (chronoUnit.compareTo(ChronoUnit.SECONDS) < 0 || chronoUnit.compareTo(ChronoUnit.DECADES) > 0) {
 				continue;
@@ -40,7 +40,7 @@ public class PlayerTransferHistory {
 					LocalDateTime since = now.minus(numberOfUnits, chronoUnit);
 
 					sender.sendMessage(Component.text("Fetching transfer history...", NamedTextColor.GREEN));
-					Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+					Bukkit.getScheduler().runTaskAsynchronously(MonumentaRedisSync.getInstance(), () -> {
 						List<AccountTransferDetails> transferDetailsList;
 						try {
 							transferDetailsList = AccountTransferAPI.getEffectiveTransfersSince(since).join();
@@ -50,7 +50,7 @@ public class PlayerTransferHistory {
 							return;
 						}
 
-						Bukkit.getScheduler().runTask(plugin, () -> {
+						Bukkit.getScheduler().runTask(MonumentaRedisSync.getInstance(), () -> {
 							try {
 								for (AccountTransferDetails transferDetails : transferDetailsList) {
 									String transferStr = String.format(
@@ -84,7 +84,7 @@ public class PlayerTransferHistory {
 					LocalDateTime since = now.minus(numberOfUnits, chronoUnit);
 
 					sender.sendMessage(Component.text("Fetching transfer history...", NamedTextColor.GREEN));
-					Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+					Bukkit.getScheduler().runTaskAsynchronously(MonumentaRedisSync.getInstance(), () -> {
 						List<AccountTransferDetails> transferDetailsList;
 						try {
 							transferDetailsList = AccountTransferAPI.getAllTransfersSince(since).join();
@@ -94,7 +94,7 @@ public class PlayerTransferHistory {
 							return;
 						}
 
-						Bukkit.getScheduler().runTask(plugin, () -> {
+						Bukkit.getScheduler().runTask(MonumentaRedisSync.getInstance(), () -> {
 							try {
 								for (AccountTransferDetails transferDetails : transferDetailsList) {
 									String transferStr = String.format(

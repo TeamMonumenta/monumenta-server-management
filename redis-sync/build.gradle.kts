@@ -20,6 +20,7 @@ monumenta {
 		"com.playmonumenta.redissync.MonumentaRedisSync", BukkitPluginYaml.PluginLoadOrder.POSTWORLD,
         "26.1.2", "26.1.2.build.+",
 		depends = listOf("CommandAPI", "MonumentaCommon", "MonumentaNetworkRelay"),
+		bootstrapper = "com.playmonumenta.redissync.MonumentaRedisSyncBootstrap",
 	)
 
 	versionAdapterApi("adapter_api", paper = "26.1.2.build.+") {
