@@ -4,6 +4,8 @@ import com.destroystokyo.paper.event.player.PlayerAdvancementDataLoadEvent;
 import com.destroystokyo.paper.event.player.PlayerAdvancementDataSaveEvent;
 import com.destroystokyo.paper.event.player.PlayerDataLoadEvent;
 import com.destroystokyo.paper.event.player.PlayerDataSaveEvent;
+import com.destroystokyo.paper.event.player.ServerStatsDataLoadEvent;
+import com.destroystokyo.paper.event.player.ServerStatsDataSaveEvent;
 import com.destroystokyo.paper.profile.PlayerProfile;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -213,7 +215,11 @@ public class DataEventListener implements Listener {
 	}
 
 	protected static boolean isPlayerTransferring(Player player) {
-		return INSTANCE.mTransferringPlayers.contains(player.getUniqueId());
+		return isPlayerTransferring(player.getUniqueId());
+	}
+
+	protected static boolean isPlayerTransferring(UUID playerId) {
+		return INSTANCE.mTransferringPlayers.contains(playerId);
 	}
 
 	protected static void waitForPlayerToSaveThenSync(Player player, Runnable callback) {
@@ -790,6 +796,79 @@ public class DataEventListener implements Listener {
 		} catch (IOException ex) {
 			MMLog.severe("Failed to save player data for player=" + playerName, ex);
 		}
+	}
+
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void serverStatsDataLoadEvent(ServerStatsDataLoadEvent event) {
+		if (BukkitConfigAPI.getSavingDisabled()) {
+			/* No data saved, no data loaded */
+			return;
+		}
+
+		// The player object might not be available. Attempt to get their name anyway.
+		UUID playerId = event.getPlayerId();
+		String playerNameNullable = MonumentaRedisSyncAPI.cachedUuidToName(playerId);
+		String playerName = playerNameNullable == null ? playerId.toString() : playerNameNullable;
+
+		long startTime = System.currentTimeMillis();
+		MMLog.debug("Started loading stats data for player=" + playerName);
+
+		/* Wait until player has finished saving if they just logged out and back in */
+		blockingWaitForPlayerToSave(playerId, playerName);
+
+		RedisFuture<String> statsFuture;
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			statsFuture = conn.lindex(MonumentaRedisSyncAPI.getRedisStatsPath(playerId), 0);
+		}
+
+		try {
+			/* Stats */
+			final String statsData = statsFuture.get();
+			MMLog.trace(() -> "Stats data loaded for player=" + playerName);
+			MMLog.trace(() -> "Stats data:" + statsData);
+			if (statsData != null) {
+				event.setJsonData(statsData);
+			} else {
+				MMLog.warning("No stats data for player '" + playerName + "' - if they are not new, this is a serious error!");
+			}
+
+			MMLog.debug(() -> "Processing ServerStatsDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
+		} catch (InterruptedException | ExecutionException ex) {
+			MMLog.severe("Failed to get stats data for player '" + playerName + "'. This is very bad!", ex);
+		}
+	}
+
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void serverStatsDataSaveEvent(ServerStatsDataSaveEvent event) {
+		/* Always cancel saving the player file to disk with this plugin present */
+		event.setCancelled(true);
+
+		if (BukkitConfigAPI.getSavingDisabled()) {
+			/* No data saved, no data loaded */
+			return;
+		}
+
+		// The player object might not be available. Attempt to get their name anyway.
+		UUID playerId = event.getPlayerId();
+		String playerNameNullable = MonumentaRedisSyncAPI.cachedUuidToName(playerId);
+		String playerName = playerNameNullable == null ? playerId.toString() : playerNameNullable;
+
+		if (isPlayerTransferring(playerId)) {
+			MMLog.debug("Ignoring ServerStatsDataLoadEvent for player:" + playerName);
+			return;
+		}
+
+		/* Execute the stats as a multi() batch */
+		/* Stats */
+		MMLog.debug("Saving stats data for player=" + playerNameNullable);
+		MMLog.trace(() -> "Data:" + event.getJsonData());
+		String statsPath = MonumentaRedisSyncAPI.getRedisStatsPath(playerId);
+		String statsJsonData = event.getJsonData();
+		/* Don't block - store the pending futures for completion later */
+		trackPendingSave(playerId, RedisAPI.multi(commands -> {
+			commands.lpush(statsPath, statsJsonData);
+			commands.ltrim(statsPath, 0, BukkitConfigAPI.getHistoryAmount());
+		}), () -> "Stats saving for player=" + playerNameNullable + " failed");
 	}
 
 	/* ******************* Transferring Restriction Event Handlers ******************* */
