@@ -24,7 +24,7 @@ public class ContentInfo {
 	protected ContentInfo(WorldManagementPlugin plugin, String contentName, ConfigurationSection config) {
 		mContentName = contentName;
 
-		mInstanceObjective = config.getString("instance-objective", "Instance");
+		mInstanceObjective = config.getString("instance-objective", "");
 		plugin.printConfig("    instance-objective", mInstanceObjective);
 
 		mBaseWorldName = config.getString("base-world-name", "instance");
@@ -76,6 +76,22 @@ public class ContentInfo {
 		return mBaseWorldName;
 	}
 
+	public @Nullable String getWorldName(Player player) {
+		if (getInstanceObjective().isEmpty()) {
+			MMLog.debug(() -> "ContentInfo.getWorldName(Player) instanceObjective is null for " + getContentName() + ", using base name instead");
+			return getBaseWorldName();
+		} else {
+			int score = ScoreboardUtils.getScoreboardValue(player, getInstanceObjective()).orElse(0);
+			if (score <= 0) {
+				MMLog.debug(() -> "ContentInfo.getWorldName(Player) instanceObjective is " + score + " for " + getContentName() + ", returning null");
+				return null;
+			} else {
+				MMLog.debug(() -> "ContentInfo.getWorldName(Player) instanceObjective is " + score + " for " + getContentName() + ", returning " + getBaseWorldName() + score);
+				return getBaseWorldName() + score;
+			}
+		}
+	}
+
 	public @Nullable String getJoinInstanceCommand() {
 		return mJoinInstanceCommand;
 	}
@@ -109,7 +125,7 @@ public class ContentInfo {
 			score = 0;
 			variantTemplate = mVariantTemplates.get(0);
 		}
-		if (variantTemplate == null) {
+		if (variantTemplate == null && !mVariantTemplates.isEmpty()) {
 			MMLog.severe("No template world for score " + score);
 		}
 		return variantTemplate;

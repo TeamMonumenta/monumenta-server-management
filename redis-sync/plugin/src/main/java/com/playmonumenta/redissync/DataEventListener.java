@@ -818,6 +818,24 @@ public class DataEventListener implements Listener {
 	public void playerJoinEvent(PlayerJoinEvent event) {
 		Bukkit.getScheduler().runTask(MonumentaRedisSync.getInstance(),
 			() -> mLoadingPlayers.remove(event.getPlayer().getUniqueId()));
+		notifyContentChange(event.getPlayer().getUniqueId());
+	}
+
+	protected static void notifyContentChange(UUID playerUUID) {
+		String permission = BukkitConfigAPI.getNotifyContentPermission();
+		if (permission == null) {
+			return;
+		}
+
+		ContentData contentData = getPlayerContentData(playerUUID);
+		String contentId = contentData == null || contentData.getId().isEmpty() ? "<not set>" : contentData.getId();
+
+		Bukkit.getScheduler().runTaskLater(MonumentaRedisSync.getInstance(), () -> {
+			Player player = Bukkit.getPlayer(playerUUID);
+			if (player != null && player.hasPermission(permission)) {
+				player.sendMessage(Component.text("Joined content " + contentId, NamedTextColor.YELLOW));
+			}
+		}, 1L);
 	}
 
 	@EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
