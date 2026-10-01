@@ -16,6 +16,7 @@ import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.adapters.VersionAdapter.ReturnParams;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
 import com.playmonumenta.redissync.data.ContentData;
+import com.playmonumenta.redissync.data.StatsDataManager;
 import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
 import com.playmonumenta.redissync.event.UpdateAvailableContentIdsEvent;
@@ -827,7 +828,11 @@ public class DataEventListener implements Listener {
 			MMLog.trace(() -> "Stats data loaded for player=" + playerName);
 			MMLog.trace(() -> "Stats data:" + statsData);
 			if (statsData != null) {
-				event.setJsonData(statsData);
+				String presented = StatsDataManager.load(playerId, statsData);
+
+				if (presented != null) {
+					event.setJsonData(presented);
+				}
 			} else {
 				MMLog.warning("No stats data for player '" + playerName + "' - if they are not new, this is a serious error!");
 			}
@@ -863,7 +868,7 @@ public class DataEventListener implements Listener {
 		MMLog.debug("Saving stats data for player=" + playerNameNullable);
 		MMLog.trace(() -> "Data:" + event.getJsonData());
 		String statsPath = MonumentaRedisSyncAPI.getRedisStatsPath(playerId);
-		String statsJsonData = event.getJsonData();
+		String statsJsonData = StatsDataManager.save(playerId, event.getJsonData()); 
 		/* Don't block - store the pending futures for completion later */
 		trackPendingSave(playerId, RedisAPI.multi(commands -> {
 			commands.lpush(statsPath, statsJsonData);
@@ -917,6 +922,7 @@ public class DataEventListener implements Listener {
 				mPlayerContentData.remove(playerUUID);
 				mPluginData.remove(playerUUID);
 				mShardData.remove(playerUUID);
+				StatsDataManager.remove(playerUUID);
 			}
 		}, 50);
 	}

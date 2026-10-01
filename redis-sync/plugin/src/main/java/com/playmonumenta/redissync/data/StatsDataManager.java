@@ -1,16 +1,14 @@
 package com.playmonumenta.redissync.data;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-
-import org.jetbrains.annotations.Nullable;
-
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.playmonumenta.redissync.utils.MMLog;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 public class StatsDataManager {
 	private static final Map<UUID, Map<String, Map<String, Long>>> mTruth = new HashMap<>();
