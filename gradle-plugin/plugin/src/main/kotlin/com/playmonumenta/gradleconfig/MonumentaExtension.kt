@@ -84,12 +84,14 @@ interface MonumentaExtension {
      * @param authors The list of authors. Defaults to `"Team Monumenta"`
      * @param depends The list of dependencies that are required for the plugin to start.
      * @param softDepends The list of optional dependencies.
+     * @param bootstrapper The bootstrapper class.
      */
     fun paper(
         main: String, order: BukkitPluginYaml.PluginLoadOrder, apiVersion: String, apiJarVersion: String,
         authors: List<String> = listOf("Team Monumenta"),
         depends: List<String> = listOf(),
         softDepends: List<String> = listOf(),
+        bootstrapper: String? = null,
         action: PaperPluginYaml.() -> Unit = {}
     )
 

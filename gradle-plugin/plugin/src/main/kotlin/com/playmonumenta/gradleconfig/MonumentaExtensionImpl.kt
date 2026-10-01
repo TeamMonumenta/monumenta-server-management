@@ -326,6 +326,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
         authors: List<String>,
         depends: List<String>,
         softDepends: List<String>,
+        bootstrapper: String?,
         action: PaperPluginYaml.() -> Unit
     ) {
         if (isBukkitConfigured) {
@@ -348,6 +349,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
                 it.authors.set(authors)
 	            depends.forEach { depend -> it.dependencies.server(depend, PaperPluginYaml.Load.BEFORE) }
 	            softDepends.forEach { depend -> it.dependencies.server(depend, PaperPluginYaml.Load.BEFORE, false) }
+	            bootstrapper?.let { b -> it.bootstrapper.set(b) }
                 action(it)
             }
 
