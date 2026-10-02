@@ -6,7 +6,7 @@ import com.playmonumenta.redissync.utils.MMLog;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class StatsDataManager {
 	private final Map<UUID, PlayerStats> mPlayerStats = new HashMap<>();
