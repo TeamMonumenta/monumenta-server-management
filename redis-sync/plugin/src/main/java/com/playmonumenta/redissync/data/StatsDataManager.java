@@ -53,7 +53,7 @@ public class StatsDataManager {
 			// For every namespace stat, get their real value and generate a marker value
 			for (Map.Entry<String, JsonElement> statEntry : namespaceEntry.getValue().getAsJsonObject().entrySet()) {
 				long value = statEntry.getValue().getAsLong();
-				int marker = (int) present(value);
+				int marker = present(value);
 
 				truthNamespace.put(statEntry.getKey(), value);
 				presentedNamespace.put(statEntry.getKey(), marker);
@@ -95,7 +95,7 @@ public class StatsDataManager {
 		}
 
 		Map<String, Map<String, Integer>> presented = mPresented.get(uuid);
-		Map<String, Map<String, Integer>> nextPresented = new HashMap<>();
+		Map<String, Map<String, Integer>> nextPresented = copyPresented(presented);
 
 		for (Map.Entry<String, JsonElement> namespaceEntry : stats.entrySet()) {
 			if (!namespaceEntry.getValue().isJsonObject()) {
@@ -122,7 +122,7 @@ public class StatsDataManager {
 					truthNamespace.put(stat, curr + delta);
 				}
 
-				nextPresentedNamespace.put(stat, (int) bukkitValue);
+				nextPresentedNamespace.put(stat, present(bukkitValue));
 			}
 
 			nextPresented.put(namespace, nextPresentedNamespace);
@@ -150,12 +150,25 @@ public class StatsDataManager {
 		mPresented.remove(uuid);
 	}
 
-	private static long present(long truth) {
-		return Math.floorMod(truth, PRESENT_MODULUS);
+	private static int present(long truth) {
+		return (int) Math.floorMod(truth, PRESENT_MODULUS);
 	}
 
 	private static boolean isTimeSince(String namespace, String stat) {
 		return namespace.equals("minecraft:custom") 
 		&& stat.startsWith("minecraft:time_since");
 	}
+
+	private static Map<String, Map<String, Integer>> copyPresented(Map<String, Map<String, Integer>> presented)  { 
+		Map<String, Map<String, Integer>> out = new HashMap<>();
+
+		if (presented == null) {
+			return out;
+		}
+		for (Map.Entry<String, Map<String, Integer>> inner : presented.entrySet()) {
+			out.put(inner.getKey(), new HashMap<>(inner.getValue()));
+		}
+
+		return out;
+	} 
 }
