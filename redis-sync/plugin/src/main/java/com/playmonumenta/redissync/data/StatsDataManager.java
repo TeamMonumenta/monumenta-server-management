@@ -1,174 +1,61 @@
 package com.playmonumenta.redissync.data;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.JsonPrimitive;
 import com.playmonumenta.redissync.utils.MMLog;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import org.jetbrains.annotations.Nullable;
+import javax.annotation.Nullable;
 
 public class StatsDataManager {
-	private static final Map<UUID, Map<String, Map<String, Long>>> mTruth = new HashMap<>();
-	private static final Map<UUID, Map<String, Map<String, Integer>>> mPresented = new HashMap<>();
-	private static final long PRESENT_MODULUS = 1L << 30; // around 1.073b
-	
-	private StatsDataManager() {
+	private final Map<UUID, PlayerStats> mPlayerStats = new HashMap<>();
 
-	}
-
-	public static @Nullable String load(UUID uuid, @Nullable String storedJson) {
+	public @Nullable String load(UUID uuid, @Nullable String storedJson) {
 		if (storedJson == null || storedJson.isBlank()) {
 			return null;
 		}
 
-		// Try to parse storedJson. If operation fails, log it
 		JsonObject root;
 		try {
 			root = JsonParser.parseString(storedJson).getAsJsonObject();
-		} catch (Exception e){
-			MMLog.warning("Could not parse stats for " + uuid, e);
-			return null;
-		}
-		
-		JsonObject stats = root.getAsJsonObject("stats");
-		if (stats == null) {
+		} catch (Exception e) {
+			MMLog.warning("Failed to parse data for UUID " + uuid, e);
 			return null;
 		}
 
-		Map<String, Map<String, Long>> truth = new HashMap<>();
-		Map<String, Map<String, Integer>> presented = new HashMap<>();
-		
-		// Iterate through every namespace entry in our object
-		for (Map.Entry<String, JsonElement> namespaceEntry : stats.entrySet()) {
-			if (!namespaceEntry.getValue().isJsonObject()) {
-				continue;
-			}
+		PlayerStats ps = PlayerStats.fromJson(uuid, root);
 
-			Map<String, Long> truthNamespace = new HashMap<>();
-			Map<String, Integer> presentedNamespace = new HashMap<>();
-			
-			// For every namespace stat, get their real value and generate a marker value
-			for (Map.Entry<String, JsonElement> statEntry : namespaceEntry.getValue().getAsJsonObject().entrySet()) {
-				long value = statEntry.getValue().getAsLong();
-				int marker = present(value);
-
-				truthNamespace.put(statEntry.getKey(), value);
-				presentedNamespace.put(statEntry.getKey(), marker);
-
-				statEntry.setValue(new JsonPrimitive(marker));
-			}
-
-			truth.put(namespaceEntry.getKey(), truthNamespace);
-			presented.put(namespaceEntry.getKey(), presentedNamespace);
+		if (ps == null) {
+			return null;
 		}
-		
-		mTruth.put(uuid, truth);
-		mPresented.put(uuid, presented);
+
+
+		mPlayerStats.put(uuid, ps);
 
 		return root.toString();
 	}
 
-	public static String save(UUID uuid, String bukkitJson) {
-		Map<String, Map<String, Long>> truth = mTruth.get(uuid);
-
-		// Return bukkit json if there's no entry recorded
-		if (truth == null) {
-			return bukkitJson;
+	public String save(UUID uuid, String savedJson) {
+		PlayerStats ps = mPlayerStats.get(uuid);
+		if (ps == null) {
+			return savedJson;
 		}
 
-		// Parse bukkitJson into an object
 		JsonObject root;
 		try {
-			root = JsonParser.parseString(bukkitJson).getAsJsonObject();
+			root = JsonParser.parseString(savedJson).getAsJsonObject();
 		} catch (Exception e) {
-			MMLog.warning("Could not save player stats for " + uuid, e);
-			return bukkitJson;
+			MMLog.warning("Failed to save data for UUID " + uuid, e);
+			return savedJson;
 		}
 
-		JsonObject stats = root.getAsJsonObject("stats");
-		if (stats == null) {
-			stats = new JsonObject();
-			root.add("stats", stats);
-		}
-
-		Map<String, Map<String, Integer>> presented = mPresented.get(uuid);
-		Map<String, Map<String, Integer>> nextPresented = copyPresented(presented);
-
-		for (Map.Entry<String, JsonElement> namespaceEntry : stats.entrySet()) {
-			if (!namespaceEntry.getValue().isJsonObject()) {
-				continue;
-			}
-
-			String namespace = namespaceEntry.getKey();
-			Map<String, Long> truthNamespace = truth.computeIfAbsent(namespace, key -> new HashMap<>());
-			Map<String, Integer> presentedNamespace = presented == null ? null : presented.get(namespace);
-			Map<String, Integer> nextPresentedNamespace = new HashMap<>();
-
-			for (Map.Entry<String, JsonElement> statEntry : namespaceEntry.getValue().getAsJsonObject().entrySet()) {
-				String stat = statEntry.getKey();
-				long bukkitValue = statEntry.getValue().getAsLong();
-
-				if (isTimeSince(namespace, stat)) {
-					truthNamespace.put(stat, bukkitValue);
-				} else {
-					Integer baseline = presentedNamespace == null ? null : presentedNamespace.get(stat);
-
-					long delta = baseline == null ? bukkitValue : bukkitValue - baseline;
-					long curr = truthNamespace.getOrDefault(stat, 0L);
-
-					truthNamespace.put(stat, curr + delta);
-				}
-
-				nextPresentedNamespace.put(stat, present(bukkitValue));
-			}
-
-			nextPresented.put(namespace, nextPresentedNamespace);
-		}
-
-		for (Map.Entry<String, Map<String, Long>> truthNamespaceEntry : truth.entrySet()) {
-			JsonObject namespaceObj = stats.has(truthNamespaceEntry.getKey()) 
-			? stats.getAsJsonObject(truthNamespaceEntry.getKey()) 
-			: new JsonObject();
-
-			for (Map.Entry<String, Long> truthStatEntry : truthNamespaceEntry.getValue().entrySet()) {
-				namespaceObj.add(truthStatEntry.getKey(), new JsonPrimitive(truthStatEntry.getValue()));
-			}
-
-			stats.add(truthNamespaceEntry.getKey(), namespaceObj);
-		}
-
-		mPresented.put(uuid, nextPresented);
+		ps.updateSavedValue(root);
 
 		return root.toString();
 	}
 
-	public static void remove(UUID uuid) {
-		mTruth.remove(uuid);
-		mPresented.remove(uuid);
+	public void remove(UUID uuid) {
+		mPlayerStats.remove(uuid);
 	}
-
-	private static int present(long truth) {
-		return (int) Math.floorMod(truth, PRESENT_MODULUS);
-	}
-
-	private static boolean isTimeSince(String namespace, String stat) {
-		return namespace.equals("minecraft:custom") 
-		&& stat.startsWith("minecraft:time_since");
-	}
-
-	private static Map<String, Map<String, Integer>> copyPresented(Map<String, Map<String, Integer>> presented)  { 
-		Map<String, Map<String, Integer>> out = new HashMap<>();
-
-		if (presented == null) {
-			return out;
-		}
-		for (Map.Entry<String, Map<String, Integer>> inner : presented.entrySet()) {
-			out.put(inner.getKey(), new HashMap<>(inner.getValue()));
-		}
-
-		return out;
-	} 
 }

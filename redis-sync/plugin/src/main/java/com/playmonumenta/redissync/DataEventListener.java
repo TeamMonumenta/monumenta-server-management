@@ -127,6 +127,7 @@ public class DataEventListener implements Listener {
 	@SuppressWarnings("NullAway") // Required to avoid many null checks, this class will always be instantiated if this plugin is loaded
 	private static DataEventListener INSTANCE = null;
 
+	private final StatsDataManager mStatsDataManager = new StatsDataManager();
 	private final Gson mGson = new Gson();
 	private final VersionAdapter mAdapter;
 	private final Set<UUID> mTransferringPlayers = ConcurrentHashMap.newKeySet();
@@ -828,7 +829,7 @@ public class DataEventListener implements Listener {
 			MMLog.trace(() -> "Stats data loaded for player=" + playerName);
 			MMLog.trace(() -> "Stats data:" + statsData);
 			if (statsData != null) {
-				String presented = StatsDataManager.load(playerId, statsData);
+				String presented = mStatsDataManager.load(playerId, statsData);
 
 				if (presented != null) {
 					event.setJsonData(presented);
@@ -868,7 +869,7 @@ public class DataEventListener implements Listener {
 		MMLog.debug("Saving stats data for player=" + playerNameNullable);
 		MMLog.trace(() -> "Data:" + event.getJsonData());
 		String statsPath = MonumentaRedisSyncAPI.getRedisStatsPath(playerId);
-		String statsJsonData = StatsDataManager.save(playerId, event.getJsonData()); 
+		String statsJsonData = mStatsDataManager.save(playerId, event.getJsonData()); 
 		/* Don't block - store the pending futures for completion later */
 		trackPendingSave(playerId, RedisAPI.multi(commands -> {
 			commands.lpush(statsPath, statsJsonData);
@@ -922,7 +923,7 @@ public class DataEventListener implements Listener {
 				mPlayerContentData.remove(playerUUID);
 				mPluginData.remove(playerUUID);
 				mShardData.remove(playerUUID);
-				StatsDataManager.remove(playerUUID);
+				mStatsDataManager.remove(playerUUID);
 			}
 		}, 50);
 	}
