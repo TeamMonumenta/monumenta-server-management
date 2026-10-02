@@ -55,6 +55,10 @@ public class StatsDataManager {
 		return root.toString();
 	}
 
+	public @Nullable PlayerStats getPlayerStats(UUID uuid) {
+		return mPlayerStats.get(uuid);
+	} 
+
 	public void remove(UUID uuid) {
 		mPlayerStats.remove(uuid);
 	}

@@ -135,6 +135,12 @@ public class PlayerStats {
 		return mUuid;
 	}
 
+	public long getStat(String namespace, String stat) {
+		return mTruth
+		.getOrDefault(namespace, Map.of())
+		.getOrDefault(stat, 0L);
+	}
+
 	private static int present(long truth) {
 		return (int) Math.floorMod(truth, PRESENT_MODULUS);
 	}	
