@@ -8,7 +8,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 /*
- * 64-bit stats for a loaded player + fake 32-bit values to hand off to mc
+ * 64-bit stats for a loaded player + fake 32-bit values to hand off to MC.
+ *
  * MC and it's network protocol only support 32-bit stats. Our approach is to
  * hand a truncated value to anything that requests it, then save the value later
  * as a 64-bit value by calculating the difference and adding to our truthy value.
@@ -21,7 +22,7 @@ public class PlayerStats {
 	private final Map<String, Map<String, Integer>> mPresented = new HashMap<>();
 	/* Used to keep our presentation values in the range [0..2^30) */
 	private static final long PRESENT_MODULUS = 1L << 30;
-	
+
 	private PlayerStats(UUID uuid) {
 		mUuid = uuid;
 	}
@@ -46,7 +47,7 @@ public class PlayerStats {
 
 			Map<String, Long> truthNamespace = new HashMap<>();
 			Map<String, Integer> presentedNamespace = new HashMap<>();
-		
+
 			for (Map.Entry<String, JsonElement> statEntry : namespaceEntry.getValue().getAsJsonObject().entrySet()) {
 				long value = statEntry.getValue().getAsLong();
 				int marker = present(value);
@@ -57,18 +58,15 @@ public class PlayerStats {
 			}
 			res.mTruth.put(namespaceEntry.getKey(), truthNamespace);
 			res.mPresented.put(namespaceEntry.getKey(), presentedNamespace);
-		} 
+		}
 		return res;
 	}
 
 	/*
 	 * Updates the saved truthy and presentable values.
-	 * For each stat, we compute the difference between the original 
+	 * For each stat, we compute the difference between the original
 	 * presented value and what we've received, then add this difference
 	 * to our truthy value.
-	 *
-	 * This method atomically saves the new truthy and presentable values,
-	 * incase there is potential corruption midway through.
 	 */
 	public void updateSavedValue(JsonObject root) {
 		JsonObject stats = root.getAsJsonObject("stats");
@@ -76,7 +74,7 @@ public class PlayerStats {
 			stats = new JsonObject();
 			root.add("stats", stats);
 		}
-		
+
 		Map<String, Map<String, Long>> nextTruth = copyTruth(mTruth);
 		Map<String, Map<String, Integer>> nextPresented = copyPresented(mPresented);
 
@@ -100,10 +98,10 @@ public class PlayerStats {
 				} else {
 					Integer baseline = presentedNamespace.get(stat);
 					// Null baseline -> we haven't presented it before
-					long delta = baseline == null 
-					? savedValue 
+					long delta = baseline == null
+					? savedValue
 					: savedValue - baseline;
-					
+
 					long curr = truthNamespace.getOrDefault(stat, 0L);
 
 					truthNamespace.put(stat, curr + delta);
@@ -114,8 +112,8 @@ public class PlayerStats {
 		}
 
 		for (Map.Entry<String, Map<String, Long>> truthNamespaceEntry : nextTruth.entrySet()) {
-			JsonObject namespaceObj = stats.has(truthNamespaceEntry.getKey()) 
-			? stats.getAsJsonObject(truthNamespaceEntry.getKey()) 
+			JsonObject namespaceObj = stats.has(truthNamespaceEntry.getKey())
+			? stats.getAsJsonObject(truthNamespaceEntry.getKey())
 			: new JsonObject();
 
 			for (Map.Entry<String, Long> truthStatEntry : truthNamespaceEntry.getValue().entrySet()) {
@@ -143,11 +141,11 @@ public class PlayerStats {
 
 	private static int present(long truth) {
 		return (int) Math.floorMod(truth, PRESENT_MODULUS);
-	}	
+	}
 
-	private static Map<String, Map<String, Long>> copyTruth(Map<String, Map<String, Long>> truth)  { 
+	private static Map<String, Map<String, Long>> copyTruth(Map<String, Map<String, Long>> truth)  {
 		Map<String, Map<String, Long>> out = new HashMap<>();
-		
+
 		if (truth == null) {
 			return out;
 		}
@@ -157,11 +155,11 @@ public class PlayerStats {
 		}
 
 		return out;
-	} 
-	
-	private static Map<String, Map<String, Integer>> copyPresented(Map<String, Map<String, Integer>> presented)  { 
+	}
+
+	private static Map<String, Map<String, Integer>> copyPresented(Map<String, Map<String, Integer>> presented)  {
 		Map<String, Map<String, Integer>> out = new HashMap<>();
-		
+
 		if (presented == null) {
 			return out;
 		}
@@ -171,11 +169,11 @@ public class PlayerStats {
 		}
 
 		return out;
-	} 
+	}
 
 	private static boolean isTimeSince(String namespace, String stat) {
 		// time_since_death, etc; these stats aren't cumulative
-		return namespace.equals("minecraft:custom") 
+		return namespace.equals("minecraft:custom")
 		&& stat.startsWith("minecraft:time_since");
 	}
 }

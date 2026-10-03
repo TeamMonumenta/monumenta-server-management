@@ -20,7 +20,7 @@ public class StatsDataManager {
 		try {
 			root = JsonParser.parseString(storedJson).getAsJsonObject();
 		} catch (Exception e) {
-			MMLog.warning("Failed to parse data for UUID " + uuid, e);
+			MMLog.warning("[class: StatsDataManager] Failed to load player stats in StatsDataManager for UUID " + uuid, e);
 			return null;
 		}
 
@@ -46,7 +46,7 @@ public class StatsDataManager {
 		try {
 			root = JsonParser.parseString(savedJson).getAsJsonObject();
 		} catch (Exception e) {
-			MMLog.warning("Failed to save data for UUID " + uuid, e);
+			MMLog.warning("Failed to save player stats in StatsDataManager for UUID" + uuid, e);
 			return savedJson;
 		}
 
