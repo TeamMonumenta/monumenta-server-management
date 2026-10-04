@@ -854,13 +854,13 @@ public class DataEventListener implements Listener {
 		String playerName = playerNameNullable == null ? playerId.toString() : playerNameNullable;
 
 		if (isPlayerTransferring(playerId)) {
-			MMLog.debug("Ignoring ServerStatsDataLoadEvent for player:" + playerName);
+			MMLog.debug("Ignoring ServerStatsDataSaveEvent for player:" + playerName);
 			return;
 		}
 
 		/* Execute the stats as a multi() batch */
 		/* Stats */
-		MMLog.debug("Saving stats data for player=" + playerNameNullable);
+		MMLog.debug("Saving stats data for player=" + playerName);
 		MMLog.trace(() -> "Data:" + event.getJsonData());
 		String statsPath = MonumentaRedisSyncAPI.getRedisStatsPath(playerId);
 		String statsJsonData = event.getJsonData();
@@ -868,7 +868,7 @@ public class DataEventListener implements Listener {
 		trackPendingSave(playerId, RedisAPI.multi(commands -> {
 			commands.lpush(statsPath, statsJsonData);
 			commands.ltrim(statsPath, 0, BukkitConfigAPI.getHistoryAmount());
-		}), () -> "Stats saving for player=" + playerNameNullable + " failed");
+		}), () -> "Stats saving for player=" + playerName + " failed");
 	}
 
 	/* ******************* Transferring Restriction Event Handlers ******************* */
