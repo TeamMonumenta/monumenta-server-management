@@ -613,8 +613,8 @@ the remaining futures. `ex` will be non-null and the early `return` ensures
 
 ### 5.6 Batching on an async thread - `LettuceFutures.awaitAll()`
 
-Some code already runs on an async thread (e.g. inside
-`waitForPlayerToSaveThenAsync`). In that context it is acceptable to block the
+Some code already runs on an async thread (e.g. a callback that
+`PlayerSessions.waitForSaves` runs asynchronously). In that context it is acceptable to block the
 thread, but **fire all futures first**, then wait for them together rather than
 calling `.get()` sequentially.
 
@@ -622,7 +622,7 @@ calling `.get()` sequentially.
 
 ```java
 // ⚠ Acceptable (already on async thread) but fire-then-await, not sequential get()
-DataEventListener.waitForPlayerToSaveThenAsync(player, () -> {
+PlayerSessions.waitForSaves(player, () -> {
     // Fire all reads at once - each borrow() is very brief
     RedisFuture<byte[]> dataFuture;
     RedisFuture<String> scoresFuture;
@@ -660,7 +660,7 @@ DataEventListener.waitForPlayerToSaveThenAsync(player, () -> {
 
     // Do further async work, then schedule main-thread work when needed
     Bukkit.getScheduler().runTask(plugin, () -> player.kick(Component.text("Data loaded")));
-});
+}, false);
 ```
 
 > Real usage: `MonumentaRedisSyncAPI.stashGet()` / `playerRollback()`.
