@@ -285,12 +285,22 @@ list as online.
 
 ## Offline edits
 
-`saveOfflinePlayerData` writes a player who is not online. It must not run while they have a
-session here or a login under way, and a login must not load while it runs. The offline write's
-claim (`PlayerSessions.claimOfflineWrite`) and pre-login's expectation of a login are taken under
-the same monitor. So either the write sees the login and is refused, or the login sees the write
-and waits for it. The write itself is a Lua script that pushes only if the newest history entry
-is still the one the edit was read from, so an edit never buries a save made since.
+This plugin is not a way to change offline players' data. "Offline" can only mean "not on this
+shard": the player may be on another shard, and nothing here can see or stop that. If they are,
+their next save there goes on top of the edit, and the edit is lost.
+
+`getOfflinePlayerData` and `saveOfflinePlayerData` exist to feed saved player data through the
+current Minecraft version's DataFixer. This is the main way player data is upgraded across
+Minecraft versions (`/monumenta redissync upgradeallplayers`), run during maintenance with no
+players online.
+
+Within that, the write still guards against what this shard can see. It must not run while the
+player has a session here or a login under way, and a login must not load while it runs. The
+write's claim (`PlayerSessions.claimOfflineWrite`) and pre-login's expectation of a login are
+taken under the same monitor. So either the write sees the login and is refused, or the login
+sees the write and waits for it. The write itself is a Lua script that pushes only if the newest
+history entry is still the one the edit was read from, so an edit never buries a save made
+since it was read. A save made afterwards, from another shard, still buries the edit.
 
 ## Threads
 
