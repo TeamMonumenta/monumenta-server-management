@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 /*
@@ -138,6 +139,19 @@ public class PlayerStats {
 		.getOrDefault(namespace, Map.of())
 		.getOrDefault(stat, 0L);
 	}
+
+	public Set<String> getNamespaces() {
+		return mTruth.keySet();
+	}
+
+	public Set<String> getStatKeys(String namespace) {
+		Map<String, Long> namespaceEntry = mTruth.get(namespace);
+		return namespaceEntry == null
+		? Set.of()
+		: namespaceEntry.keySet();
+	}
+
+
 
 	private static int present(long truth) {
 		return (int) Math.floorMod(truth, PRESENT_MODULUS);

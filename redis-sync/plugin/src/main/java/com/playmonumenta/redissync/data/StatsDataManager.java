@@ -5,6 +5,7 @@ import com.google.gson.JsonParser;
 import com.playmonumenta.redissync.utils.MMLog;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -57,7 +58,24 @@ public class StatsDataManager {
 
 	public @Nullable PlayerStats getPlayerStats(UUID uuid) {
 		return mPlayerStats.get(uuid);
-	} 
+	}
+
+	public Set<String> getNamespaces(UUID uuid) {
+		PlayerStats ps = mPlayerStats.get(uuid);
+
+		return ps == null
+		? Set.of()
+		: ps.getNamespaces();
+	}
+
+	public Set<String> getStatKeys(UUID uuid, String namespace) {
+		PlayerStats ps = mPlayerStats.get(uuid);
+
+		return ps == null
+		? Set.of()
+		: ps.getStatKeys(namespace);
+	}
+
 
 	public void remove(UUID uuid) {
 		mPlayerStats.remove(uuid);
