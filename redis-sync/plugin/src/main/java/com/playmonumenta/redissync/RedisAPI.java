@@ -115,9 +115,9 @@ public class RedisAPI {
 
 		@Override
 		public void close() {
-			MMLog.debug("[BorrowedCommands] releasing lock");
+			MMLog.trace("[BorrowedCommands] releasing lock");
 			mLock.unlock();
-			MMLog.debug("[BorrowedCommands] lock released");
+			MMLog.trace("[BorrowedCommands] lock released");
 		}
 	}
 
@@ -128,10 +128,10 @@ public class RedisAPI {
 	@MustBeClosed
 	public static BorrowedCommands<String, String> borrow() {
 		RedisAPI api = INSTANCE;
-		MMLog.debug("[borrow] caller: " + callerFrames());
-		MMLog.debug("[borrow] acquiring lock...");
+		MMLog.trace(() -> "[borrow] caller: " + callerFrames());
+		MMLog.trace("[borrow] acquiring lock...");
 		api.mLock.lock();
-		MMLog.debug("[borrow] lock acquired");
+		MMLog.trace("[borrow] lock acquired");
 		return new BorrowedCommands<>(api.mConnection, STRING_STRING_CODEC, api.mLock);
 	}
 
@@ -142,10 +142,10 @@ public class RedisAPI {
 	@MustBeClosed
 	public static BorrowedCommands<String, byte[]> borrowStringBytes() {
 		RedisAPI api = INSTANCE;
-		MMLog.debug("[borrowStringBytes] caller: " + callerFrames());
-		MMLog.debug("[borrowStringBytes] acquiring lock...");
+		MMLog.trace(() -> "[borrowStringBytes] caller: " + callerFrames());
+		MMLog.trace("[borrowStringBytes] acquiring lock...");
 		api.mBytesLock.lock();
-		MMLog.debug("[borrowStringBytes] lock acquired");
+		MMLog.trace("[borrowStringBytes] lock acquired");
 		return new BorrowedCommands<>(api.mStringByteConnection, STRING_BYTE_CODEC, api.mBytesLock);
 	}
 
@@ -165,10 +165,10 @@ public class RedisAPI {
 	 */
 	public static CompletableFuture<TransactionResult> multi(Consumer<BorrowedCommands<String, String>> block) {
 		RedisAPI api = INSTANCE;
-		MMLog.debug("[multi] caller: " + callerFrames());
-		MMLog.debug("[multi] acquiring lock...");
+		MMLog.trace(() -> "[multi] caller: " + callerFrames());
+		MMLog.trace("[multi] acquiring lock...");
 		api.mLock.lock();
-		MMLog.debug("[multi] lock acquired");
+		MMLog.trace("[multi] lock acquired");
 		try {
 			BorrowedCommands<String, String> conn = new BorrowedCommands<>(api.mConnection, STRING_STRING_CODEC, api.mLock);
 			conn.multi();
@@ -178,9 +178,9 @@ public class RedisAPI {
 			api.mConnection.async().discard();
 			throw e;
 		} finally {
-			MMLog.debug("[multi] releasing lock");
+			MMLog.trace("[multi] releasing lock");
 			api.mLock.unlock();
-			MMLog.debug("[multi] lock released");
+			MMLog.trace("[multi] lock released");
 		}
 	}
 
@@ -193,10 +193,10 @@ public class RedisAPI {
 	 */
 	public static CompletableFuture<TransactionResult> multiStringBytes(Consumer<BorrowedCommands<String, byte[]>> block) {
 		RedisAPI api = INSTANCE;
-		MMLog.debug("[multiStringBytes] caller: " + callerFrames());
-		MMLog.debug("[multiStringBytes] acquiring lock...");
+		MMLog.trace(() -> "[multiStringBytes] caller: " + callerFrames());
+		MMLog.trace("[multiStringBytes] acquiring lock...");
 		api.mBytesLock.lock();
-		MMLog.debug("[multiStringBytes] lock acquired");
+		MMLog.trace("[multiStringBytes] lock acquired");
 		try {
 			BorrowedCommands<String, byte[]> conn = new BorrowedCommands<>(api.mStringByteConnection, STRING_BYTE_CODEC, api.mBytesLock);
 			conn.multi();
@@ -206,9 +206,9 @@ public class RedisAPI {
 			api.mStringByteConnection.async().discard();
 			throw e;
 		} finally {
-			MMLog.debug("[multiStringBytes] releasing lock");
+			MMLog.trace("[multiStringBytes] releasing lock");
 			api.mBytesLock.unlock();
-			MMLog.debug("[multiStringBytes] lock released");
+			MMLog.trace("[multiStringBytes] lock released");
 		}
 	}
 
@@ -265,14 +265,14 @@ public class RedisAPI {
 	/** @deprecated Use {@link #borrow()} instead. */
 	@Deprecated
 	public RedisAsyncCommands<String, String> async() {
-		MMLog.debug("[async] caller: " + callerFrames());
+		MMLog.trace(() -> "[async] caller: " + callerFrames());
 		return mConnection.async();
 	}
 
 	/** @deprecated Use {@link #borrowStringBytes()} instead. */
 	@Deprecated
 	public RedisAsyncCommands<String, byte[]> asyncStringBytes() {
-		MMLog.debug("[asyncStringBytes] caller: " + callerFrames());
+		MMLog.trace(() -> "[asyncStringBytes] caller: " + callerFrames());
 		return mStringByteConnection.async();
 	}
 

@@ -152,7 +152,7 @@ public class DataEventListener implements Listener {
 		}
 
 		long startTime = System.currentTimeMillis();
-		MMLog.debug("Started loading advancements data for player=" + playerName);
+		MMLog.trace("Started loading advancements data for player=" + playerName);
 
 		RedisFuture<String> advanceFuture;
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
@@ -162,7 +162,7 @@ public class DataEventListener implements Listener {
 		try {
 			/* Advancements */
 			final String advanceData = advanceFuture.get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
-			MMLog.trace(() -> "Advancements data loaded for player=" + playerName);
+			MMLog.debug(() -> "Advancements data loaded for player=" + playerName);
 			MMLog.trace(() -> "Advancements data:" + advanceData);
 			if (advanceData != null) {
 				event.setJsonData(advanceData);
@@ -170,7 +170,7 @@ public class DataEventListener implements Listener {
 				MMLog.warning("No advancements data for player '" + playerName + "' - if they are not new, this is a serious error!");
 			}
 
-			MMLog.debug(() -> "Processing PlayerAdvancementDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
+			MMLog.trace(() -> "Processing PlayerAdvancementDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
 		} catch (CancellationException | InterruptedException | ExecutionException | TimeoutException ex) {
 			MMLog.severe("!!! Failed to load player advancements data !!!", ex);
 			mSessions.abortLoad(session, "advancements failed to load");
@@ -193,7 +193,7 @@ public class DataEventListener implements Listener {
 			return;
 		}
 
-		MMLog.debug("Saving advancements data for player=" + playerName);
+		MMLog.trace("Saving advancements data for player=" + playerName);
 		MMLog.trace(() -> "Data:" + event.getJsonData());
 		String advPath = MonumentaRedisSyncAPI.getRedisAdvancementsPath(player);
 		String advJsonData = event.getJsonData();
@@ -255,7 +255,7 @@ public class DataEventListener implements Listener {
 		}
 
 		long startTime = System.currentTimeMillis();
-		MMLog.debug("Started loading data for player=" + playerName);
+		MMLog.debug("Loading playerdata for player=" + playerName + " session=" + session);
 
 		//TODO: Rework to using something like MonumentaRedisSyncAPI.transformPlayerData()
 		RedisFuture<byte[]> dataFuture;
@@ -281,13 +281,13 @@ public class DataEventListener implements Listener {
 				MMLog.warning("No data for player '" + playerName + "' - if they are not new, this is a serious error!");
 				return;
 			}
-			MMLog.trace("Player data loaded for player=" + playerName);
+			MMLog.debug("Player data loaded for player=" + playerName);
 			MMLog.trace(() -> "Player data: " + b64encode(data));
 
 			/* Load content data */
 			String contentData = contentFuture.get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
 			if (contentData == null) {
-				MMLog.debug("Player '" + player.getName() + "' has no content data");
+				MMLog.info("Player '" + player.getName() + "' has no content data");
 				session.setContentData(new ContentData(""));
 			} else {
 				JsonObject obj;
@@ -301,7 +301,7 @@ public class DataEventListener implements Listener {
 					session.setContentData(new ContentData(""));
 				} else {
 					session.setContentData(new ContentData(obj));
-					MMLog.trace(() -> "Content data loaded for player=" + player.getName());
+					MMLog.debug(() -> "Content data loaded for player=" + player.getName());
 					MMLog.trace(() -> "Content data: " + contentData);
 				}
 			}
@@ -309,10 +309,10 @@ public class DataEventListener implements Listener {
 			/* Load plugin data */
 			String pluginData = pluginDataFuture.get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
 			if (pluginData == null) {
-				MMLog.debug("Player '" + playerName + "' has no plugin data");
+				MMLog.info("Player '" + playerName + "' has no plugin data");
 			} else {
 				session.setPluginData(mGson.fromJson(pluginData, JsonObject.class));
-				MMLog.trace("Plugin data loaded for player=" + playerName);
+				MMLog.debug("Plugin data loaded for player=" + playerName);
 				MMLog.trace(() -> "Plugin data: " + pluginData);
 			}
 
@@ -341,11 +341,11 @@ public class DataEventListener implements Listener {
 				session.setShardData(new HashMap<>());
 
 				/* This is not an error - this will happen whenever a player first joins the game */
-				MMLog.debug("Player '" + playerName + "' has never been to any shard before");
+				MMLog.info("Player '" + playerName + "' has never been to any shard before");
 			} else {
 				session.setShardData(shardData);
 
-				MMLog.trace("Shard data loaded for player=" + playerName);
+				MMLog.debug("Shard data loaded for player=" + playerName);
 				MMLog.trace(() -> "Shard data: " + mGson.toJson(shardData));
 
 				/* Figure out what world the player's sharddata indicates they should join
@@ -427,7 +427,7 @@ public class DataEventListener implements Listener {
 			Object nbtTagCompound = mAdapter.retrieveSaveData(data, worldShardDataJson);
 			event.setData(nbtTagCompound);
 
-			MMLog.debug(() -> "Processing PlayerDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
+			MMLog.trace(() -> "Processing PlayerDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
 		} catch (Throwable ex) {
 			MMLog.severe("!!! Failed to load player data !!!", ex);
 			mSessions.abortLoad(session, "playerdata failed to load");
@@ -475,7 +475,7 @@ public class DataEventListener implements Listener {
 			return;
 		}
 
-		MMLog.debug("Saving data for player=" + playerName);
+		MMLog.debug("Saving playerdata for player=" + playerName);
 
 		JsonObject pluginData = session.getPluginData();
 
@@ -488,7 +488,7 @@ public class DataEventListener implements Listener {
 		for (Map.Entry<String, JsonObject> ent : eventData.entrySet()) {
 			pluginData.add(ent.getKey(), ent.getValue());
 		}
-		MMLog.debug(() -> "Getting plugindata from other plugins took " + (System.currentTimeMillis() - startTime) + " milliseconds");
+		MMLog.trace(() -> "Getting plugindata from other plugins took " + (System.currentTimeMillis() - startTime) + " milliseconds");
 
 		try {
 			SaveData data = mAdapter.extractSaveData(event.getData(), session.getReturnParams());
@@ -537,10 +537,10 @@ public class DataEventListener implements Listener {
 			MMLog.trace(() -> "plugindata: " + pluginDataStr);
 
 			/* Scoreboards */
-			MMLog.debug("Saving scoreboard data for player=" + playerName);
+			MMLog.trace("Saving scoreboard data for player=" + playerName);
 			long scoreStartTime = System.currentTimeMillis();
 			String scoreboardData = mGson.toJson(mAdapter.getPlayerScoresAsJson(playerName, Bukkit.getScoreboardManager().getMainScoreboard()));
-			MMLog.debug(() -> "Scoreboard saving took " + (System.currentTimeMillis() - scoreStartTime) + " " + "milliseconds on main thread");
+			MMLog.trace(() -> "Scoreboard saving took " + (System.currentTimeMillis() - scoreStartTime) + " " + "milliseconds on main thread");
 			MMLog.trace(() -> "Data:" + scoreboardData);
 			String scorePath = MonumentaRedisSyncAPI.getRedisScoresPath(player);
 
