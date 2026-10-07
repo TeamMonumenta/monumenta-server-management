@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
+import com.playmonumenta.redissync.data.ContentData;
 import com.playmonumenta.worlds.common.MMLog;
 import java.io.File;
 import java.io.IOException;
@@ -15,6 +16,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -183,21 +185,45 @@ public class WorldManagementPlugin extends JavaPlugin {
 	}
 
 	public static @Nullable ContentInfo getContentInfo(Player player) {
-		// TODO: If the content is not available on the current shard, and content is enabled, return null
+		// TODO: If no matching content is not available on the current shard, and content is enabled, return the local overworld for now
 		// Eventually need to sort the player's shard if this does not match
+		MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): Begin");
+		ContentInfo info = null;
 		if (isSortByContent()) {
-			return getContentInfo(MonumentaRedisSyncAPI.getPlayerContentData(player).getId());
+			MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): isSortbyContent() is true");
+			info = getContentInfo(MonumentaRedisSyncAPI.getPlayerContentData(player).getId());
+			boolean usedFallback = false;
+			while (info != null) {
+				ContentInfo finalInfo = info;
+				boolean finalUsedFallback = usedFallback;
+				MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): info = " + finalInfo.getContentName() + ", usedFallback = " + finalUsedFallback);
+				Optional<Integer> score = info.getInstanceScore(player);
+				MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): score = " + score);
+				if (score.isEmpty() || score.get() > 0) {
+					if (usedFallback) {
+						ContentData contentData = new ContentData(info.getContentName());
+						MonumentaRedisSyncAPI.savePlayerContent(player.getUniqueId(), contentData);
+						MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): Saved content data " + contentData.getId());
+					}
+					MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): Returning " + finalInfo.getContentName());
+					return info;
+				}
+				info = mContentInfoMap.get(info.getFallbackContentName());
+				usedFallback = true;
+			}
 		}
 
-		ContentInfo info = null;
+		MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): no results via sort by content (if enabled)");
 		for (ContentInfo contentInfo : mContentInfoMap.values()) {
 			info = contentInfo;
 			break;
 		}
 		if (info == null) {
-			MMLog.debug("No content info found.");
+			MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): No content info found");
 			return null;
 		}
+		ContentInfo finalInfo1 = info;
+		MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): Using default of " + finalInfo1.getContentName());
 		return info;
 	}
 
