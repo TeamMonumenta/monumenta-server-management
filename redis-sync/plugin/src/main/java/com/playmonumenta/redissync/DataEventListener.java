@@ -420,6 +420,7 @@ public class DataEventListener implements Listener {
 				worldShardDataJson.add("Rotation", rotation);
 			}
 
+			MonumentaRedisSyncAPI.PlayerWorldData.removeForeignSpawn(worldShardDataJson, playerWorld);
 			worldShardDataJson.addProperty("world", playerWorld.getName());
 
 			/* At this point shardDataJson contains at minimum the world the player should be attached to and the location/rotation */
