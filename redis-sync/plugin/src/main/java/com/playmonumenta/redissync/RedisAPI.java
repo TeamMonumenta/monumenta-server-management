@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import org.jetbrains.annotations.Nullable;
 
 public class RedisAPI {
 	private static final class StringByteCodec implements RedisCodec<String, byte[]> {
@@ -101,7 +102,7 @@ public class RedisAPI {
 	 * }</pre>
 	 *
 	 * <p>WARNING: Do not store or use this object outside its try-with-resources block.
-	 * Do not call {@code multi()}/{@code exec()} directly — use
+	 * Do not call {@code multi()}/{@code exec()} directly; use
 	 * {@link RedisAPI#multi(Consumer)} instead.
 	 */
 	public static final class BorrowedCommands<K, V> extends AbstractRedisAsyncCommands<K, V> implements AutoCloseable {
@@ -227,11 +228,34 @@ public class RedisAPI {
 		INSTANCE = this;
 	}
 
+	@SuppressWarnings("NullAway") // Clearing the singleton is intentional; borrow() after shutdown is a bug either way
 	protected void shutdown() {
 		mConnection.close();
 		mStringByteConnection.close();
 		mRedisClient.shutdown();
 		mClientResources.shutdown();
+		if (INSTANCE == this) {
+			INSTANCE = null;
+		}
+	}
+
+	/**
+	 * A command inside a MULTI can fail on its own (WRONGTYPE, OOM) without failing the EXEC, and
+	 * the rest of the transaction still applies. Returns the first such failure, if any.
+	 */
+	static @Nullable Throwable firstCommandError(@Nullable TransactionResult result) {
+		if (result == null) {
+			return null;
+		}
+		if (result.wasDiscarded()) {
+			return new IllegalStateException("transaction was discarded");
+		}
+		for (Object item : result) {
+			if (item instanceof Throwable error) {
+				return error;
+			}
+		}
+		return null;
 	}
 
 	public static RedisAPI getInstance() {
