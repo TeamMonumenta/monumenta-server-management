@@ -13,7 +13,7 @@ import org.jetbrains.annotations.Nullable;
 
 public class ContentInfo {
 	private final String mContentName;
-	private final @Nullable String mFallbackContentName;
+	private final @Nullable String mReturnToContentName;
 	private final String mInstanceObjective;
 	private final String mBaseWorldName;
 	private final @Nullable String mJoinInstanceCommand;
@@ -26,8 +26,8 @@ public class ContentInfo {
 	protected ContentInfo(WorldManagementPlugin plugin, String contentName, ConfigurationSection config) {
 		mContentName = contentName;
 
-		mFallbackContentName = config.getString("fallback-content-name", null);
-		plugin.printConfig("    fallback-content-name", mFallbackContentName);
+		mReturnToContentName = config.getString("return-to-content-name", null);
+		plugin.printConfig("    return-to-content-name", mReturnToContentName);
 
 		mInstanceObjective = config.getString("instance-objective", "");
 		plugin.printConfig("    instance-objective", mInstanceObjective);
@@ -73,8 +73,8 @@ public class ContentInfo {
 		return mContentName;
 	}
 
-	public @Nullable String getFallbackContentName() {
-		return mFallbackContentName;
+	public @Nullable String getReturnToContentName() {
+		return mReturnToContentName;
 	}
 
 	public String getInstanceObjective() {

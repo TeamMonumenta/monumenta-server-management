@@ -192,15 +192,15 @@ public class WorldManagementPlugin extends JavaPlugin {
 		if (isSortByContent()) {
 			MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): isSortbyContent() is true");
 			info = getContentInfo(MonumentaRedisSyncAPI.getPlayerContentData(player).getId());
-			boolean usedFallback = false;
+			boolean returnedToContent = false;
 			while (info != null) {
 				ContentInfo finalInfo = info;
-				boolean finalUsedFallback = usedFallback;
-				MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): info = " + finalInfo.getContentName() + ", usedFallback = " + finalUsedFallback);
+				boolean finalReturnedToContent = returnedToContent;
+				MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): info = " + finalInfo.getContentName() + ", returnedToContent = " + finalReturnedToContent);
 				Optional<Integer> score = info.getInstanceScore(player);
 				MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): score = " + score);
 				if (score.isEmpty() || score.get() > 0) {
-					if (usedFallback) {
+					if (returnedToContent) {
 						ContentData contentData = new ContentData(info.getContentName());
 						MonumentaRedisSyncAPI.savePlayerContent(player.getUniqueId(), contentData);
 						MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): Saved content data " + contentData.getId());
@@ -208,8 +208,8 @@ public class WorldManagementPlugin extends JavaPlugin {
 					MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): Returning " + finalInfo.getContentName());
 					return info;
 				}
-				info = mContentInfoMap.get(info.getFallbackContentName());
-				usedFallback = true;
+				info = mContentInfoMap.get(info.getReturnToContentName());
+				returnedToContent = true;
 			}
 		}
 
