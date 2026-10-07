@@ -107,7 +107,7 @@ public final class PlayerSessions implements Listener {
 	/** Schedules work on the main thread from any thread, unless the plugin is being disabled, when there is no one left to do it for */
 	static void runOnMainThread(Runnable task) {
 		if (!INSTANCE.mPlugin.isEnabled()) {
-			MMLog.debug("Dropping main thread task scheduled while the plugin is disabled");
+			MMLog.trace("Dropping main thread task scheduled while the plugin is disabled");
 			return;
 		}
 		Bukkit.getScheduler().runTask(INSTANCE.mPlugin, task);
@@ -162,6 +162,7 @@ public final class PlayerSessions implements Listener {
 		synchronized (this) {
 			mExpectedLogins.remove(uuid, expectedUntil);
 		}
+		MMLog.debug(() -> "Started session " + session);
 		return session;
 	}
 
@@ -202,7 +203,7 @@ public final class PlayerSessions implements Listener {
 					MMLog.warning("Skipping " + what + " save for player=" + playerName + " because their data has been replaced and they must rejoin");
 					runOnMainThread(lock::kickHandedOff);
 				} else {
-					MMLog.debug("Skipping " + what + " save for player=" + playerName + " because their data is moving elsewhere");
+					MMLog.trace("Skipping " + what + " save for player=" + playerName + " because their data is moving elsewhere");
 				}
 			}
 			default -> throw new IllegalStateException("current() never returns an ended session");
@@ -241,13 +242,13 @@ public final class PlayerSessions implements Listener {
 		PlayerSession previous = mSessions.get(uuid);
 		if (previous != null) {
 			if (!previous.isEnded()) {
-				MMLog.info(() -> "Login for " + profile.getName() + " while their previous connection is still open here; closing it");
+				MMLog.debug(() -> "Login for " + profile.getName() + " while their previous connection is still open here; closing it");
 				runOnMainThread(() -> supersede(previous));
 			}
 			long startTime = System.currentTimeMillis();
 			try {
 				previous.finished().get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
-				MMLog.info(() -> "Login for " + profile.getName() + " waited " + (System.currentTimeMillis() - startTime) + "ms for their previous session to finish saving");
+				MMLog.debug(() -> "Login for " + profile.getName() + " waited " + (System.currentTimeMillis() - startTime) + "ms for their previous session to finish saving");
 			} catch (InterruptedException | ExecutionException | TimeoutException ex) {
 				MMLog.warning(() -> "Refusing login for uuid=" + uuid + " name=" + profile.getName() + ": their previous connection here did not close and finish saving in time");
 				event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, Component.translatable("multiplayer.disconnect.duplicate_login"));
@@ -445,7 +446,7 @@ public final class PlayerSessions implements Listener {
 			if (ex != null) {
 				MMLog.severe("Got timeout waiting to commit transactions for player '" + player.getName() + "'. This is very bad!", ex);
 			}
-			MMLog.debug(() -> "Committing save took " + (System.currentTimeMillis() - startTime) + " milliseconds");
+			MMLog.trace(() -> "Committing save took " + (System.currentTimeMillis() - startTime) + " milliseconds");
 			if (sync) {
 				runOnMainThread(callback);
 			} else if (INSTANCE.mPlugin.isEnabled()) {

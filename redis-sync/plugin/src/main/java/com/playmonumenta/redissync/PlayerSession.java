@@ -119,14 +119,20 @@ final class PlayerSession {
 	/** The join event is over, so saving can start, unless the session has failed meanwhile */
 	void joined() {
 		if (mState == State.LOADING) {
-			mState = State.PLAYING;
+			setState(State.PLAYING);
 		}
 	}
 
 	void fail() {
 		if (isLive()) {
-			mState = State.FAILED;
+			setState(State.FAILED);
 		}
+	}
+
+	private void setState(State state) {
+		State previous = mState;
+		mState = state;
+		MMLog.debug(() -> "Session player=" + mName + " " + previous + " -> " + state);
 	}
 
 	/**
@@ -134,7 +140,7 @@ final class PlayerSession {
 	 * after this, so {@link #finished()} completes once the saves already made have committed.
 	 */
 	void end() {
-		mState = State.ENDED;
+		setState(State.ENDED);
 		mEnded.complete(null);
 		SessionLock lock = mLock;
 		if (lock != null) {

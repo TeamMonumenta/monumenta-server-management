@@ -98,6 +98,7 @@ final class SessionLock {
 		session.setLock(lock);
 		shoulderEntities.forEach(shoulder -> sessions.getLockedShoulderEntities().put(shoulder, lock));
 		lock.scheduleTimeout();
+		MMLog.debug(() -> "Locked player=" + session.getName() + " state=" + session.getState() + " savePushed=" + lock.mSavePushed + " shoulderEntities=" + shoulderEntities.size());
 		return lock;
 	}
 
@@ -122,6 +123,9 @@ final class SessionLock {
 	private synchronized void advance(Phase from, Phase to) {
 		if (mPhase == from) {
 			mPhase = to;
+			MMLog.debug(() -> "Lock player=" + mSession.getName() + " " + from + " -> " + to);
+		} else {
+			MMLog.trace(() -> "Lock player=" + mSession.getName() + " stays " + mPhase + ", ignoring " + from + " -> " + to);
 		}
 	}
 
@@ -161,6 +165,7 @@ final class SessionLock {
 			return;
 		}
 		mSession.setLock(null);
+		MMLog.debug(() -> "Unlocked player=" + mSession.getName() + " phase=" + mPhase + " session=" + mSession.getState());
 		if (mTimeout != null) {
 			mTimeout.cancel();
 		}
@@ -173,6 +178,7 @@ final class SessionLock {
 		if (!isHeld() || isHandedOff()) {
 			return;
 		}
+		MMLog.debug(() -> "Releasing lock for player=" + mSession.getName() + " phase=" + mPhase + "; transfer failed or timed out");
 		detach();
 		Player player = getPlayer();
 		Bukkit.getPluginManager().callEvent(new com.playmonumenta.redissync.event.PlayerTransferFailEvent(player));
@@ -195,6 +201,7 @@ final class SessionLock {
 	 * saves: if they leave before it is done, their next login here waits for it.
 	 */
 	void afterSaves(Collection<Player> alsoWaitFor, Supplier<? extends CompletableFuture<?>> action) {
+		MMLog.trace(() -> "Lock player=" + mSession.getName() + " waiting for saves to commit, alsoWaitFor=" + alsoWaitFor.size());
 		CompletableFuture<?>[] saves = Stream.concat(Stream.of(getPlayer()), alsoWaitFor.stream())
 			.map(mSessions::savesCommitted)
 			.toArray(CompletableFuture<?>[]::new);

@@ -316,7 +316,7 @@ public class MonumentaRedisSyncAPI {
 			return CompletableFuture.completedFuture(null);
 		});
 
-		MMLog.debug(() -> "Transferring players took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
+		MMLog.trace(() -> "Transferring players took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
 	}
 
 	public static void stashPut(Player player, @Nullable String name) throws Exception {
