@@ -6,6 +6,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import com.playmonumenta.common.event.PlayerServerTransferEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter.ReturnParams;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
@@ -957,7 +958,9 @@ public class MonumentaRedisSyncAPI {
 		// Other sharddata fields that are not returned here: {"SpawnDimension":"minecraft:overworld","Dimension":0,"Paper.Origin":[-1450.0,241.0,-1498.0]}"}
 		// Note: This list might be out of date
 
-		private final Location mSpawnLoc; // {"SpawnX":-1450,"SpawnY":241,"SpawnZ":-1498,"SpawnAngle":0.0}
+		private static final List<String> SPAWN_KEYS = List.of("SpawnX", "SpawnY", "SpawnZ", "SpawnForced", "SpawnAngle", "SpawnDimension");
+
+		private final @Nullable Location mSpawnLoc; // {"SpawnX":-1450,"SpawnY":241,"SpawnZ":-1498,"SpawnAngle":0.0}, null if none saved for this world
 		private final Location mPlayerLoc; // {"Pos":[-1280.5,95.0,5369.7001953125],"Rotation":[-358.9,2.1]}
 		private final Vector mMotion; // {"Motion":[0.0,-0.0784000015258789,0.0]}
 		private final boolean mSpawnForced; // {"SpawnForced":true}
@@ -966,7 +969,7 @@ public class MonumentaRedisSyncAPI {
 		private final float mFallDistance; // {"FallDistance":0.0}
 		private final boolean mOnGround; // {"OnGround":true}
 
-		private PlayerWorldData(Location spawnLoc, Location playerLoc, Vector motion, boolean spawnForced, boolean flying, boolean fallFlying, float fallDistance, boolean onGround) {
+		private PlayerWorldData(@Nullable Location spawnLoc, Location playerLoc, Vector motion, boolean spawnForced, boolean flying, boolean fallFlying, float fallDistance, boolean onGround) {
 			mSpawnLoc = spawnLoc;
 			mPlayerLoc = playerLoc;
 			mMotion = motion;
@@ -977,7 +980,7 @@ public class MonumentaRedisSyncAPI {
 			mOnGround = onGround;
 		}
 
-		public Location getSpawnLoc() {
+		public @Nullable Location getSpawnLoc() {
 			return mSpawnLoc;
 		}
 
@@ -1007,13 +1010,40 @@ public class MonumentaRedisSyncAPI {
 			player.setFlying(mFlying && player.getAllowFlight());
 			player.setGliding(mFallFlying);
 			player.setFallDistance(mFallDistance);
-			player.setBedSpawnLocation(mSpawnLoc, mSpawnForced);
+			if (mSpawnLoc != null) {
+				player.setBedSpawnLocation(mSpawnLoc, mSpawnForced);
+			}
+		}
+
+		/**
+		 * Whether a saved spawn point is located in the given world. A missing dimension is the vanilla default, the overworld.
+		 */
+		static boolean spawnDimensionMatches(@Nullable String spawnDimension, String worldKey, String worldName) {
+			if (spawnDimension == null || spawnDimension.isEmpty()) {
+				spawnDimension = "minecraft:overworld";
+			}
+			return spawnDimension.equals(worldKey) || spawnDimension.equals(worldName);
+		}
+
+		/**
+		 * Removes the spawn point from saved world data if it is not located in that world.
+		 * Spawn is one global value per player but is saved with every world, so a copy saved while standing
+		 * in a different world must not be applied here, or the player would respawn in the wrong world.
+		 */
+		static void removeForeignSpawn(JsonObject worldData, World world) {
+			if (SPAWN_KEYS.stream().noneMatch(worldData::has)) {
+				return;
+			}
+			String dimension = worldData.get("SpawnDimension") instanceof JsonPrimitive primitive ? primitive.getAsString() : null;
+			if (!spawnDimensionMatches(dimension, world.getKey().toString(), world.getName())) {
+				SPAWN_KEYS.forEach(worldData::remove);
+			}
 		}
 
 		private static PlayerWorldData fromJson(@Nullable String jsonStr, World world) {
 			// Defaults to world spawn
-			Location spawnLoc = world.getSpawnLocation();
-			Location playerLoc = spawnLoc.clone();
+			Location playerLoc = world.getSpawnLocation();
+			Location spawnLoc = null;
 			Vector motion = new Vector(0, 0, 0);
 			boolean spawnForced = true;
 			boolean flying = false;
@@ -1024,14 +1054,12 @@ public class MonumentaRedisSyncAPI {
 			if (jsonStr != null && !jsonStr.isEmpty()) {
 				try {
 					JsonObject obj = new Gson().fromJson(jsonStr, JsonObject.class);
-					if (obj.has("SpawnX")) {
-						spawnLoc.setX(obj.get("SpawnX").getAsDouble());
-					}
-					if (obj.has("SpawnY")) {
-						spawnLoc.setY(obj.get("SpawnY").getAsDouble());
-					}
-					if (obj.has("SpawnZ")) {
-						spawnLoc.setZ(obj.get("SpawnZ").getAsDouble());
+					removeForeignSpawn(obj, world);
+					if (obj.has("SpawnX") && obj.has("SpawnY") && obj.has("SpawnZ")) {
+						spawnLoc = new Location(world, obj.get("SpawnX").getAsDouble(), obj.get("SpawnY").getAsDouble(), obj.get("SpawnZ").getAsDouble());
+						if (obj.has("SpawnAngle")) {
+							spawnLoc.setYaw(obj.get("SpawnAngle").getAsFloat());
+						}
 					}
 					if (obj.has("Pos")) {
 						JsonArray arr = obj.get("Pos").getAsJsonArray();
