@@ -2,6 +2,7 @@ package com.playmonumenta.redissync;
 
 import com.playmonumenta.common.event.PlayerTransferFailEvent;
 import com.playmonumenta.redissync.RedisSyncTestHarness.TestPlayer;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
@@ -11,6 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -184,6 +187,73 @@ public class DataHandoffTest {
 		harness.awaitWithTicks("target kicked to load the copy", () -> !target.isPlaced());
 
 		assertEquals(40, harness.progress(harness.join("Target")));
+	}
+
+	/**
+	 * History from before stats were saved in redis has no stats to roll back to. The player keeps
+	 * their current stats, which are pushed again, so the stats history stays lined up with the
+	 * others for later rollbacks.
+	 */
+	@Test
+	void rollbackToASaveFromBeforeStatsKeepsTheCurrentStats(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer moderator = harness.join("Moderator");
+		TestPlayer first = harness.join("Tester");
+		harness.setProgress(first, 30);
+		MonumentaRedisSyncAPI.savePlayer(first);
+		harness.awaitSaved(first);
+		harness.redisDelete(MonumentaRedisSyncAPI.getRedisStatsPath(first));
+		harness.setProgress(first, 31);
+		MonumentaRedisSyncAPI.savePlayer(first);
+		harness.awaitSaved(first);
+
+		MonumentaRedisSyncAPI.playerRollback(moderator, first, 1);
+		harness.awaitWithTicks("player kicked to apply the rollback", () -> !first.isPlaced());
+
+		TestPlayer second = harness.join("Tester");
+		assertEquals(30, harness.progressExceptStats(second));
+		assertEquals(31, harness.statProgress(second));
+		assertEquals(List.of(30, 31, 31, 30), harness.savedProgressHistoryExceptStats(second));
+		assertEquals(List.of(31, 31, 31), harness.savedStatProgressHistory(second), "the newest entries, lined up");
+	}
+
+	/** As rollback: a stash from before stats were saved in redis keeps the player's current stats. */
+	@Test
+	void stashFromBeforeStatsKeepsTheCurrentStats(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer first = harness.join("Tester");
+		harness.setProgress(first, 20);
+		stashPut(harness, first);
+		harness.redisHashDelete(MonumentaRedisSyncAPI.getStashPath(), first.getUniqueId() + "-stats");
+
+		harness.setProgress(first, 21);
+		MonumentaRedisSyncAPI.stashGet(first, null);
+		harness.awaitWithTicks("player kicked to load the stash", () -> !first.isPlaced());
+
+		TestPlayer second = harness.join("Tester");
+		assertEquals(20, harness.progressExceptStats(second));
+		assertEquals(21, harness.statProgress(second));
+		assertEquals(harness.redisListLength(MonumentaRedisSyncAPI.getRedisDataPath(second)),
+			harness.redisListLength(MonumentaRedisSyncAPI.getRedisStatsPath(second)), "stats history lined up");
+	}
+
+	/**
+	 * Stashing a player with no stats in redis over a stash of the same name must not leave the
+	 * older stash's stats behind. The player is still joining, so stash put's own save is skipped.
+	 */
+	@Test
+	void stashPutWithoutStatsReplacesTheOlderStashsStats(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer first = harness.join("Tester");
+		harness.setProgress(first, 20);
+		stashPut(harness, first);
+		String stashStats = first.getUniqueId() + "-stats";
+		assertNotNull(harness.redisHashGet(MonumentaRedisSyncAPI.getStashPath(), stashStats));
+		harness.disconnect(first);
+		harness.awaitSaved(first);
+		harness.redisDelete(MonumentaRedisSyncAPI.getRedisStatsPath(first));
+
+		TestPlayer joining = harness.newPlayer("Tester");
+		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.login(joining));
+		stashPut(harness, joining);
+		assertNull(harness.redisHashGet(MonumentaRedisSyncAPI.getStashPath(), stashStats));
 	}
 
 	/* A player whose newest two saves have the given progress, newest last, and who is still online */

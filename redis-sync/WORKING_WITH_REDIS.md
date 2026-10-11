@@ -353,8 +353,8 @@ scoresFuture.whenComplete((scores, ex) -> {
 
 #### Offline player data (full save blob)
 
-Loads the complete save data (inventory, advancements, scores, plugin data) for
-a player who is **not** currently online on this shard.
+Loads the complete save data (inventory, advancements, scores, plugin data, and
+stats if they have any) for a player who is **not** currently online on this shard.
 
 ```java
 // Throws if the player is online
@@ -754,6 +754,7 @@ to get the configured domain (e.g. `"monumenta"`).
 |---|---|
 | `{domain}:playerdata:{uuid}:plugins` | Player plugin data blob |
 | `{domain}:playerdata:{uuid}:scores` | Player scoreboard data |
+| `{domain}:playerdata:{uuid}:stats` | Player stats (JSON, 64-bit values) |
 | `{domain}:playerdata:{uuid}:data` | Player NBT data (binary) |
 | `{domain}:playerdata:{uuid}:remotedata` | RemoteDataAPI store |
 | `{domain}:rboard:{name}` | RBoardAPI hash |

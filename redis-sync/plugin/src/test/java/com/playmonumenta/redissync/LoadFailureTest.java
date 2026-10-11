@@ -52,6 +52,40 @@ public class LoadFailureTest {
 	}
 
 	/**
+	 * Stats load as the player is constructed, before the advancements, so a failure there refuses
+	 * the login too. Played, the server's own stats would be saved over the ones in redis.
+	 */
+	@Test
+	void statsThatFailToLoadRefuseTheLogin(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer saved = harness.savedAndLeft("Tester", 9);
+		String statsPath = MonumentaRedisSyncAPI.getRedisStatsPath(saved);
+		harness.redisRename(statsPath, statsPath + ".good");
+		harness.redisBreakKey(statsPath);
+
+		assertNotEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.login(harness.newPlayer("Tester")));
+
+		harness.redisDelete(statsPath);
+		harness.redisRename(statsPath + ".good", statsPath);
+		assertEquals(9, harness.progress(harness.join("Tester")), "logs in once the data is repaired");
+	}
+
+	/** Stats that cannot be parsed refuse the login: their 64-bit values are nowhere else, so starting from none would lose them */
+	@Test
+	void statsThatCannotBeParsedRefuseTheLogin(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer saved = harness.savedAndLeft("Tester", 9);
+		String statsPath = MonumentaRedisSyncAPI.getRedisStatsPath(saved);
+		String good = harness.redisListEntry(statsPath, 0);
+		harness.redisSetListEntry(statsPath, 0, "not json {");
+
+		assertNotEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.login(harness.newPlayer("Tester")));
+		harness.awaitPluginCommandsExecuted();
+		assertEquals(1, harness.redisListLength(statsPath), "nothing saved over them");
+
+		harness.redisSetListEntry(statsPath, 0, String.valueOf(good));
+		assertEquals(9, harness.progress(harness.join("Tester")), "logs in once the data is repaired");
+	}
+
+	/**
 	 * A datapack reload reloads the advancements of every player online. If that fails, the player
 	 * is left with none in memory, which must not be saved over the ones in redis.
 	 */

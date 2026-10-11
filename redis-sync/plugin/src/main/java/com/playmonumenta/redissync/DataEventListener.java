@@ -9,11 +9,12 @@ import com.destroystokyo.paper.event.player.ServerStatsDataSaveEvent;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
 import com.playmonumenta.redissync.data.ContentData;
-import com.playmonumenta.redissync.data.StatsDataManager;
+import com.playmonumenta.redissync.data.PlayerStats;
 import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
 import com.playmonumenta.redissync.event.UpdateAvailableContentIdsEvent;
@@ -33,9 +34,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -51,6 +54,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.Nullable;
 
 public class DataEventListener implements Listener {
 	private static class PlayerUuidToNameStreamingChannel implements KeyValueStreamingChannel<String, String> {
@@ -82,12 +86,31 @@ public class DataEventListener implements Listener {
 	@SuppressWarnings("NullAway") // Required to avoid many null checks, this class will always be instantiated if this plugin is loaded
 	private static DataEventListener INSTANCE = null;
 
-	private final StatsDataManager mStatsDataManager = new StatsDataManager();
 	private final Gson mGson = new Gson();
 	private final Plugin mPlugin;
 	private final VersionAdapter mAdapter;
 	private final PlayerSessions mSessions;
 	private Set<String> mAvailableContentIds = Set.of();
+
+	/*
+	 * Stats loaded for a login, until its session takes them at the advancement load. The server
+	 * loads stats as it constructs the player, just before the advancements, but the stats event
+	 * carries only a UUID, so they cannot go to the session directly.
+	 */
+	private final Map<UUID, LoadedStats> mLoadedStats = new ConcurrentHashMap<>();
+	/*
+	 * The playerdata save of the full save under way. Its stats save comes next, and carries only a
+	 * UUID, so it goes by this: it is pushed exactly when the playerdata save was. Main thread only.
+	 */
+	private @Nullable StatsSave mStatsSave = null;
+
+	/* Stats a login loaded, or null stats if loading them failed */
+	private record LoadedStats(@Nullable PlayerStats mStats) {
+	}
+
+	/* A playerdata save: the session it pushed to, or null if it was skipped */
+	private record StatsSave(UUID mPlayerId, @Nullable PlayerSession mSession) {
+	}
 
 	protected DataEventListener(Plugin plugin, VersionAdapter adapter, PlayerSessions sessions) {
 		mPlugin = plugin;
@@ -150,9 +173,23 @@ public class DataEventListener implements Listener {
 			return;
 		}
 
+		/* Always taken, so none are left behind; a datapack reload's advancement load comes with none */
+		LoadedStats loadedStats = mLoadedStats.remove(player.getUniqueId());
 		if (!session.isLive()) {
 			MMLog.warning("Skipping advancements load for player=" + playerName + " because their session is " + session.getState());
 			return;
+		}
+		if (session.getStats() == null && mSessions.isKept(session)) {
+			if (loadedStats == null) {
+				mSessions.abortLoad(session, "no stats load came before the advancements load");
+				return;
+			}
+			PlayerStats stats = loadedStats.mStats();
+			if (stats == null) {
+				mSessions.abortLoad(session, "stats failed to load");
+				return;
+			}
+			session.setStats(stats);
 		}
 
 		long startTime = System.currentTimeMillis();
@@ -186,6 +223,14 @@ public class DataEventListener implements Listener {
 		/* Always cancel saving the player file to disk with this plugin present */
 		event.setCancelled(true);
 
+		/* The end of a full save: its stats save should have taken this already */
+		StatsSave missedStats = mStatsSave;
+		mStatsSave = null;
+		if (missedStats != null && missedStats.mSession() != null) {
+			MMLog.severe("No stats save came in the full save of player=" + event.getPlayer().getName()
+				+ ", so their stats history is falling behind the others. Is stats.disable-saving set in spigot.yml?");
+		}
+
 		if (BukkitConfigAPI.getSavingDisabled()) {
 			return;
 		}
@@ -215,6 +260,134 @@ public class DataEventListener implements Listener {
 				commands.ltrim(advPath, 0, BukkitConfigAPI.getHistoryAmount());
 			}
 		}), () -> "Advancements saving for player=" + playerName + " failed");
+	}
+
+	/*
+	 * Fires as the server constructs a player, just before the advancement load, and also when
+	 * another plugin reads or changes the stats of a player who is not online here.
+	 */
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void serverStatsDataLoadEvent(ServerStatsDataLoadEvent event) {
+		if (BukkitConfigAPI.getSavingDisabled()) {
+			return;
+		}
+
+		/* A login's player has no name yet, and another plugin's read has no player at all */
+		UUID playerId = event.getPlayerId();
+		String playerName = Objects.requireNonNullElse(MonumentaRedisSyncAPI.cachedUuidToName(playerId), playerId.toString());
+		/* Only a login's stats are ever saved back; anything else is a read */
+		boolean login = mSessions.isLoginExpected(playerId);
+		mLoadedStats.remove(playerId);
+
+		long startTime = System.currentTimeMillis();
+		MMLog.trace("Started loading stats data for player=" + playerName);
+
+		RedisFuture<String> statsFuture;
+		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+			statsFuture = conn.lindex(MonumentaRedisSyncAPI.getRedisStatsPath(playerId), 0);
+		}
+
+		String statsData;
+		try {
+			statsData = statsFuture.get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
+		} catch (CancellationException | InterruptedException | ExecutionException | TimeoutException ex) {
+			MMLog.severe("!!! Failed to load player stats data for player=" + playerName + " !!!", ex);
+			if (login) {
+				/* The session fails as it starts, so the stats the server loads instead are never saved */
+				mLoadedStats.put(playerId, new LoadedStats(null));
+			}
+			return;
+		}
+		MMLog.debug(() -> "Stats data loaded for player=" + playerName);
+		MMLog.trace(() -> "Stats data:" + statsData);
+
+		@Nullable PlayerStats stats = new PlayerStats();
+		if (statsData == null) {
+			if (login) {
+				MMLog.warning("No stats data in redis for player '" + playerName + "', so the server loads its own stats file if it has one. "
+					+ "Expected for new players, and once per player when stats are first kept in redis");
+			}
+		} else {
+			try {
+				JsonObject root = JsonParser.parseString(statsData).getAsJsonObject();
+				if (login) {
+					stats = PlayerStats.load(root);
+				} else {
+					PlayerStats.clampForReading(root);
+				}
+				event.setJsonData(root.toString());
+			} catch (RuntimeException ex) {
+				/*
+				 * The 64-bit values are nowhere else, so a login fails rather than start from none and
+				 * save that over them. A read is handed them as they are, which the server cannot read either.
+				 */
+				MMLog.severe("!!! Failed to parse stats data for player '" + playerName + "' !!!", ex);
+				event.setJsonData(statsData);
+				stats = null;
+			}
+		}
+		if (login) {
+			mLoadedStats.put(playerId, new LoadedStats(stats));
+		}
+
+		MMLog.trace(() -> "Processing ServerStatsDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
+	}
+
+	/*
+	 * Fires in a full save, between the playerdata and advancements saves, and also when another
+	 * plugin changes the stats of a player who is not online here.
+	 */
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void serverStatsDataSaveEvent(ServerStatsDataSaveEvent event) {
+		/* Always cancel saving the player file to disk with this plugin present */
+		event.setCancelled(true);
+
+		UUID playerId = event.getPlayerId();
+		StatsSave save = mStatsSave;
+		mStatsSave = null;
+		if (save == null || !save.mPlayerId().equals(playerId)) {
+			/*
+			 * OfflinePlayer#incrementStatistic and the like. Not saved: the player's data is not this
+			 * shard's to change while they are away, and the entry would pair with nothing on the
+			 * other history lists. The server catches and logs this, and the stack trace names the
+			 * plugin that made the change; its caller sees no error.
+			 */
+			if (BukkitConfigAPI.getSavingDisabled()) {
+				return;
+			}
+			throw new IllegalStateException("Stats of a player who is not online are not saved; discarded a change to the stats of uuid=" + playerId);
+		}
+		PlayerSession session = save.mSession();
+		if (session == null) {
+			/* The playerdata save was skipped, and said why */
+			return;
+		}
+
+		String playerName = session.getName();
+		MMLog.trace("Saving stats data for player=" + playerName);
+		MMLog.trace(() -> "Data:" + event.getJsonData());
+		PlayerStats stats = session.getStats();
+		if (stats == null) {
+			MMLog.severe("Player=" + playerName + " has no stats loaded, so their stats are saved as the server has them");
+			stats = new PlayerStats();
+			session.setStats(stats);
+		}
+		String statsJsonData;
+		try {
+			JsonObject root = JsonParser.parseString(event.getJsonData()).getAsJsonObject();
+			stats.save(root);
+			statsJsonData = root.toString();
+		} catch (RuntimeException ex) {
+			/* Still pushed, so the stats history stays lined up with the other lists */
+			MMLog.severe("Failed to process stats data for player=" + playerName + ", so it is saved as the server has it", ex);
+			statsJsonData = event.getJsonData();
+		}
+		String statsPath = MonumentaRedisSyncAPI.getRedisStatsPath(playerId);
+		String pushed = statsJsonData;
+		session.trackSave(RedisAPI.multi(commands -> {
+			commands.lpush(statsPath, pushed);
+			commands.ltrim(statsPath, 0, BukkitConfigAPI.getHistoryAmount());
+		}), () -> "Stats saving for player=" + playerName + " failed");
 	}
 
 	private interface Callable {
@@ -469,11 +642,14 @@ public class DataEventListener implements Listener {
 	public void playerDataSaveEvent(PlayerDataSaveEvent event) {
 		event.setCancelled(true);
 
+		Player player = event.getPlayer();
+		/* Its stats save is skipped too, unless this pushes */
+		mStatsSave = new StatsSave(player.getUniqueId(), null);
+
 		if (BukkitConfigAPI.getSavingDisabled()) {
 			return;
 		}
 
-		Player player = event.getPlayer();
 		String playerName = player.getName();
 		PlayerSession session = mSessions.sessionForSave(player, "playerdata");
 		if (session == null) {
@@ -561,83 +737,11 @@ public class DataEventListener implements Listener {
 				commands.lpush(scorePath, scoreboardData);
 				commands.ltrim(scorePath, 0, BukkitConfigAPI.getHistoryAmount());
 			}), () -> "Failed to save player data for player=" + playerName);
+			/* Set after the PlayerSaveEvent above, in case another plugin made a whole save of its own in it */
+			mStatsSave = new StatsSave(player.getUniqueId(), session);
 		} catch (IOException ex) {
 			MMLog.severe("Failed to save player data for player=" + playerName, ex);
 		}
-	}
-
-	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-	public void serverStatsDataLoadEvent(ServerStatsDataLoadEvent event) {
-		if (BukkitConfigAPI.getSavingDisabled()) {
-			/* No data saved, no data loaded */
-			return;
-		}
-
-		// The player object might not be available. Attempt to get their name anyway.
-		UUID playerId = event.getPlayerId();
-		String playerNameNullable = MonumentaRedisSyncAPI.cachedUuidToName(playerId);
-		String playerName = playerNameNullable == null ? playerId.toString() : playerNameNullable;
-
-		/* Drop any stats from a previous session (e.g. quick rejoin) - they don't match what MC is about to load */
-		mStatsDataManager.remove(playerId);
-
-		long startTime = System.currentTimeMillis();
-		MMLog.debug("Started loading stats data for player=" + playerName);
-
-		RedisFuture<String> statsFuture;
-		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
-			statsFuture = conn.lindex(MonumentaRedisSyncAPI.getRedisStatsPath(playerId), 0);
-		}
-
-		try {
-			/* Stats */
-			final String statsData = statsFuture.get();
-			MMLog.trace(() -> "Stats data loaded for player=" + playerName);
-			MMLog.trace(() -> "Stats data:" + statsData);
-			if (statsData != null) {
-				String presented = mStatsDataManager.load(playerId, statsData);
-				/* If the stats couldn't be tracked as 64-bit, still load them from redis rather than the local file */
-				event.setJsonData(presented != null ? presented : statsData);
-			} else {
-				MMLog.warning("No stats data for player '" + playerName + "' - if they are not new, this is a serious error!");
-			}
-
-			MMLog.debug(() -> "Processing ServerStatsDataLoadEvent took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
-		} catch (InterruptedException | ExecutionException ex) {
-			MMLog.severe("Failed to get stats data for player '" + playerName + "'. This is very bad!", ex);
-		}
-	}
-
-	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-	public void serverStatsDataSaveEvent(ServerStatsDataSaveEvent event) {
-		/* Always cancel saving the player file to disk with this plugin present */
-		event.setCancelled(true);
-
-		if (BukkitConfigAPI.getSavingDisabled()) {
-			/* No data saved, no data loaded */
-			return;
-		}
-
-		UUID playerId = event.getPlayerId();
-		Player player = Bukkit.getPlayer(playerId);
-		if (player == null) {
-			MMLog.warning("Skipping stats save for uuid=" + playerId + " because they are not online");
-			return;
-		}
-		String playerName = player.getName();
-		PlayerSession session = mSessions.sessionForSave(player, "stats");
-		if (session == null) {
-			return;
-		}
-
-		MMLog.debug("Saving stats data for player=" + playerName);
-		MMLog.trace(() -> "Data:" + event.getJsonData());
-		String statsPath = MonumentaRedisSyncAPI.getRedisStatsPath(playerId);
-		String statsJsonData = mStatsDataManager.save(playerId, event.getJsonData());
-		session.trackSave(RedisAPI.multi(commands -> {
-			commands.lpush(statsPath, statsJsonData);
-			commands.ltrim(statsPath, 0, BukkitConfigAPI.getHistoryAmount());
-		}), () -> "Stats saving for player=" + playerName + " failed");
 	}
 
 	@EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)

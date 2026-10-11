@@ -397,7 +397,7 @@ public class MonumentaRedisSyncAPI {
 						player.sendMessage(Component.text("Failed to save stash data: " + writeEx.getMessage(), NamedTextColor.RED));
 						return;
 					}
-					player.sendMessage(Component.text("Data, scores, advancements saved to stash successfully", NamedTextColor.GOLD));
+					player.sendMessage(Component.text("Data, scores, advancements, stats saved to stash successfully", NamedTextColor.GOLD));
 				});
 			});
 		}, true);
@@ -430,8 +430,7 @@ public class MonumentaRedisSyncAPI {
 	 * The end of a data handoff: reads one saved state (the eight fields {@code read} queues, in order
 	 * data, advancements, scores, plugin data, content, history, stats, then the locked player's
 	 * current stats), pushes it as the locked player's newest save, and kicks them so they rejoin
-	 * with it. Any failure is reported to {@code notify};
-	 * one before the write releases the lock.
+	 * with it. Any failure is reported to {@code notify}; one before the write releases the lock.
 	 *
 	 * @return the redis work, complete once the state is written or the handoff has failed
 	 */
