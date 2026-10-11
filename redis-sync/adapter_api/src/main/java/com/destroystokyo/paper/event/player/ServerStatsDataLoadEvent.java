@@ -10,11 +10,11 @@ import org.jetbrains.annotations.Nullable;
 public class ServerStatsDataLoadEvent extends Event {
 	private static final HandlerList handlers = new HandlerList();
 	@NotNull
-	private final UUID playerId;
+	private final UUID mPlayerId;
 	@Nullable
-	private String jsonData;
+	private String mJsonData;
 	@NotNull
-	private File path;
+	private File mPath;
 
 	public ServerStatsDataLoadEvent(@NotNull File path) {
 		String fileName = path.getName();
@@ -22,9 +22,9 @@ public class ServerStatsDataLoadEvent extends Event {
 			throw new RuntimeException("Player stats file expected to end in .json");
 		}
 		String uuidStr = fileName.substring(0, fileName.length() - 5);
-		this.playerId = UUID.fromString(uuidStr);
-		this.jsonData = null;
-		this.path = path;
+		this.mPlayerId = UUID.fromString(uuidStr);
+		this.mJsonData = null;
+		this.mPath = path;
 	}
 
 	@NotNull
@@ -38,7 +38,7 @@ public class ServerStatsDataLoadEvent extends Event {
 	 */
 	@NotNull
 	public UUID getPlayerId() {
-		return this.playerId;
+		return this.mPlayerId;
 	}
 
 	/**
@@ -50,7 +50,7 @@ public class ServerStatsDataLoadEvent extends Event {
 	 */
 	@NotNull
 	public File getPath() {
-		return path;
+		return mPath;
 	}
 
 	/**
@@ -61,7 +61,7 @@ public class ServerStatsDataLoadEvent extends Event {
 	 * @param path stats data File to load from
 	 */
 	public void setPath(@NotNull File path) {
-		this.path = path;
+		this.mPath = path;
 	}
 
 	/**
@@ -74,7 +74,7 @@ public class ServerStatsDataLoadEvent extends Event {
 	 */
 	@Nullable
 	public String getJsonData() {
-		return jsonData;
+		return mJsonData;
 	}
 
 	/**
@@ -86,7 +86,7 @@ public class ServerStatsDataLoadEvent extends Event {
 	 * @param jsonData stats data JSON string to load. If null, load from file
 	 */
 	public void setJsonData(@Nullable String jsonData) {
-		this.jsonData = jsonData;
+		this.mJsonData = jsonData;
 	}
 
 	@Override
@@ -97,9 +97,9 @@ public class ServerStatsDataLoadEvent extends Event {
 	@Override
 	public String toString() {
 		return "ServerStatsDataLoadEvent{" +
-		       "jsonData='" + jsonData + '\'' +
-		       ", path=" + path +
-		       ", playerId=" + playerId +
+		       "jsonData='" + mJsonData + '\'' +
+		       ", path=" + mPath +
+		       ", playerId=" + mPlayerId +
 		       '}';
 	}
 }

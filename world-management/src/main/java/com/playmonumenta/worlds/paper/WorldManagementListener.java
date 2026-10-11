@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.data.ContentData;
+import com.playmonumenta.redissync.data.OptionalLocation;
 import com.playmonumenta.redissync.event.PlayerContentChangeRequestEvent;
 import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
@@ -12,10 +13,13 @@ import com.playmonumenta.worlds.common.MMLog;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -44,8 +48,12 @@ public class WorldManagementListener implements Listener {
 		reloadConfig();
 	}
 
-	protected static @Nullable WorldManagementListener getInstance() {
-		return INSTANCE;
+	protected static WorldManagementListener getInstance() {
+		WorldManagementListener instance = INSTANCE;
+		if (instance == null) {
+			throw new RuntimeException("Attempted to get WorldManagementListener instance before initialization");
+		}
+		return instance;
 	}
 
 	/*
@@ -66,40 +74,35 @@ public class WorldManagementListener implements Listener {
 			return;
 		}
 
-		int score = ScoreboardUtils.getScoreboardValue(player, info.getInstanceObjective()).orElse(0);
-		if (score <= 0) {
+		String worldName = info.getWorldName(player);
+		if (worldName == null) {
 			player.sendMessage(Component.text("You respawned on an instanced world without an instance assigned to you. Unless you are an operator, this is probably a bug", NamedTextColor.RED));
-		} else {
-			try {
-				/* World should already be loaded, just need to grab it */
-				String templateName;
-				if (WorldManagementPlugin.allowInstanceAutocreation()) {
-					templateName = info.getVariant(player);
-				} else {
-					templateName = null;
-				}
-				World world = MonumentaWorldManagementAPI.ensureWorldLoaded(info.getBaseWorldName() + score, templateName);
+			return;
+		}
 
-				// RESPAWN: The player is respawning in this world after having (probably) died there
-				if (info.getRespawnInstanceCommand() != null) {
-					Bukkit.getScheduler().runTaskLater(mPlugin, () -> {
-						// Note that this will run after the player has been moved to the correct world, since it runs a tick later
-						if (Bukkit.getOnlinePlayers().contains(player)) {
-							MMLog.debug("Running respawn command on player=" + player.getName() + " thread=" + Thread.currentThread().getName());
-							Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "execute as " + player.getUniqueId() + " at @s run " + info.getRespawnInstanceCommand());
-						}
-					}, 1);
-				}
+		String templateName = info.getVariant(player);
+		try {
+			World world = MonumentaWorldManagementAPI.ensureWorldLoaded(worldName, templateName);
 
-				if (!event.getRespawnLocation().getWorld().equals(world)) {
-					/* Modify the event so the player respawns on this same world at spawn */
-					event.setRespawnLocation(world.getSpawnLocation());
-				}
-			} catch (Exception ex) {
-				String msg = "Failed to load your assigned world instance " + score + ": " + ex.getMessage();
-				player.sendMessage(msg);
-				MMLog.warning(msg, ex);
+			// RESPAWN: The player is respawning in this world after having (probably) died there
+			if (info.getRespawnInstanceCommand() != null) {
+				Bukkit.getScheduler().runTaskLater(mPlugin, () -> {
+					// Note that this will run after the player has been moved to the correct world, since it runs a tick later
+					if (Bukkit.getOnlinePlayers().contains(player)) {
+						MMLog.debug("Running respawn command on player=" + player.getName() + " thread=" + Thread.currentThread().getName());
+						Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "execute as " + player.getUniqueId() + " at @s run " + info.getRespawnInstanceCommand());
+					}
+				}, 1);
 			}
+
+			if (!event.getRespawnLocation().getWorld().equals(world)) {
+				/* Modify the event so the player respawns on this same world at spawn */
+				event.setRespawnLocation(world.getSpawnLocation());
+			}
+		} catch (Exception ex) {
+			String msg = "Failed to load your assigned world instance " + worldName + ": " + ex.getMessage();
+			player.sendMessage(msg);
+			MMLog.warning(msg, ex);
 		}
 	}
 
@@ -111,7 +114,9 @@ public class WorldManagementListener implements Listener {
 		Player player = event.getPlayer();
 		MMLog.debug("playerJoinSetWorldEvent: player=" + player.getName() + " thread=" + Thread.currentThread().getName());
 
+		World sortWorld = null;
 		if (!WorldManagementPlugin.isSortWorldByScoreOnJoin()) {
+			MMLog.debug("playerJoinSetWorldEvent: player=" + player.getName() + " Not attempting to sort the player by world, this is disabled on join");
 			String lastSavedWorldName = event.getLastSavedWorldName();
 
 			if (lastSavedWorldName != null) {
@@ -126,11 +131,31 @@ public class WorldManagementListener implements Listener {
 				}
 			}
 		} else {
+			MMLog.debug("playerJoinSetWorldEvent: player=" + player.getName() + " Attempting to sort the player by world");
 			try {
-				event.setWorld(getSortWorld(player));
+				sortWorld = getSortWorld(player);
+				event.setWorld(sortWorld);
+				MMLog.debug("playerJoinSetWorldEvent: player=" + player.getName() + " sorted the player by score into " + sortWorld.getName());
 			} catch (Exception ex) {
 				MMLog.warning("Failed to set world for player " + player.getName(), ex);
 			}
+		}
+
+		ContentInfo info = WorldManagementPlugin.getContentInfo(player);
+		ContentData contentData = MonumentaRedisSyncAPI.getPlayerContentData(player);
+		World expectedContentWorld;
+		try {
+			expectedContentWorld = getSortWorld(player, info);
+		} catch (Exception ignored) {
+			expectedContentWorld = null;
+		}
+		if (
+			WorldManagementPlugin.isSortByContent() && contentData != null && info != null &&
+			contentData.getId().equals(info.getContentName()) &&
+			sortWorld != null && expectedContentWorld != null &&
+			expectedContentWorld.getName().equals(sortWorld.getName())
+		) {
+			preprocessArrivalContentData(player, contentData, sortWorld.getName(), true);
 		}
 
 		if (WorldManagementPlugin.getNotifyWorldPermission() != null && player.hasPermission(WorldManagementPlugin.getNotifyWorldPermission())) {
@@ -160,6 +185,7 @@ public class WorldManagementListener implements Listener {
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
 	public void playerJoinEvent(PlayerJoinEvent event) {
 		Player player = event.getPlayer();
+		World oldWorld = player.getWorld();
 		final var uuid = player.getUniqueId();
 		// FIXME: replace with configuration phase aware code
 		Bukkit.getScheduler().runTask(mPlugin, () -> {
@@ -171,6 +197,22 @@ public class WorldManagementListener implements Listener {
 		if (info == null) {
 			return;
 		}
+
+		ContentData contentData = MonumentaRedisSyncAPI.getPlayerContentData(player);
+		World expectedContentWorld;
+		try {
+			expectedContentWorld = getSortWorld(player, info);
+		} catch (Exception ignored) {
+			expectedContentWorld = null;
+		}
+		boolean processContentData = (
+			WorldManagementPlugin.isSortByContent() && contentData != null && contentData.getId().equals(info.getContentName()) &&
+			expectedContentWorld != null && expectedContentWorld.getName().equals(player.getWorld().getName())
+		);
+		if (processContentData) {
+			processEphemeralContentData(player, contentData, oldWorld.getName());
+		}
+
 		String instanceObjective = info.getInstanceObjective();
 		if (instanceObjective.isEmpty()) {
 			return;
@@ -265,13 +307,78 @@ public class WorldManagementListener implements Listener {
 	public void playerContentChangeRequestEvent(PlayerContentChangeRequestEvent event) {
 		Player player = event.getPlayer();
 		ContentData contentData = event.getContent();
+		Set<Player> others = event.getOthers();
 
-		// TODO Send the player to that content instead,
-		//  saving when they arrive on the correct world like the world changed event does
 		MonumentaRedisSyncAPI.savePlayerContent(player.getUniqueId(), contentData);
-		for (Player other : event.getOthers()) {
+		for (Player other : others) {
 			MonumentaRedisSyncAPI.savePlayerContent(other.getUniqueId(), contentData);
 		}
+
+		try {
+			// Need to sort the first player first, so that when the world can
+			// be on other shards, their proxy ping is taken into account
+			MonumentaWorldManagementAPI.sortWorld(player);
+
+			for (Player other : others) {
+				MonumentaWorldManagementAPI.sortWorld(other);
+			}
+		} catch (Exception ex) {
+			MMLog.severe("Attempted to sort " + player.getName() + " and " + others.size() + " others before WorldManagementPlugin initialized its listener", ex);
+		}
+	}
+
+	/**
+	 * Process arrival location, and any other data that must be set before sending the player to that location
+	 * @param player       The player being moved
+	 * @param contentData  The content data matching that world
+	 * @param arrivalWorld The world name that was determined
+	 * @return A future indicating the application of the arrival location, and any other pre-teleport data
+	 */
+	@SuppressWarnings("SameParameterValue") // isLocalWorld will be false when handling other shards later
+	protected CompletableFuture<Void> preprocessArrivalContentData(Player player, ContentData contentData, String arrivalWorld, boolean isLocalWorld) {
+		OptionalLocation arrivalLocation = contentData.getArrivalLocation();
+		if (arrivalLocation == null) {
+			return CompletableFuture.completedFuture(null);
+		}
+		CompletableFuture<Void> future = MonumentaRedisSyncAPI.setPlayerLocationOnWorld(
+			player, arrivalWorld, arrivalLocation.positionBukkit(), arrivalLocation.yaw(), arrivalLocation.pitch()
+		);
+		if (isLocalWorld) {
+			// No need to wait for completion - at least in this case, since it's mirrored locally
+			contentData.setArrivalLocation(null);
+			return CompletableFuture.completedFuture(null);
+		}
+
+		// Remote world, need to wait for redis to accept the data first
+		future.thenAccept(ignored -> contentData.setArrivalLocation(null));
+		return future;
+	}
+
+	protected void processEphemeralContentData(Player player, ContentData contentData, String returnWorld) {
+		// Player is joining the content they're assigned to;
+		// check for any post-arrival data, apply it, then clear temporary data
+
+		// Player has already arrived; process location data and clear it
+		OptionalLocation returnLocation = contentData.getReturnLocation();
+		if (!returnWorld.equals(player.getWorld().getName()) && returnLocation != null) {
+			// The player just left - no need to delay on this
+			MonumentaRedisSyncAPI.setPlayerLocationOnWorld(
+				player, returnWorld, returnLocation.positionBukkit(), returnLocation.yaw(), returnLocation.pitch()
+			);
+		}
+		contentData.setReturnLocation(null);
+
+		// Command to run on arrival
+		NamespacedKey mcfunctionOnArrival = contentData.getMcfunctionOnArrival();
+		if (mcfunctionOnArrival != null) {
+			MMLog.debug("Running content mcfunctionOnArrival command on player=" + player.getName() + " thread=" + Thread.currentThread().getName());
+			Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "execute as " + player.getUniqueId() + " at @s run function " + mcfunctionOnArrival.asString());
+
+			// Command has been run, clear it
+			contentData.setMcfunctionOnArrival(null);
+		}
+
+		MonumentaRedisSyncAPI.savePlayerContent(player.getUniqueId(), contentData);
 	}
 
 	protected void reloadConfig() {
@@ -314,24 +421,42 @@ public class WorldManagementListener implements Listener {
 	}
 
 	/**
-	 * Gets the world where a player should be sorted to based on their instance score.
-	 * <p>
-	 * Throws an exception if score is negative or the world fails to load. Will trigger instance pregeneration if applicable.
+	 * Gets the world where a player should be sorted to based on their content and instance score.
 	 * <p>
 	 * Will not actually put the player on this world - need to do this and then also set their location data.
 	 * <p>
-	 * XXX: This should only be called as a precursor to moving the player to this world immediately afterwards on this same tick, otherwise the join/rejoin functions will be called incorrectly!
+	 * XXX: This should only be called as a precursor to moving the player to this world immediately afterward on this same tick, otherwise the join/rejoin functions will be called incorrectly!
 	 * <p>
 	 * Must be called from the main thread
+	 * @param player The player whose sorted world we wish to identify
+	 * @return The world the player should be sorted to
+	 * @throws Exception The player's score is negative, the world failed to load, or the plugin hasn't started. Will trigger instance pregeneration if applicable.
 	 */
 	protected World getSortWorld(Player player) throws Exception {
-		ContentInfo info = WorldManagementPlugin.getContentInfo(player);
+		return getSortWorld(player, WorldManagementPlugin.getContentInfo(player));
+	}
+
+	/**
+	 * Gets the world where a player should be sorted to for specific content based on their instance score.
+	 * <p>
+	 * Will not actually put the player on this world - need to do this and then also set their location data.
+	 * <p>
+	 * XXX: This should only be called as a precursor to moving the player to this world immediately afterward on this same tick, otherwise the join/rejoin functions will be called incorrectly!
+	 * <p>
+	 * Must be called from the main thread
+	 * @param player The player whose sorted world we wish to identify
+	 * @param info The specific content info to check against, which may not be their current content
+	 * @return The world the player should be sorted to
+	 * @throws Exception The player's score is negative, the world failed to load, or the plugin hasn't started. Will trigger instance pregeneration if applicable.
+	 */
+	protected World getSortWorld(Player player, @Nullable ContentInfo info) throws Exception {
 		if (info == null) {
 			throw new Exception("Tried to get sort world for player but no instancing content info exists");
 		}
 
+		String worldName = info.getWorldName(player);
 		int score = ScoreboardUtils.getScoreboardValue(player, info.getInstanceObjective()).orElse(0);
-		if (score == 0) {
+		if (worldName == null) {
 			List<World> worlds = Bukkit.getWorlds();
 			if (worlds.isEmpty()) {
 				throw new Exception("There are no loaded worlds; has the server started?");
@@ -348,6 +473,6 @@ public class WorldManagementListener implements Listener {
 			templateName = null;
 		}
 
-		return MonumentaWorldManagementAPI.ensureWorldLoaded(info.getBaseWorldName() + score, templateName);
+		return MonumentaWorldManagementAPI.ensureWorldLoaded(worldName, templateName);
 	}
 }

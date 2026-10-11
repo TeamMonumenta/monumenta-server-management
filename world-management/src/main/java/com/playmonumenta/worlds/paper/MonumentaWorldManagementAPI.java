@@ -1,6 +1,7 @@
 package com.playmonumenta.worlds.paper;
 
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
+import com.playmonumenta.redissync.data.ContentData;
 import com.playmonumenta.worlds.common.MMLog;
 import com.playmonumenta.worlds.common.utils.FileUtils;
 import java.io.File;
@@ -93,33 +94,80 @@ public class MonumentaWorldManagementAPI {
 	 * - Additional instances will start pregenerating (if configured)
 	 * <p>
 	 * Must be called from the main thread
+	 * @param player The player to be sorted
+	 * @throws Exception If the world management listener is null (not initialized)
 	 */
 	public static void sortWorld(Player player) throws Exception {
-		WorldManagementListener listener = WorldManagementListener.getInstance();
-		if (listener == null) {
-			throw new Exception("WorldManagementListener is null");
+		WorldManagementListener listener;
+		try {
+			listener = WorldManagementListener.getInstance();
+		} catch (RuntimeException ex) {
+			throw new Exception("WorldManagementListener is not initialized", ex);
 		}
+
+		// Remember the player's previous world for later
+		World oldWorld = player.getWorld();
 
 		// Important - need to save the player's location data on the existing world
 		player.saveData();
 
 		// Figure out what world the player would sort to
 		World newWorld = listener.getSortWorld(player);
+		MMLog.debug("MonumentaWorldManagementAPI.sortWorld(Player " + player.getName() + "): newWorld = " + newWorld.getName());
 
-		// Move the player to that world at their last position (or world spawn)
-		MonumentaRedisSyncAPI.getPlayerWorldData(player, newWorld).applyToPlayer(player);
+		ContentInfo info = WorldManagementPlugin.getContentInfo(player);
+		MMLog.debug("MonumentaWorldManagementAPI.sortWorld(Player " + player.getName() + "): info = " + (info == null ? "null" : info.getContentName()));
+		ContentData contentData = MonumentaRedisSyncAPI.getPlayerContentData(player);
+		MMLog.debug("MonumentaWorldManagementAPI.sortWorld(Player " + player.getName() + "): contentData = " + (contentData == null ? "null" : contentData.getId()));
+		World expectedContentWorld;
+		try {
+			expectedContentWorld = listener.getSortWorld(player, info);
+		} catch (Exception ignored) {
+			expectedContentWorld = null;
+		}
+		MMLog.debug("MonumentaWorldManagementAPI.sortWorld(Player " + player.getName() + "): expectedContentWorld = " + (expectedContentWorld == null ? "null" : expectedContentWorld.getName()));
+		boolean processContentData = (
+			WorldManagementPlugin.isSortByContent() && contentData != null && info != null &&
+			contentData.getId().equals(info.getContentName()) &&
+			expectedContentWorld != null && expectedContentWorld.getName().equals(newWorld.getName())
+		);
+		MMLog.debug("MonumentaWorldManagementAPI.sortWorld(Player " + player.getName() + "): processContentData = " + processContentData);
+
+		CompletableFuture<Void> preprocessArrivalDataFuture;
+		if (processContentData) {
+			preprocessArrivalDataFuture = WorldManagementListener.getInstance().preprocessArrivalContentData(player, contentData, newWorld.getName(), true);
+		} else {
+			preprocessArrivalDataFuture = CompletableFuture.completedFuture(null);
+		}
+		preprocessArrivalDataFuture.whenComplete((ignored, ex) -> {
+			if (ex != null) {
+				MMLog.severe("Unable to set world arrival data for " + player.getName() + " on " + newWorld.getName(), ex);
+			}
+
+			// Move the player to that world at their last position (or world spawn)
+			MonumentaRedisSyncAPI.getPlayerWorldData(player, newWorld).applyToPlayer(player);
+
+			if (processContentData) {
+				listener.processEphemeralContentData(player, contentData, oldWorld.getName());
+			}
+		});
 	}
 
 	/**
 	 * Gets the specified world, loading and optionally creating it if needed.
 	 * <p>
-	 * Will always return a non-null world, or throw an exception if the request is not possible
+	 * Will always return a non-null world, or throw an exception if the request is not possible.
 	 * <p>
-	 * If world is already loaded will return it (fast)
-	 * If world already exists but is not loaded, will load that world (slow, maybe a few ticks on good hardware)
-	 * If world does not exist and templateName is not null, will rename a pregenerated world to that name and load it
+	 * If world is already loaded will return it (fast).
+	 * If world already exists but is not loaded, will load that world (slow, maybe a few ticks on good hardware).
+	 * If world does not exist and templateName is not null, will rename a pregenerated world to that name and load it.
 	 * <p>
-	 * Must be called from the main thread
+	 * Must be called from the main thread.
+	 *
+	 * @param worldName    The world name to ensure is loaded
+	 * @param templateName If not null, the template to use to create worldName if it does not exist
+	 * @return The loaded world
+	 * @throws Exception If the world could not be loaded or generated
 	 */
 	public static World ensureWorldLoaded(String worldName, @Nullable String templateName) throws Exception {
 		WorldManagementPlugin plugin = WorldManagementPlugin.getInstance();
@@ -171,9 +219,11 @@ public class MonumentaWorldManagementAPI {
 
 	public static CompletableFuture<Void> unloadWorld(String worldName) {
 		CompletableFuture<Void> future = new CompletableFuture<>();
-		WorldManagementListener listener = WorldManagementListener.getInstance();
-		if (listener == null) {
-			future.completeExceptionally(new Exception("WorldManagementListener is null"));
+		WorldManagementListener listener;
+		try {
+			listener = WorldManagementListener.getInstance();
+		} catch (RuntimeException ex) {
+			future.completeExceptionally(new Exception("WorldManagementListener is not initialized", ex));
 			return future;
 		}
 
@@ -183,7 +233,7 @@ public class MonumentaWorldManagementAPI {
 			return future;
 		}
 
-		if (Bukkit.getWorlds().get(0).equals(world)) {
+		if (Bukkit.getWorlds().getFirst().equals(world)) {
 			future.completeExceptionally(new Exception("Can't unload main world '" + worldName + "'"));
 			return future;
 		}

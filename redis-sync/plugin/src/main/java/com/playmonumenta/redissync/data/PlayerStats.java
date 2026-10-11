@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
+
 /*
  * 64-bit stats for a loaded player + fake 32-bit values to hand off to MC.
  *
@@ -157,7 +158,7 @@ public class PlayerStats {
 		return (int) Math.floorMod(truth, PRESENT_MODULUS);
 	}
 
-	private static Map<String, Map<String, Long>> copyTruth(Map<String, Map<String, Long>> truth)  {
+	private static Map<String, Map<String, Long>> copyTruth(Map<String, Map<String, Long>> truth) {
 		Map<String, Map<String, Long>> out = new HashMap<>();
 
 		if (truth == null) {
@@ -171,7 +172,7 @@ public class PlayerStats {
 		return out;
 	}
 
-	private static Map<String, Map<String, Integer>> copyPresented(Map<String, Map<String, Integer>> presented)  {
+	private static Map<String, Map<String, Integer>> copyPresented(Map<String, Map<String, Integer>> presented) {
 		Map<String, Map<String, Integer>> out = new HashMap<>();
 
 		if (presented == null) {

@@ -10,12 +10,12 @@ import org.jetbrains.annotations.NotNull;
 public class ServerStatsDataSaveEvent extends Event implements Cancellable {
 	private static final HandlerList handlers = new HandlerList();
 	@NotNull
-	private final UUID playerId;
+	private final UUID mPlayerId;
 	@NotNull
-	private String jsonData;
+	private String mJsonData;
 	@NotNull
-	private File path;
-	private boolean cancel = false;
+	private File mPath;
+	private boolean mCancel = false;
 
 	public ServerStatsDataSaveEvent(@NotNull File path, @NotNull String jsonData) {
 		super();
@@ -24,9 +24,9 @@ public class ServerStatsDataSaveEvent extends Event implements Cancellable {
 			throw new RuntimeException("Player stats file expected to end in .json");
 		}
 		String uuidStr = fileName.substring(0, fileName.length() - 5);
-		this.playerId = UUID.fromString(uuidStr);
-		this.jsonData = jsonData;
-		this.path = path;
+		this.mPlayerId = UUID.fromString(uuidStr);
+		this.mJsonData = jsonData;
+		this.mPath = path;
 	}
 
 	@NotNull
@@ -40,7 +40,7 @@ public class ServerStatsDataSaveEvent extends Event implements Cancellable {
 	 */
 	@NotNull
 	public UUID getPlayerId() {
-		return this.playerId;
+		return this.mPlayerId;
 	}
 
 	/**
@@ -50,14 +50,14 @@ public class ServerStatsDataSaveEvent extends Event implements Cancellable {
 	 */
 	@NotNull
 	public File getPath() {
-		return path;
+		return mPath;
 	}
 
 	/**
 	 * Set the file path where advancement data will be saved to.
 	 */
 	public void setPath(@NotNull File path) {
-		this.path = path;
+		this.mPath = path;
 	}
 
 	/**
@@ -67,7 +67,7 @@ public class ServerStatsDataSaveEvent extends Event implements Cancellable {
 	 */
 	@NotNull
 	public String getJsonData() {
-		return jsonData;
+		return mJsonData;
 	}
 
 	/**
@@ -76,17 +76,17 @@ public class ServerStatsDataSaveEvent extends Event implements Cancellable {
 	 * @param jsonData advancement data JSON string to save instead
 	 */
 	public void setJsonData(@NotNull String jsonData) {
-		this.jsonData = jsonData;
+		this.mJsonData = jsonData;
 	}
 
 	@Override
 	public boolean isCancelled() {
-		return cancel;
+		return mCancel;
 	}
 
 	@Override
 	public void setCancelled(boolean cancel) {
-		this.cancel = cancel;
+		this.mCancel = cancel;
 	}
 
 	@NotNull
@@ -98,10 +98,10 @@ public class ServerStatsDataSaveEvent extends Event implements Cancellable {
 	@Override
 	public String toString() {
 		return "ServerStatsDataSaveEvent{" +
-		       "playerId=" + playerId +
-		       ", cancel=" + cancel +
-		       ", path=" + path +
-		       ", jsonData='" + jsonData + '\'' +
+		       "playerId=" + mPlayerId +
+		       ", cancel=" + mCancel +
+		       ", path=" + mPath +
+		       ", jsonData='" + mJsonData + '\'' +
 		       '}';
 	}
 }

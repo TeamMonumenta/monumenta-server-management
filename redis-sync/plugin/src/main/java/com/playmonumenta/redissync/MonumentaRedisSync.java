@@ -18,6 +18,7 @@ import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -94,8 +95,7 @@ public class MonumentaRedisSync extends JavaPlugin {
 
 		loadConfig();
 		mRedisAPI = new RedisAPI(BukkitConfigAPI.getRedisHost(), BukkitConfigAPI.getRedisPort());
-		getServer().getPluginManager().registerEvents(new DataEventListener(mVersionAdapter), this);
-		getServer().getPluginManager().registerEvents(new ScoreboardCleanupListener(this, mVersionAdapter), this);
+		registerPlayerDataListeners(this, mVersionAdapter);
 		getServer().getPluginManager().registerEvents(AccountTransferManager.getInstance(), this);
 		if (BukkitConfigAPI.getTicksPerPlayerAutosave() > 0) {
 			getServer().getPluginManager().registerEvents(new AutoSaveListener(this, mVersionAdapter), this);
@@ -109,10 +109,20 @@ public class MonumentaRedisSync extends JavaPlugin {
 		INSTANCE = null;
 		AccountTransferManager.onDisable();
 		if (mRedisAPI != null) {
+			/* Before redis closes: the last players' final saves may still be in flight */
+			PlayerSessions.onDisable();
 			mRedisAPI.shutdown();
 		}
 		mRedisAPI = null;
 		getServer().getScheduler().cancelTasks(this);
+	}
+
+	/* Everything that loads, saves and tracks player data; tests register it the same way */
+	static void registerPlayerDataListeners(Plugin plugin, VersionAdapter adapter) {
+		PlayerSessions sessions = new PlayerSessions(plugin, adapter);
+		plugin.getServer().getPluginManager().registerEvents(sessions, plugin);
+		plugin.getServer().getPluginManager().registerEvents(new DataEventListener(plugin, adapter, sessions), plugin);
+		plugin.getServer().getPluginManager().registerEvents(new LockedPlayerListener(), plugin);
 	}
 
 	public static MonumentaRedisSync getInstance() {
@@ -150,8 +160,16 @@ public class MonumentaRedisSync extends JavaPlugin {
 		int ticksPerPlayerAutosave = config.getInt("ticks_per_player_autosave", 6060);
 		boolean savingDisabled = config.getBoolean("saving_disabled", false);
 		boolean scoreboardCleanupEnabled = config.getBoolean("scoreboard_cleanup_enabled", true);
+		boolean contentArgumentsRestricted = config.getBoolean("content_arguments_restricted", false);
+		String notifyContentPermission = config.getString("notify_content_permission", "monumenta.redissync.contentnotify");
+		if (notifyContentPermission.equals("null") || notifyContentPermission.isEmpty()) {
+			notifyContentPermission = null;
+		}
 
-		new BukkitConfigAPI(getLogger(), redisHost, redisPort, serverDomain, shardName, historyAmount, ticksPerPlayerAutosave, savingDisabled, scoreboardCleanupEnabled);
+		new BukkitConfigAPI(
+			getLogger(), redisHost, redisPort, serverDomain, shardName, historyAmount, ticksPerPlayerAutosave,
+			savingDisabled, scoreboardCleanupEnabled, contentArgumentsRestricted, notifyContentPermission
+		);
 	}
 
 	/** @deprecated Use {@link MMLog} static methods instead. */

@@ -56,7 +56,7 @@ public class AutoSaveListener implements Listener {
 				// Schedule this player's save for that later time slot
 				BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
 					try {
-						if (player.isOnline() && !DataEventListener.isPlayerTransferring(player)) {
+						if (player.isOnline() && !PlayerSessions.isLocked(player)) {
 							adapter.savePlayer(player);
 						}
 					} catch (Exception ex) {

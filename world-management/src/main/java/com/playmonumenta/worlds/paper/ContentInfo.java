@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -12,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 
 public class ContentInfo {
 	private final String mContentName;
+	private final @Nullable String mFallbackContentName;
 	private final String mInstanceObjective;
 	private final String mBaseWorldName;
 	private final @Nullable String mJoinInstanceCommand;
@@ -24,7 +26,10 @@ public class ContentInfo {
 	protected ContentInfo(WorldManagementPlugin plugin, String contentName, ConfigurationSection config) {
 		mContentName = contentName;
 
-		mInstanceObjective = config.getString("instance-objective", "Instance");
+		mFallbackContentName = config.getString("fallback-content-name", null);
+		plugin.printConfig("    fallback-content-name", mFallbackContentName);
+
+		mInstanceObjective = config.getString("instance-objective", "");
 		plugin.printConfig("    instance-objective", mInstanceObjective);
 
 		mBaseWorldName = config.getString("base-world-name", "instance");
@@ -68,12 +73,44 @@ public class ContentInfo {
 		return mContentName;
 	}
 
+	public @Nullable String getFallbackContentName() {
+		return mFallbackContentName;
+	}
+
 	public String getInstanceObjective() {
 		return mInstanceObjective;
 	}
 
+	/**
+	 * Gets the player's instance score
+	 * @param player The player whose score you wish to check
+	 * @return A score (including 0 if not set), or empty if there is no instance objective
+	 */
+	public Optional<Integer> getInstanceScore(Player player) {
+		if (mInstanceObjective.isEmpty()) {
+			return Optional.empty();
+		}
+		return Optional.of(ScoreboardUtils.getScoreboardValue(player, mInstanceObjective).orElse(0));
+	}
+
 	public String getBaseWorldName() {
 		return mBaseWorldName;
+	}
+
+	public @Nullable String getWorldName(Player player) {
+		if (getInstanceObjective().isEmpty()) {
+			MMLog.debug(() -> "ContentInfo.getWorldName(Player) instanceObjective is null for " + getContentName() + ", using base name instead");
+			return getBaseWorldName();
+		} else {
+			int score = ScoreboardUtils.getScoreboardValue(player, getInstanceObjective()).orElse(0);
+			if (score <= 0) {
+				MMLog.debug(() -> "ContentInfo.getWorldName(Player) instanceObjective is " + score + " for " + getContentName() + ", returning null");
+				return null;
+			} else {
+				MMLog.debug(() -> "ContentInfo.getWorldName(Player) instanceObjective is " + score + " for " + getContentName() + ", returning " + getBaseWorldName() + score);
+				return getBaseWorldName() + score;
+			}
+		}
 	}
 
 	public @Nullable String getJoinInstanceCommand() {
@@ -109,7 +146,7 @@ public class ContentInfo {
 			score = 0;
 			variantTemplate = mVariantTemplates.get(0);
 		}
-		if (variantTemplate == null) {
+		if (variantTemplate == null && !mVariantTemplates.isEmpty()) {
 			MMLog.severe("No template world for score " + score);
 		}
 		return variantTemplate;

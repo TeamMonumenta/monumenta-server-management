@@ -1,5 +1,6 @@
 package com.playmonumenta.redissync.commands;
 
+import com.playmonumenta.redissync.CommonConfig;
 import com.playmonumenta.redissync.MonumentaRedisSync;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.NetworkRelayIntegration;
@@ -18,6 +19,7 @@ import java.util.Collection;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 
 public class SetLocationOnShardCommand {
 	@SuppressWarnings({"unchecked"})
@@ -45,21 +47,30 @@ public class SetLocationOnShardCommand {
 					String shard = args.getByArgument(serverArg);
 					String world = args.getByArgument(worldArg);
 					Location location = args.getByArgument(locationArg);
+					Vector locationVec = location.toVector();
 					Rotation rotation = args.getByArgument(rotationArg);
+					double yaw = rotation.getYaw();
+					double pitch = rotation.getPitch();
 					boolean transfer = args.getByArgumentOrDefault(transferArg, false);
+
+					boolean sameShard = CommonConfig.getShardName().equals(shard);
 					for (Player player : players) {
-						MonumentaRedisSyncAPI.setPlayerWorldAndLocationOnShard(player, shard, world, location.toVector(), rotation.getYaw(), rotation.getPitch())
-							.whenComplete((unused, ex1) -> {
-								if (ex1 == null && transfer) {
-									Bukkit.getScheduler().runTask(MonumentaRedisSync.getInstance(), () -> {
-										try {
-											MonumentaRedisSyncAPI.sendPlayer(player, shard);
-										} catch (Exception ex2) {
-											MMLog.severe("Caught exception when transferring player after remotely setting their world and location", ex2);
-										}
-									});
-								}
-							});
+						if (sameShard) {
+							MonumentaRedisSyncAPI.setPlayerLocationOnWorld(player, world, locationVec, yaw, pitch);
+						} else {
+							MonumentaRedisSyncAPI.setPlayerWorldAndLocationOnShard(player, shard, world, locationVec, yaw, pitch)
+								.whenComplete((unused, ex1) -> {
+									if (ex1 == null && transfer) {
+										Bukkit.getScheduler().runTask(MonumentaRedisSync.getInstance(), () -> {
+											try {
+												MonumentaRedisSyncAPI.sendPlayer(player, shard);
+											} catch (Exception ex2) {
+												MMLog.severe("Caught exception when transferring player after remotely setting their world and location", ex2);
+											}
+										});
+									}
+								});
+						}
 					}
 				}
 			).register();
