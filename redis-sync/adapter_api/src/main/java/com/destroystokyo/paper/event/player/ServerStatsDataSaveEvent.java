@@ -44,9 +44,9 @@ public class ServerStatsDataSaveEvent extends Event implements Cancellable {
 	}
 
 	/**
-	 * Get the file path where advancement data will be saved to.
+	 * Get the file path where stats data will be saved to.
 	 *
-	 * @return advancement data File to save to
+	 * @return stats data File to save to
 	 */
 	@NotNull
 	public File getPath() {
@@ -54,16 +54,16 @@ public class ServerStatsDataSaveEvent extends Event implements Cancellable {
 	}
 
 	/**
-	 * Set the file path where advancement data will be saved to.
+	 * Set the file path where stats data will be saved to.
 	 */
 	public void setPath(@NotNull File path) {
 		this.mPath = path;
 	}
 
 	/**
-	 * Get the JSON advancements data that will be saved.
+	 * Get the JSON stats data that will be saved.
 	 *
-	 * @return JSON data of the player's advancements
+	 * @return JSON data of the player's stats
 	 */
 	@NotNull
 	public String getJsonData() {
@@ -71,9 +71,9 @@ public class ServerStatsDataSaveEvent extends Event implements Cancellable {
 	}
 
 	/**
-	 * Set the JSON advancements data that will be saved.
+	 * Set the JSON stats data that will be saved.
 	 *
-	 * @param jsonData advancement data JSON string to save instead
+	 * @param jsonData stats data JSON string to save instead
 	 */
 	public void setJsonData(@NotNull String jsonData) {
 		this.mJsonData = jsonData;

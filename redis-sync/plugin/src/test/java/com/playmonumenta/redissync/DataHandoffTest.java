@@ -231,8 +231,8 @@ public class DataHandoffTest {
 		TestPlayer second = harness.join("Tester");
 		assertEquals(20, harness.progressExceptStats(second));
 		assertEquals(21, harness.statProgress(second));
-		assertEquals(harness.redisListLength(MonumentaRedisSyncAPI.getRedisDataPath(second)),
-			harness.redisListLength(MonumentaRedisSyncAPI.getRedisStatsPath(second)), "stats history lined up");
+		assertEquals(List.of(20, 21, 20), harness.savedProgressHistoryExceptStats(second));
+		assertEquals(List.of(21, 21, 20), harness.savedStatProgressHistory(second), "lined up, the stash's entry with the current stats");
 	}
 
 	/**

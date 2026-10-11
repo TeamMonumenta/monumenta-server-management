@@ -27,8 +27,7 @@ little rough around the edges, missing some nice-to-have features.
 
 Here's a list of currently supported things:
 
-- Save playerdata, advancements, stats (as 64-bit values) and scoreboard data
-  to/from Redis
+- Save playerdata, advancements, stats and scoreboard data to/from Redis
 - Function & command block accessible /transferserver command to move players
   between servers on the same bungeecord network
 - /playerhistory to inspect a player's save history
@@ -70,10 +69,9 @@ framework, which requires using a [fabric mod loader for paper](https://github.c
 as the server software. The mixin implementation is [here](https://github.com/TeamMonumenta/monumenta-mixins).
 
 Stats need a monumenta-mixins with the stats load and save events
-(`ServerStatsDataLoadEvent`, `ServerStatsDataSaveEvent`). Without them, every login is refused,
-as the player's stats would be neither loaded from nor saved to redis. Upgrade monumenta-mixins
-first: it works with versions of this plugin that do not handle stats, which leave them to the
-server's own files.
+(`ServerStatsDataLoadEvent`, `ServerStatsDataSaveEvent`); without them this plugin refuses to
+enable. Upgrade monumenta-mixins first: it works with versions of this plugin that do not handle
+stats, which leave them to the server's own files.
 
 A fork of paper with these patches (and others) can be found here:
 https://github.com/TeamMonumenta/monumenta-paperfork
@@ -173,15 +171,11 @@ Position and world are kept per shard in a hash. How the plugin tracks a player 
 - **Offline edits** (`getOfflinePlayerData`, then `saveOfflinePlayerData`) are refused, returning
   false, if the player is on this shard, logging in, just leaving, or has saved since the data
   was read. A login waits for an offline edit in flight.
-- **Stats** are saved as 64-bit values, though the server only holds ints. A login hands the
-  server each stat wrapped below 2^30 (time_since stats clamped instead), and each save adds
-  what the server counted since. So the server, and `Player#getStatistic`, see wrapped values;
-  the real ones are in redis. A player with no stats in redis loads the server's own stats file,
-  if it has one, and their first save puts it in redis. Those files are per shard, so only the
-  first shard's are kept unless they are merged into redis beforehand. Changes are counted as
-  deltas: `Player#setStatistic` lower, on a stat at or past 2^30, subtracts rather than sets.
+- **Stats** are saved as the server has them. A player with no stats in redis loads the
+  server's own stats file, if it has one, and their first save puts it in redis. Those files are
+  per shard, so only the first shard's are kept unless they are merged into redis beforehand.
 - **Stats of players not online here** (`OfflinePlayer#getStatistic` and the like) are read from
-  redis, clamped to what an int can hold. Changing them (`OfflinePlayer#incrementStatistic` and
+  redis. Changing them (`OfflinePlayer#incrementStatistic` and
   the like) is never saved. It throws, which the server catches and logs with a stack trace
   naming the plugin that tried; the caller itself sees no error.
 - **Restoring data from before stats were saved** (a stash, rollback or offline edit with no
@@ -212,10 +206,10 @@ Position and world are kept per shard in a hash. How the plugin tracks a player 
   bytes.
 - **stashPut** stashes the newest save once its own save has committed. If the player saves
   again before then, the stash is of that later save.
+- **Reading the stats of players not online here** blocks the main thread on a redis read each
+  time the server builds their stats, which `OfflinePlayer#getStatistic` does on every call.
 - **Shutdown without monumenta-mixins.** Vanilla Paper disables plugins before it saves the
   players still online, so that save goes to disk, not redis.
-- **A stat counted past 2^31 - 2^30 in one session** stops at Integer.MAX_VALUE, as the server
-  stops counting there, and the rest of that session's count is lost.
 
 ## Testing
 
@@ -271,8 +265,7 @@ constructors and `MonumentaRedisSync.registerPlayerDataListeners`.
 | `DataHandoffTest` | stash get, rollback and loadFromPlayer |
 | `ShutdownTest` | everything in flight at shutdown commits: final saves, the saves of players still online, other API writes, a rollback mid-write |
 | `OfflineEditTest` | offline edits never bury newer progress |
-| `StatsTest` | 64-bit stats across loads and saves, offline stats, players with no stats in redis |
-| `PlayerStatsTest` | the 64-bit stats arithmetic, without a server |
+| `StatsTest` | offline stats, fake players, players with no stats in redis, stats saves outside a full save |
 | `LifecycleFuzzTest` | random sequences of all of the above, checked against a model of the save history |
 
 `LifecycleFuzzTest` runs 8 fixed seeds by default. Run more with

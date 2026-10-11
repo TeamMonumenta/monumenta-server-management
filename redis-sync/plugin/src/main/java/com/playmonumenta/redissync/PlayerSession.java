@@ -3,7 +3,6 @@ package com.playmonumenta.redissync;
 import com.google.gson.JsonObject;
 import com.playmonumenta.redissync.adapters.VersionAdapter.ReturnParams;
 import com.playmonumenta.redissync.data.ContentData;
-import com.playmonumenta.redissync.data.PlayerStats;
 import com.playmonumenta.redissync.utils.MMLog;
 import io.lettuce.core.TransactionResult;
 import java.util.HashMap;
@@ -81,7 +80,6 @@ final class PlayerSession {
 	private JsonObject mPluginData = new JsonObject();
 	private Map<String, String> mShardData = new HashMap<>();
 	private ContentData mContentData = new ContentData("");
-	private @Nullable PlayerStats mStats = null;
 
 	private final Set<CompletableFuture<?>> mPendingSaves = ConcurrentHashMap.newKeySet();
 	private final CompletableFuture<Void> mEnded = new CompletableFuture<>();
@@ -230,18 +228,9 @@ final class PlayerSession {
 		mContentData = contentData;
 	}
 
-	/** The player's 64-bit stats, and the values the server was handed in their place; null until the login's stats load is taken */
-	@Nullable PlayerStats getStats() {
-		return mStats;
-	}
-
-	void setStats(PlayerStats stats) {
-		mStats = stats;
-	}
-
 	/* ******************* Saves ******************* */
 
-	/** A playerdata save, which pushes onto every history list but stats and advancements, is being made; its advancements save comes next */
+	/** A playerdata save, which pushes onto every history list but stats and advancements, is being made; its stats and then advancements saves come next */
 	void beginPlayerdataSave() {
 		mAwaitingAdvancementsSave = true;
 		mPlayerdataSaves++;

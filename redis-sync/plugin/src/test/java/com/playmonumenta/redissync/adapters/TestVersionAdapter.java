@@ -54,6 +54,7 @@ public class TestVersionAdapter implements VersionAdapter {
 	private final Map<Player, JsonObject> mLivePlayerData = Collections.synchronizedMap(new IdentityHashMap<>());
 	private final Map<Player, String> mLiveAdvancements = Collections.synchronizedMap(new IdentityHashMap<>());
 	private final Map<Player, JsonObject> mLiveStats = Collections.synchronizedMap(new IdentityHashMap<>());
+	private volatile boolean mSkipStatsSaves = false;
 
 	/** Sets the data that the next {@link #savePlayer} for this player will write. */
 	public void setLiveData(Player player, JsonObject nbt, String advancementsJson) {
@@ -168,11 +169,18 @@ public class TestVersionAdapter implements VersionAdapter {
 		JsonObject nbt = mLivePlayerData.computeIfAbsent(player, k -> new JsonObject());
 		File path = new File("unused-in-tests");
 		Bukkit.getPluginManager().callEvent(new PlayerDataSaveEvent(player, path, nbt.deepCopy()));
-		Bukkit.getPluginManager().callEvent(new ServerStatsDataSaveEvent(statsFile(player.getUniqueId()), getLiveStats(player).toString()));
+		if (!mSkipStatsSaves) {
+			Bukkit.getPluginManager().callEvent(new ServerStatsDataSaveEvent(statsFile(player.getUniqueId()), getLiveStats(player).toString()));
+		}
 		String advancements = mLiveAdvancements.get(player);
 		if (advancements != null) {
 			Bukkit.getPluginManager().callEvent(new PlayerAdvancementDataSaveEvent(player, path, advancements));
 		}
+	}
+
+	/** Leaves the stats save out of full saves, as spigot.yml's stats.disable-saving does */
+	public void setSkipStatsSaves(boolean skip) {
+		mSkipStatsSaves = skip;
 	}
 
 	/** The stats file the server names in its stats events, from which they take the player's UUID */

@@ -754,7 +754,7 @@ to get the configured domain (e.g. `"monumenta"`).
 |---|---|
 | `{domain}:playerdata:{uuid}:plugins` | Player plugin data blob |
 | `{domain}:playerdata:{uuid}:scores` | Player scoreboard data |
-| `{domain}:playerdata:{uuid}:stats` | Player stats (JSON, 64-bit values) |
+| `{domain}:playerdata:{uuid}:stats` | Player stats (JSON) |
 | `{domain}:playerdata:{uuid}:data` | Player NBT data (binary) |
 | `{domain}:playerdata:{uuid}:remotedata` | RemoteDataAPI store |
 | `{domain}:rboard:{name}` | RBoardAPI hash |

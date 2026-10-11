@@ -166,16 +166,6 @@ public final class PlayerSessions implements Listener {
 		return session;
 	}
 
-	/** Whether this is the session kept for its player, which is saved, rather than one that never is */
-	boolean isKept(PlayerSession session) {
-		return mSessions.get(session.getPlayer().getUniqueId()) == session;
-	}
-
-	/** Whether a login for this player passed pre-login and has yet to start its session */
-	boolean isLoginExpected(UUID uuid) {
-		return expectedLogin(uuid) != null;
-	}
-
 	private PlayerSession refuse(Player player, String reason) {
 		PlayerSession session = new PlayerSession(player);
 		abortLoad(session, reason);
