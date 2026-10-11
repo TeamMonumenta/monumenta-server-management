@@ -52,7 +52,10 @@ public class PlayerStats {
 
 			for (Map.Entry<String, JsonElement> statEntry : namespaceEntry.getValue().getAsJsonObject().entrySet()) {
 				long value = statEntry.getValue().getAsLong();
-				int marker = present(value);
+				// Time Since stats aren't cumulative - hand them to MC as-is rather than wrapped
+				int marker = isTimeSince(namespaceEntry.getKey(), statEntry.getKey())
+					? (int) Math.min(value, Integer.MAX_VALUE)
+					: present(value);
 
 				truthNamespace.put(statEntry.getKey(), value);
 				presentedNamespace.put(statEntry.getKey(), marker);
@@ -108,7 +111,9 @@ public class PlayerStats {
 
 					truthNamespace.put(stat, curr + delta);
 				}
-				nextPresentedNamespace.put(stat, present(savedValue));
+				// The baseline must be what MC still holds in memory, not a re-presented value;
+				// MC keeps counting up from savedValue until the player is reloaded
+				nextPresentedNamespace.put(stat, (int) savedValue);
 			}
 			nextPresented.put(namespace, nextPresentedNamespace);
 		}

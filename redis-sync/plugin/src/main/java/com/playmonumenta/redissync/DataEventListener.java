@@ -578,6 +578,9 @@ public class DataEventListener implements Listener {
 		String playerNameNullable = MonumentaRedisSyncAPI.cachedUuidToName(playerId);
 		String playerName = playerNameNullable == null ? playerId.toString() : playerNameNullable;
 
+		/* Drop any stats from a previous session (e.g. quick rejoin) - they don't match what MC is about to load */
+		mStatsDataManager.remove(playerId);
+
 		long startTime = System.currentTimeMillis();
 		MMLog.debug("Started loading stats data for player=" + playerName);
 
@@ -593,10 +596,8 @@ public class DataEventListener implements Listener {
 			MMLog.trace(() -> "Stats data:" + statsData);
 			if (statsData != null) {
 				String presented = mStatsDataManager.load(playerId, statsData);
-
-				if (presented != null) {
-					event.setJsonData(presented);
-				}
+				/* If the stats couldn't be tracked as 64-bit, still load them from redis rather than the local file */
+				event.setJsonData(presented != null ? presented : statsData);
 			} else {
 				MMLog.warning("No stats data for player '" + playerName + "' - if they are not new, this is a serious error!");
 			}
