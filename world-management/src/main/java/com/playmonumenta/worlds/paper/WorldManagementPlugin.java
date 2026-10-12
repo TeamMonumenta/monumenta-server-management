@@ -202,6 +202,7 @@ public class WorldManagementPlugin extends JavaPlugin {
 				if (score.isEmpty() || score.get() > 0) {
 					if (usedFallback) {
 						ContentData contentData = new ContentData(info.getContentName());
+						contentData.setFallbackContentId(finalInfo.getFallbackContentName());
 						MonumentaRedisSyncAPI.savePlayerContent(player.getUniqueId(), contentData);
 						MMLog.debug(() -> "WorldManagementPlugin.getContentInfo(Player " + player.getName() + "): Saved content data " + contentData.getId());
 					}
