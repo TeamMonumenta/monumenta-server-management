@@ -141,6 +141,7 @@ public class MonumentaRedisSyncAPI {
 			this.mHistory = history;
 		}
 
+		/** Stats JSON as stored in redis: 64-bit values, which may not fit in an int */
 		public @Nullable String getStats() {
 			return mStats;
 		}

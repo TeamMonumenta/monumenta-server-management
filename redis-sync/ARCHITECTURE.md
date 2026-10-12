@@ -204,18 +204,27 @@ lone advancements saves replace it, and so does the next full save's, which pair
 
 ### Stats
 
+The server holds stats as ints, which stop counting at Integer.MAX_VALUE, but they are stored in
+redis as 64-bit values. `PlayerStats` keeps each stat's 64-bit value and the value the server was
+given in its place (its baseline). A login gives the server each stat wrapped into [0, 2^30), so it
+has at least 2^30 to count up from. A save adds the server's value minus the baseline to the 64-bit
+value, and the server's value becomes the next baseline: the server keeps counting from what it
+holds until the player loads again. time_since stats are not counts, so they are loaded clamped and
+saved exactly as the server has them. Each session holds its own `PlayerStats`, so each connection
+counts from what it loaded.
+
 The stats events carry only a UUID (taken from the stats file name), not a `Player`:
 
 - **Loading.** The server loads stats while constructing the player, just before loading
-  advancements, so there is no session or `Player` yet. Stats are passed to the server exactly as
-  stored in redis. If the redis read fails, the advancement load that follows fails the new
-  session. Otherwise the player would play with whatever stats the server loaded instead, and
-  those would overwrite the ones in redis. Only a session that is still loading is failed this
-  way: another plugin reading an offline player's stats can leave a failed read behind, and that
-  must not fail a playing session on a later datapack reload. Those offline reads and fake
-  players load stats the same way as logins. Stats in redis that the server cannot parse are
-  passed to it anyway, same as advancements: the server logs the error, starts with empty stats,
-  and saves those.
+  advancements, so there is no session or `Player` yet. If a login is expected for the UUID, the
+  stats are held until the advancement load, where the new kept session takes them. A kept session
+  with nothing to take (loading or parsing failed, or no stats load came first) fails as it starts.
+  Otherwise the player would play with whatever stats the server loaded instead, and those would
+  overwrite the 64-bit values in redis. A stats load with no login expected is another plugin
+  reading an offline player's stats, or a fake player: it is served from redis clamped rather than
+  wrapped, since nothing will count from it, and is not held for anyone. A read that comes
+  while a login is expected cannot be told apart from the login's own load: it is served wrapped
+  and held, and the login's load then replaces it.
 - **Saving.** A full save fires the stats save between the playerdata and advancements saves.
   The playerdata save records whether it pushed, and the stats save pushes only if it did. This
   keeps the lists aligned without the stats save looking up the session again. A stats save with
@@ -225,6 +234,11 @@ The stats events carry only a UUID (taken from the stats file name), not a `Play
   shard, and the entry would not match anything on the other lists. The advancements save ends
   the full save; if no stats save happened during it (e.g. `stats.disable-saving` is set in
   spigot.yml), an error is logged, since the stats history is falling behind.
+
+Since a save adds what the server counted since the baseline, any change the server makes is
+treated as a delta: `Player#setStatistic(stat, 0)` on a stat at or past 2^30 subtracts what the
+server held rather than resetting the 64-bit value, and spigot.yml's `forced-stats` counts as
+progress.
 
 A player with no stats in redis loads the server's own stats file if one exists, and their first
 save copies it into redis. Those files were per shard, so only the stats from the first shard the

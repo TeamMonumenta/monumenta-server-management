@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * A failed load fails closed: the player is not let play with whatever partial state they ended
@@ -66,6 +67,23 @@ public class LoadFailureTest {
 
 		harness.redisDelete(statsPath);
 		harness.redisRename(statsPath + ".good", statsPath);
+		assertEquals(9, harness.progress(harness.join("Tester")), "logs in once the data is repaired");
+	}
+
+	/** Stats that cannot be parsed refuse the login: their 64-bit values are nowhere else, so starting from none would lose them */
+	@Test
+	void statsThatCannotBeParsedRefuseTheLogin(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer saved = harness.savedAndLeft("Tester", 9);
+		String statsPath = MonumentaRedisSyncAPI.getRedisStatsPath(saved);
+		String good = harness.redisListEntry(statsPath, 0);
+		assertNotNull(good);
+		harness.redisSetListEntry(statsPath, 0, "not json {");
+
+		assertNotEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.login(harness.newPlayer("Tester")));
+		harness.awaitPluginCommandsExecuted();
+		assertEquals(1, harness.redisListLength(statsPath), "nothing saved over them");
+
+		harness.redisSetListEntry(statsPath, 0, good);
 		assertEquals(9, harness.progress(harness.join("Tester")), "logs in once the data is repaired");
 	}
 
