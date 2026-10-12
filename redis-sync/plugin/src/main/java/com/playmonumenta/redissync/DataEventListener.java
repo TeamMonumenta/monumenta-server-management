@@ -91,14 +91,14 @@ public class DataEventListener implements Listener {
 	private Set<String> mAvailableContentIds = Set.of();
 
 	/*
-	 * Players whose stats failed to load, until the advancement load that follows fails their
-	 * session. The server loads stats as it constructs the player, just before the advancements,
-	 * but the stats event carries only a UUID, so it cannot fail the session itself.
+	 * Players whose stats failed to load. The advancement load that follows fails their session.
+	 * The server loads stats while constructing the player, just before advancements, but the stats
+	 * event carries only a UUID, so it cannot fail the session itself.
 	 */
 	private final Set<UUID> mFailedStatsLoads = ConcurrentHashMap.newKeySet();
 	/*
-	 * The playerdata save of the full save under way. Its stats save comes next, and carries only a
-	 * UUID, so it goes by this: it is pushed exactly when the playerdata save was. Main thread only.
+	 * The playerdata save of the full save in progress. The stats save comes next and carries only a
+	 * UUID, so it uses this to decide whether to push: only if the playerdata save did. Main thread only.
 	 */
 	private @Nullable StatsSave mStatsSave = null;
 
@@ -167,14 +167,14 @@ public class DataEventListener implements Listener {
 			return;
 		}
 
-		/* Always taken, so none is left behind */
+		/* Always remove, so no stale failure is left behind */
 		boolean statsFailed = mFailedStatsLoads.remove(player.getUniqueId());
 		if (!session.isLive()) {
 			MMLog.warning("Skipping advancements load for player=" + playerName + " because their session is " + session.getState());
 			return;
 		}
 		if (statsFailed && session.getState() == PlayerSession.State.LOADING) {
-			/* Played, the stats the server loaded instead would be saved over the ones in redis. A reload's advancement load has no stats load of its own */
+			/* Otherwise the server's fallback stats would overwrite the ones in redis. Only LOADING: a datapack reload's advancement load has no stats load before it */
 			mSessions.abortLoad(session, "stats failed to load");
 			return;
 		}
@@ -210,7 +210,7 @@ public class DataEventListener implements Listener {
 		/* Always cancel saving the player file to disk with this plugin present */
 		event.setCancelled(true);
 
-		/* The end of a full save: its stats save should have taken this already */
+		/* End of a full save: the stats save should have already consumed this */
 		StatsSave missedStats = mStatsSave;
 		mStatsSave = null;
 		if (missedStats != null && missedStats.mSession() != null && missedStats.mPlayerId().equals(event.getPlayer().getUniqueId())) {
@@ -250,7 +250,7 @@ public class DataEventListener implements Listener {
 	}
 
 	/*
-	 * Fires as the server constructs a player, just before the advancement load, and also when
+	 * Fires while the server constructs a player, just before the advancement load, and also when
 	 * another plugin reads or changes the stats of a player who is not online here.
 	 */
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -259,7 +259,7 @@ public class DataEventListener implements Listener {
 			return;
 		}
 
-		/* A login's player has no name yet, and another plugin's read has no player at all */
+		/* No Player exists yet during login, or at all for another plugin's offline read */
 		UUID playerId = event.getPlayerId();
 		String playerName = Objects.requireNonNullElse(MonumentaRedisSyncAPI.cachedUuidToName(playerId), playerId.toString());
 		mFailedStatsLoads.remove(playerId);
@@ -277,7 +277,7 @@ public class DataEventListener implements Listener {
 			statsData = statsFuture.get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
 		} catch (CancellationException | InterruptedException | ExecutionException | TimeoutException ex) {
 			MMLog.severe("!!! Failed to load player stats data for player=" + playerName + " !!!", ex);
-			/* A login's session fails at its advancement load; a read gets whatever the server has */
+			/* A login fails at the advancement load that follows; an offline read gets the server's fallback */
 			mFailedStatsLoads.add(playerId);
 			return;
 		}
@@ -306,10 +306,10 @@ public class DataEventListener implements Listener {
 		mStatsSave = null;
 		if (save == null || !save.mPlayerId().equals(playerId)) {
 			/*
-			 * OfflinePlayer#incrementStatistic and the like. Not saved: the player's data is not this
-			 * shard's to change while they are away, and the entry would pair with nothing on the
-			 * other history lists. The server catches and logs this, and the stack trace names the
-			 * plugin that made the change; its caller sees no error.
+			 * OfflinePlayer#incrementStatistic and similar. Not saved: this shard does not own the
+			 * player's data while they are away, and the entry would not match anything on the other
+			 * history lists. The server catches and logs this exception, and the stack trace names
+			 * the plugin that made the change; the caller sees no error.
 			 */
 			if (BukkitConfigAPI.getSavingDisabled()) {
 				return;
@@ -318,7 +318,7 @@ public class DataEventListener implements Listener {
 		}
 		PlayerSession session = save.mSession();
 		if (session == null) {
-			/* The playerdata save was skipped, and said why */
+			/* The playerdata save was skipped and already logged why */
 			return;
 		}
 
@@ -586,7 +586,7 @@ public class DataEventListener implements Listener {
 		event.setCancelled(true);
 
 		Player player = event.getPlayer();
-		/* Its stats save is skipped too, unless this pushes */
+		/* The stats save is skipped too, unless this save pushes */
 		mStatsSave = new StatsSave(player.getUniqueId(), null);
 
 		if (BukkitConfigAPI.getSavingDisabled()) {
@@ -680,7 +680,7 @@ public class DataEventListener implements Listener {
 				commands.lpush(scorePath, scoreboardData);
 				commands.ltrim(scorePath, 0, BukkitConfigAPI.getHistoryAmount());
 			}), () -> "Failed to save player data for player=" + playerName);
-			/* Set after the PlayerSaveEvent above, in case another plugin made a whole save of its own in it */
+			/* Set after the PlayerSaveEvent above, in case another plugin triggered a nested full save from it */
 			mStatsSave = new StatsSave(player.getUniqueId(), session);
 		} catch (IOException ex) {
 			MMLog.severe("Failed to save player data for player=" + playerName, ex);

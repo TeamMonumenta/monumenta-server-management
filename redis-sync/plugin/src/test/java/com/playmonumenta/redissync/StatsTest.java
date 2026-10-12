@@ -20,21 +20,21 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Stats outside a player's own logins and saves. Their round trip, history alignment, handoffs and
- * offline edits ride on the progress the other tests already check, which the harness keeps in a
- * stat too.
+ * Stats outside a player's own logins and saves. Round trips, history alignment, handoffs and
+ * offline edits are covered by the other tests through progress, which the harness also stores in
+ * a stat.
  *
  * <p>MockBukkit rethrows a listener's exception to whoever fired the event, which is what the
- * assertThrows below see. Paper instead logs it, and the plugin that fired the event sees none.
+ * assertThrows below check. Paper instead logs it, and the plugin that fired the event sees nothing.
  */
 @ExtendWith(RedisSyncTestHarness.PerTest.class)
 public class StatsTest {
 	private static final String JUMP = "minecraft:jump";
 
 	/**
-	 * Before stats were saved in redis the server kept them in its own files. A player with none in
-	 * redis yet starts from the server's file, which their first save then puts in redis. Their
-	 * stats history is shorter than the others from then on, but lined up with the newest entries.
+	 * Before stats were stored in redis the server kept them in its own files. A player with none in
+	 * redis yet starts from the server's file, which their first save then copies into redis. Their
+	 * stats history is shorter than the others from then on, but aligned with the newest entries.
 	 */
 	@Test
 	void playerWithNoStatsInRedisStartsFromTheServersOwnFile(RedisSyncTestHarness harness) throws Exception {
@@ -59,8 +59,8 @@ public class StatsTest {
 
 	/**
 	 * CraftOfflinePlayer's stat methods load a player's stats when they are not online here, and
-	 * its setters save them straight back. The read is served from redis, and the save is refused
-	 * loudly: it is not this shard's to make, and would pair with nothing on the other history lists.
+	 * its setters save them right back. The read is served from redis, and the save is refused with
+	 * an exception: this shard does not own the data, and the entry would not match the other lists.
 	 */
 	@Test
 	void statsOfAPlayerNotOnlineAreReadButNeverSaved(RedisSyncTestHarness harness) throws Exception {
@@ -74,7 +74,7 @@ public class StatsTest {
 		RedisSyncTestHarness.putStat(read, CUSTOM_STATS, JUMP, 1);
 		ServerStatsDataSaveEvent save = new ServerStatsDataSaveEvent(TestVersionAdapter.statsFile(uuid), read.toString());
 		assertThrows(IllegalStateException.class, () -> harness.callEvent(save));
-		assertTrue(save.isCancelled(), "nor written to the server's own file");
+		assertTrue(save.isCancelled(), "also not written to the server's own file");
 		harness.awaitPluginCommandsExecuted();
 		assertEquals(1, harness.redisListLength(MonumentaRedisSyncAPI.getRedisStatsPath(uuid)));
 
@@ -83,7 +83,7 @@ public class StatsTest {
 
 	/** A stats save that is not part of a full save is refused even for a player who is online */
 	@Test
-	void statsSaveOutsideAFullSaveIsNeverTakenForThePlayers(RedisSyncTestHarness harness) throws Exception {
+	void statsSaveOutsideAFullSaveIsRefused(RedisSyncTestHarness harness) throws Exception {
 		TestPlayer player = harness.join("Tester");
 		harness.setProgress(player, 5);
 		ServerStatsDataSaveEvent save = new ServerStatsDataSaveEvent(TestVersionAdapter.statsFile(player.getUniqueId()),
@@ -92,7 +92,7 @@ public class StatsTest {
 
 		MonumentaRedisSyncAPI.savePlayer(player);
 		harness.awaitSaved(player);
-		assertEquals(List.of(5), harness.savedProgressHistory(player), "only the full save's");
+		assertEquals(List.of(5), harness.savedProgressHistory(player), "only the full save is in the history");
 	}
 
 	/** NPC plugins construct fake players, which load stats like any other but are never saved */
@@ -114,8 +114,8 @@ public class StatsTest {
 	}
 
 	/**
-	 * Stats in redis the server cannot parse are handed to it anyway, as advancements are: it starts
-	 * from none, and its next save puts that in redis.
+	 * Stats in redis that the server cannot parse are passed to it anyway, same as advancements: it
+	 * starts with empty stats, and its next save writes those to redis.
 	 */
 	@Test
 	void statsTheServerCannotParseStartFromNone(RedisSyncTestHarness harness) throws Exception {
@@ -133,9 +133,9 @@ public class StatsTest {
 	}
 
 	/**
-	 * Another plugin reading the stats of a player who is here but still configuring, whose read
-	 * fails, leaves the failure behind. It must not fail the player's session at a datapack reload,
-	 * whose advancement load has no stats load before it.
+	 * A failed stats read by another plugin for a player already on this shard leaves a failure
+	 * behind. That must not fail the player's session on a datapack reload, whose advancement load
+	 * has no stats load before it.
 	 */
 	@Test
 	void failedStatsReadLeftBehindDoesNotFailAPlayingSession(RedisSyncTestHarness harness) throws Exception {
@@ -154,10 +154,10 @@ public class StatsTest {
 		harness.tick(2);
 		assertTrue(player.isPlaced(), "not kicked");
 		harness.awaitSaved(player);
-		assertEquals(List.of(5, 5), harness.savedProgressHistory(player), "and still saved");
+		assertEquals(List.of(5, 5), harness.savedProgressHistory(player), "still saved");
 	}
 
-	/** A plugin saving another player inside a PlayerSaveEvent: each full save's stats go with its own playerdata */
+	/** A plugin saving another player inside a PlayerSaveEvent: each full save's stats pair with its own playerdata */
 	@Test
 	void fullSaveNestedInAnotherKeepsBothAligned(RedisSyncTestHarness harness) throws Exception {
 		TestPlayer first = harness.join("First");
@@ -183,9 +183,9 @@ public class StatsTest {
 	}
 
 	/**
-	 * A full save whose stats save never comes (spigot.yml's stats.disable-saving stops the server
-	 * making it) leaves the stats history behind, which is logged. Nothing is left over for a later
-	 * stats save to be taken as part of it.
+	 * A full save with no stats save (spigot.yml's stats.disable-saving prevents it) leaves the stats
+	 * history behind, which is logged. No state is left over that would make a later stray stats
+	 * save count as part of it.
 	 */
 	@Test
 	void fullSaveWithoutAStatsSaveLeavesNothingBehind(RedisSyncTestHarness harness) throws Exception {
@@ -197,7 +197,7 @@ public class StatsTest {
 
 		ServerStatsDataSaveEvent stray = new ServerStatsDataSaveEvent(TestVersionAdapter.statsFile(player.getUniqueId()),
 			harness.getAdapter().getLiveStats(player).toString());
-		assertThrows(IllegalStateException.class, () -> harness.callEvent(stray), "not taken as the skipped save's");
+		assertThrows(IllegalStateException.class, () -> harness.callEvent(stray), "not treated as part of the earlier full save");
 
 		harness.setProgress(player, 6);
 		MonumentaRedisSyncAPI.savePlayer(player);

@@ -183,7 +183,7 @@ public class TestVersionAdapter implements VersionAdapter {
 		mSkipStatsSaves = skip;
 	}
 
-	/** The stats file the server names in its stats events, from which they take the player's UUID */
+	/** The stats file path the server passes to its stats events, which derive the player's UUID from its name */
 	public static File statsFile(UUID uuid) {
 		return new File("stats", uuid + ".json");
 	}

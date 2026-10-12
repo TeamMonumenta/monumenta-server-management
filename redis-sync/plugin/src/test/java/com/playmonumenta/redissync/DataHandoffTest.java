@@ -213,10 +213,10 @@ public class DataHandoffTest {
 		assertEquals(30, harness.progressExceptStats(second));
 		assertEquals(31, harness.statProgress(second));
 		assertEquals(List.of(30, 31, 31, 30), harness.savedProgressHistoryExceptStats(second));
-		assertEquals(List.of(31, 31, 31), harness.savedStatProgressHistory(second), "the newest entries, lined up");
+		assertEquals(List.of(31, 31, 31), harness.savedStatProgressHistory(second), "aligned with the newest entries");
 	}
 
-	/** As rollback: a stash from before stats were saved in redis keeps the player's current stats. */
+	/** Like rollback, a stash from before stats were saved in redis keeps the player's current stats. */
 	@Test
 	void stashFromBeforeStatsKeepsTheCurrentStats(RedisSyncTestHarness harness) throws Exception {
 		TestPlayer first = harness.join("Tester");
@@ -232,7 +232,7 @@ public class DataHandoffTest {
 		assertEquals(20, harness.progressExceptStats(second));
 		assertEquals(21, harness.statProgress(second));
 		assertEquals(List.of(20, 21, 20), harness.savedProgressHistoryExceptStats(second));
-		assertEquals(List.of(21, 21, 20), harness.savedStatProgressHistory(second), "lined up, the stash's entry with the current stats");
+		assertEquals(List.of(21, 21, 20), harness.savedStatProgressHistory(second), "aligned, with the current stats in the stash's entry");
 	}
 
 	/**

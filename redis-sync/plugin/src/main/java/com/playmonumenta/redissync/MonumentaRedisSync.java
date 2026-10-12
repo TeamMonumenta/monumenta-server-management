@@ -93,7 +93,7 @@ public class MonumentaRedisSync extends JavaPlugin {
 			}
 		}
 
-		/* Without it, registering DataEventListener fails as a whole, and every player would be saved to local files */
+		/* Without these events, registering DataEventListener fails entirely and every player would be saved to local files */
 		try {
 			Class.forName("com.destroystokyo.paper.event.player.ServerStatsDataLoadEvent");
 		} catch (ClassNotFoundException ex) {

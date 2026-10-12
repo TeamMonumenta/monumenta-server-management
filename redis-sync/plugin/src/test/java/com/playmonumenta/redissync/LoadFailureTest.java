@@ -52,8 +52,8 @@ public class LoadFailureTest {
 	}
 
 	/**
-	 * Stats load as the player is constructed, before the advancements, so a failure there refuses
-	 * the login too. Played, the server's own stats would be saved over the ones in redis.
+	 * Stats load while the player is constructed, before advancements, so a failure there refuses
+	 * the login too. Otherwise the server's fallback stats would overwrite the ones in redis.
 	 */
 	@Test
 	void statsThatFailToLoadRefuseTheLogin(RedisSyncTestHarness harness) throws Exception {

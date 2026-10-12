@@ -68,10 +68,10 @@ version loads these patches at runtime with the Mixin bytecode transformation
 framework, which requires using a [fabric mod loader for paper](https://github.com/Floweynt/fabric-paper-modloader)
 as the server software. The mixin implementation is [here](https://github.com/TeamMonumenta/monumenta-mixins).
 
-Stats need a monumenta-mixins with the stats load and save events
+Stats require a version of monumenta-mixins that provides the stats load and save events
 (`ServerStatsDataLoadEvent`, `ServerStatsDataSaveEvent`); without them this plugin refuses to
-enable. Upgrade monumenta-mixins first: it works with versions of this plugin that do not handle
-stats, which leave them to the server's own files.
+enable. Upgrade monumenta-mixins first: it still works with older versions of this plugin, which
+leave stats in the server's own files.
 
 A fork of paper with these patches (and others) can be found here:
 https://github.com/TeamMonumenta/monumenta-paperfork
@@ -137,11 +137,13 @@ Player data lives in redis as per-player history lists, newest first: playerdata
 advancements, scores, stats, plugin data, content, and a history line naming who saved it. Each
 save pushes one entry onto every list.
 
-The stats history of a player who played before stats were saved in redis is shorter than the
-others, as it starts with their first save since; its entries are still the newest saves'.
+For players who played before stats were stored in redis, the stats history is shorter than the
+others, since it starts at their first save after that. Its entries still line up with the newest
+entries of the other lists.
 
-Position and world are kept per shard in a hash. How the plugin tracks a player and decides when to load and save is described in
-[ARCHITECTURE.md](ARCHITECTURE.md); this section is what other plugins can rely on, on one shard.
+Position and world are kept per shard in a hash. How the plugin tracks a player and decides when
+to load and save is described in [ARCHITECTURE.md](ARCHITECTURE.md); this section is what other
+plugins can rely on, on one shard.
 
 - **A login always loads the newest save.** If the player's previous connection here has not
   closed, or its last save has not committed, the login waits for it (up to `TIMEOUT_SECONDS`)
@@ -171,13 +173,14 @@ Position and world are kept per shard in a hash. How the plugin tracks a player 
 - **Offline edits** (`getOfflinePlayerData`, then `saveOfflinePlayerData`) are refused, returning
   false, if the player is on this shard, logging in, just leaving, or has saved since the data
   was read. A login waits for an offline edit in flight.
-- **Stats** are saved as the server has them. A player with no stats in redis loads the
-  server's own stats file, if it has one, and their first save puts it in redis. Those files are
-  per shard, so only the first shard's are kept unless they are merged into redis beforehand.
-- **Stats of players not online here** (`OfflinePlayer#getStatistic` and the like) are read from
-  redis. Changing them (`OfflinePlayer#incrementStatistic` and
-  the like) is never saved. It throws, which the server catches and logs with a stack trace
-  naming the plugin that tried; the caller itself sees no error.
+- **Stats** are saved exactly as the server provides them. A player with no stats in redis loads
+  the server's own stats file if one exists, and their first save copies it into redis. Those
+  files are per shard, so only the stats from the first shard the player joins are kept, unless
+  they are merged into redis beforehand.
+- **Stats of players not online here** (`OfflinePlayer#getStatistic` and similar) are read from
+  redis. Changes to them (`OfflinePlayer#incrementStatistic` and similar) are never saved.
+  Instead an exception is thrown, which the server catches and logs with a stack trace naming the
+  responsible plugin; the caller itself sees no error.
 - **Restoring data from before stats were saved** (a stash, rollback or offline edit with no
   stats) keeps the player's current stats.
 - **Shutdown** waits for every save and other player data write in flight before closing redis.
@@ -210,6 +213,11 @@ Position and world are kept per shard in a hash. How the plugin tracks a player 
   time the server builds their stats, which `OfflinePlayer#getStatistic` does on every call.
 - **Shutdown without monumenta-mixins.** Vanilla Paper disables plugins before it saves the
   players still online, so that save goes to disk, not redis.
+- **Server player files are never removed.** A player with no data of a given type in redis
+  (playerdata, advancements or stats) loads the server's own file for it, if one exists. This
+  plugin never writes or removes those files. After moving existing players into redis, delete the
+  world's `playerdata`, `advancements` and `stats` folders. Otherwise deleting a player's data from
+  redis brings back whatever was in those files.
 
 ## Testing
 

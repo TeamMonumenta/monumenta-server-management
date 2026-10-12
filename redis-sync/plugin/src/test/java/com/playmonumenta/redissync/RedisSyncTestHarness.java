@@ -124,8 +124,8 @@ import org.junit.jupiter.api.extension.ParameterResolver;
  *
  * <h2>Stats</h2>
  * The server holds stats as ints in its stats counter, which {@link TestVersionAdapter#getLiveStats}
- * stands in for: what the stats load handed it, or its own stats file
- * ({@link #setLocalStatsFile}) if the load handed it nothing.
+ * stands in for: whatever the stats load provided, or its own stats file
+ * ({@link #setLocalStatsFile}) if the load provided nothing.
  */
 public final class RedisSyncTestHarness implements AutoCloseable {
 	/** Long enough to cover a local redis round trip, short enough to fail fast. */
@@ -145,7 +145,7 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 	/* The harness's own connection, so pausing redis or reading what it holds never queues behind the plugin */
 	private final RedisClient mControlClient;
 	private final StatefulRedisConnection<String, String> mControlConnection;
-	/* The server's own stats files, which it reads when a stats load hands it nothing */
+	/* The server's own stats files, which it reads when a stats load provides nothing */
 	private final Map<UUID, JsonObject> mLocalStatsFiles = new ConcurrentHashMap<>();
 
 	public RedisSyncTestHarness() throws Exception {
@@ -278,7 +278,7 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 		return progress;
 	}
 
-	/** As {@link #progress}, but leaving out the stats, for players whose stats are meant to differ */
+	/** As {@link #progress}, but ignoring stats, for players whose stats are expected to differ */
 	public int progressExceptStats(Player player) {
 		JsonObject live = mAdapter.getLiveData(player);
 		int data = live.has("XpLevel") ? live.get("XpLevel").getAsInt() : -1;
@@ -339,7 +339,7 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 		return value == null ? null : value.getAsInt();
 	}
 
-	/** Gives the server a stats file of its own for this player, which it reads if a stats load hands it nothing */
+	/** Creates a local stats file for this player, which the server reads if the stats load provides nothing */
 	public void setLocalStatsFile(UUID uuid, JsonObject stats) {
 		mLocalStatsFiles.put(uuid, stats);
 	}
@@ -352,7 +352,7 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 		return loadStats(uuid);
 	}
 
-	/* The server's stats counter for a player: what the stats load hands it, or else its own stats file */
+	/* The server's stats counter for a player: whatever the stats load provides, or else its own stats file */
 	private JsonObject loadStats(UUID uuid) {
 		ServerStatsDataLoadEvent load = new ServerStatsDataLoadEvent(TestVersionAdapter.statsFile(uuid));
 		callEvent(load);
@@ -364,7 +364,7 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 		try {
 			return JsonParser.parseString(json).getAsJsonObject();
 		} catch (RuntimeException ex) {
-			/* The server logs that it cannot read them, and starts from none */
+			/* The server logs the parse failure and starts with empty stats */
 			return TestVersionAdapter.emptyStats();
 		}
 	}
@@ -384,7 +384,7 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 		List<Integer> history = savedProgressHistoryExceptStats(player);
 		List<Integer> stats = savedStatProgressHistory(player);
 		if (!history.equals(stats)) {
-			throw new AssertionError("Stats history " + stats + " is not lined up with the others " + history);
+			throw new AssertionError("Stats history " + stats + " is not aligned with the others " + history);
 		}
 		return history;
 	}

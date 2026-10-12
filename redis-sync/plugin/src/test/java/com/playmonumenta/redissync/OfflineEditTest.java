@@ -128,7 +128,7 @@ public class OfflineEditTest {
 		assertEquals(List.of(3, 3), harness.savedStatProgressHistory(player), "lined up with the other lists");
 	}
 
-	/** A player with no stats in redis gets none from an edit without them, which would pair with the wrong entries */
+	/** An edit without stats pushes no stats for a player who has none in redis, since that entry would pair with the wrong saves */
 	@Test
 	void offlineEditWithoutStatsOfAPlayerWithNonePushesNone(RedisSyncTestHarness harness) throws Exception {
 		UUID uuid = savedPlayerWithProgress(harness, 3);
