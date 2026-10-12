@@ -22,13 +22,16 @@ that nothing ever saves stale or partial data over it. Three things make that ha
 ## Data in redis
 
 Each player's data is a set of history lists, newest first: playerdata (NBT), advancements,
-scores, plugin data, content, and a history line naming who saved it. Every full save pushes one
-entry onto every list, so index *n* of every list is the same save. Rollback, stash put and
-loadFromPlayer read all lists at one index, so the lists must stay aligned. Position and world
-are kept per shard and world in a hash, outside the history.
+scores, stats, plugin data, content, and a history line naming who saved it. Every full save
+pushes one entry onto every list, so index *n* of every list is the same save. For players who
+played before stats were stored in redis, the stats list is shorter, but its index *n* still
+refers to the same save as on the other lists. Rollback, stash put and loadFromPlayer read all
+lists at one index, so the lists must stay aligned. Position and world are kept per shard and
+world in a hash, outside the history.
 
-A save is two transactions on two connections: playerdata over a connection with byte values,
-and everything else over a string connection. Each connection is FIFO, but the two are not
+A save is several transactions on two connections: playerdata over a connection with byte
+values, and everything else over a string connection (stats and advancements each get their own
+transaction, since each has its own save event). Each connection is FIFO, but the two are not
 ordered against each other.
 
 ## Components
@@ -133,8 +136,10 @@ sequenceDiagram
     P->>S: AsyncPlayerPreLoginEvent (async)
     S->>S: wait for the previous session to finish
     S->>S: expect this login, and wait for any offline edit in flight
+    P->>D: ServerStatsDataLoadEvent (UUID only)
+    D->>R: read stats, handed to the server (a failure is remembered by UUID)
     P->>D: PlayerAdvancementDataLoadEvent
-    D->>S: sessionForLoad: new session, LOADING
+    D->>S: sessionForLoad: new session, LOADING (failed, if its stats failed to load)
     D->>R: read advancements
     P->>S: PlayerLoginEvent: refuse if its session is not live, or it was refused
     Note over P: configuration phase
@@ -144,7 +149,7 @@ sequenceDiagram
     P->>S: PlayerJoinEvent
     S-->>S: next tick: PLAYING
     loop autosaves, API saves
-        P->>D: PlayerDataSaveEvent, then PlayerAdvancementDataSaveEvent
+        P->>D: PlayerDataSaveEvent, ServerStatsDataSaveEvent, PlayerAdvancementDataSaveEvent
         D->>S: sessionForSave
         D->>R: push (tracked on the session)
     end
@@ -196,6 +201,37 @@ on their own, before a datapack reload. Pushing that would put an advancements e
 matching entry on the other lists, and every index into the history after it would pair the
 wrong saves. So the session remembers that the newest advancements entry is unpaired. Further
 lone advancements saves replace it, and so does the next full save's, which pairs it again.
+
+### Stats
+
+The stats events carry only a UUID (taken from the stats file name), not a `Player`:
+
+- **Loading.** The server loads stats while constructing the player, just before loading
+  advancements, so there is no session or `Player` yet. Stats are passed to the server exactly as
+  stored in redis. If the redis read fails, the advancement load that follows fails the new
+  session. Otherwise the player would play with whatever stats the server loaded instead, and
+  those would overwrite the ones in redis. Only a session that is still loading is failed this
+  way: another plugin reading an offline player's stats can leave a failed read behind, and that
+  must not fail a playing session on a later datapack reload. Those offline reads and fake
+  players load stats the same way as logins. Stats in redis that the server cannot parse are
+  passed to it anyway, same as advancements: the server logs the error, starts with empty stats,
+  and saves those.
+- **Saving.** A full save fires the stats save between the playerdata and advancements saves.
+  The playerdata save records whether it pushed, and the stats save pushes only if it did. This
+  keeps the lists aligned without the stats save looking up the session again. A stats save with
+  no playerdata save before it for the same UUID means another plugin is changing an offline
+  player's stats. That save is cancelled and throws, so the server log names the responsible
+  plugin (the caller itself sees no error). It is refused because the player may be on another
+  shard, and the entry would not match anything on the other lists. The advancements save ends
+  the full save; if no stats save happened during it (e.g. `stats.disable-saving` is set in
+  spigot.yml), an error is logged, since the stats history is falling behind.
+
+A player with no stats in redis loads the server's own stats file if one exists, and their first
+save copies it into redis. Those files were per shard, so only the stats from the first shard the
+player joins are kept; merging every shard's files into redis beforehand is up to the operator.
+Restoring a save that has no stats (one from before stats were stored in redis: a stash, a
+rollback past the start of the stats list, or an offline edit without stats) pushes the player's
+current stats again, so the stats list stays aligned with the others.
 
 ## Session locks: transfers and handoffs
 
@@ -321,13 +357,20 @@ for a new version, run `javap -c` on the paperweight-mapped server jar (under
 `PlayerList` and the `Server*PacketListenerImpl` classes.
 
 - **Login.** AsyncPlayerPreLoginEvent fires on an async thread. Then, on the main thread, the
-  ServerPlayer is constructed, which loads advancements (PlayerAdvancementDataLoadEvent). Then
+  ServerPlayer is constructed, which loads stats (ServerStatsDataLoadEvent, from monumenta-mixins'
+  ServerStatsCounterMixin) and then advancements (PlayerAdvancementDataLoadEvent). The stats come
+  from `PlayerList.getPlayerStats`, which reuses the stats of a player already in the game with
+  the same UUID instead of loading them; pre-login has already disconnected any such player. Then
   PlayerLoginEvent fires. Then `PlayerList.disconnectAllPlayersWithProfile` kicks any player
   already in the game with the same UUID. That is too late, because the new player's
   advancements have already loaded, which is why pre-login closes an old connection itself. A
   configuration phase follows. Then `placeNewPlayer` runs: PlayerDataLoadEvent, the player
   becomes visible, then PlayerJoinEvent.
-- **Save.** `PlayerList.save` fires PlayerDataSaveEvent, then PlayerAdvancementDataSaveEvent.
+- **Save.** `PlayerList.save` fires PlayerDataSaveEvent, then ServerStatsDataSaveEvent, then
+  PlayerAdvancementDataSaveEvent. `Player#saveData` saves only the playerdata.
+- **Offline stats.** CraftOfflinePlayer's statistic methods, for a player not in the game,
+  construct a stats counter (firing the stats load), and its setters save it (firing the stats
+  save) outside any full save.
 - **Disconnect.** `PlayerList.remove` fires PlayerQuitEvent, saves the player synchronously, and
   removes them. Only after that does PlayerConnectionCloseEvent fire. So when a session ends,
   its final save has already been handed to redis.
@@ -345,4 +388,5 @@ for a new version, run `javap -c` on the paperweight-mapped server jar (under
   network has already stopped, so `onDisable` waits on every registered session.
 - **Datapack reload.** `reloadResources` saves each player's advancements on their own, reloads
   them (firing the advancement load again), then fires ServerResourcesReloadedEvent. The plugin
-  makes a full save at that event, which pairs the lone advancements entry.
+  makes a full save at that event, which pairs the lone advancements entry. Stats are not
+  touched.

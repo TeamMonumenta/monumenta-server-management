@@ -230,7 +230,7 @@ final class PlayerSession {
 
 	/* ******************* Saves ******************* */
 
-	/** A playerdata save, which pushes onto every history list but advancements, is being made; its advancements save comes next */
+	/** A playerdata save is being made. It pushes onto every history list except stats and advancements, whose saves follow it */
 	void beginPlayerdataSave() {
 		mAwaitingAdvancementsSave = true;
 		mPlayerdataSaves++;
