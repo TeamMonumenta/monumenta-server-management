@@ -7,6 +7,7 @@ import org.jetbrains.annotations.Nullable;
 
 public class ContentData {
 	private final String mId;
+	private @Nullable String mFallbackContentId;
 	private @Nullable NamespacedKey mMcfunctionOnArrival;
 	private @Nullable OptionalLocation mReturnLocation;
 	private @Nullable OptionalLocation mArrivalLocation;
@@ -21,6 +22,7 @@ public class ContentData {
 		@Nullable OptionalLocation returnLocation, @Nullable OptionalLocation arrivalLocation, JsonObject extra
 	) {
 		mId = id;
+		mFallbackContentId = null;
 		mMcfunctionOnArrival = mcfunctionOnArrival;
 		mReturnLocation = returnLocation;
 		mArrivalLocation = arrivalLocation;
@@ -30,6 +32,7 @@ public class ContentData {
 	public ContentData(@Nullable JsonObject object) {
 		if (object == null) {
 			mId = "";
+			mFallbackContentId = null;
 			mMcfunctionOnArrival = null;
 			mReturnLocation = null;
 			mArrivalLocation = null;
@@ -41,6 +44,12 @@ public class ContentData {
 			mId = idPrimitive.getAsString();
 		} else {
 			mId = "";
+		}
+
+		if (object.get("fallbackContentId") instanceof JsonPrimitive fallbackIdPrimitive && fallbackIdPrimitive.isString()) {
+			mFallbackContentId = fallbackIdPrimitive.getAsString();
+		} else {
+			mFallbackContentId = null;
 		}
 
 		if (
@@ -73,6 +82,14 @@ public class ContentData {
 
 	public String getId() {
 		return mId;
+	}
+
+	public @Nullable String getFallbackContentId() {
+		return mFallbackContentId;
+	}
+
+	public void setFallbackContentId(@Nullable String fallbackContentId) {
+		mFallbackContentId = fallbackContentId;
 	}
 
 	public @Nullable NamespacedKey getMcfunctionOnArrival() {
@@ -114,6 +131,10 @@ public class ContentData {
 		JsonObject object = new JsonObject();
 
 		object.addProperty("id", mId);
+
+		if (mFallbackContentId != null) {
+			object.addProperty("fallbackContentId", mFallbackContentId);
+		}
 
 		if (mMcfunctionOnArrival != null) {
 			object.addProperty("mcfunctionOnArrival", mMcfunctionOnArrival.toString());
