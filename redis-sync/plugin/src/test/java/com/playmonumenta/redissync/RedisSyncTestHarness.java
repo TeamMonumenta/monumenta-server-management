@@ -125,7 +125,8 @@ import org.junit.jupiter.api.extension.ParameterResolver;
  * <h2>Stats</h2>
  * The server holds stats as ints in its stats counter, which {@link TestVersionAdapter#getLiveStats}
  * stands in for: whatever the stats load provided, or its own stats file
- * ({@link #setLocalStatsFile}) if the load provided nothing.
+ * ({@link #setLocalStatsFile}) if the load provided nothing. {@link #incrementStat} counts as the
+ * server does, stopping at Integer.MAX_VALUE.
  */
 public final class RedisSyncTestHarness implements AutoCloseable {
 	/** Long enough to cover a local redis round trip, short enough to fail fast. */
@@ -295,13 +296,14 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 
 	/** The player's progress as their live stats have it, or -1 if they do not have it */
 	public int statProgress(Player player) {
-		Integer stat = statIn(mAdapter.getLiveStats(player), CUSTOM_STATS, PROGRESS_STAT);
-		return stat == null ? -1 : stat;
+		Long stat = statIn(mAdapter.getLiveStats(player), CUSTOM_STATS, PROGRESS_STAT);
+		return stat == null ? -1 : stat.intValue();
 	}
 
 	/** A stat in the player's live stats, as the server holds it, or null if it has none */
 	public @Nullable Integer stat(Player player, String namespace, String stat) {
-		return statIn(mAdapter.getLiveStats(player), namespace, stat);
+		Long value = statIn(mAdapter.getLiveStats(player), namespace, stat);
+		return value == null ? null : value.intValue();
 	}
 
 	public void setStat(Player player, String namespace, String stat, int value) {
@@ -309,7 +311,7 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 	}
 
 	/** Sets a stat in stats JSON */
-	public static void putStat(JsonObject statsJson, String namespace, String stat, int value) {
+	public static void putStat(JsonObject statsJson, String namespace, String stat, long value) {
 		JsonObject stats = statsJson.getAsJsonObject("stats");
 		if (!stats.has(namespace)) {
 			stats.add(namespace, new JsonObject());
@@ -317,26 +319,32 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 		stats.getAsJsonObject(namespace).addProperty(stat, value);
 	}
 
+	/** Counts a stat up as the server does, which stops at Integer.MAX_VALUE */
+	public void incrementStat(Player player, String namespace, String stat, int amount) {
+		Integer current = stat(player, namespace, stat);
+		setStat(player, namespace, stat, (int) Math.min((long) (current == null ? 0 : current) + amount, Integer.MAX_VALUE));
+	}
+
 	/** A stat in the player's newest committed stats save, or null if it has none */
-	public @Nullable Integer savedStat(Player player, String namespace, String stat) throws Exception {
+	public @Nullable Long savedStat(Player player, String namespace, String stat) throws Exception {
 		String saved = redisListEntry(MonumentaRedisSyncAPI.getRedisStatsPath(player), 0);
 		return saved == null ? null : statIn(JsonParser.parseString(saved).getAsJsonObject(), namespace, stat);
 	}
 
 	/** Stats JSON holding just the given stat, as the server would write it */
-	public static JsonObject statsWith(String namespace, String stat, int value) {
+	public static JsonObject statsWith(String namespace, String stat, long value) {
 		JsonObject stats = TestVersionAdapter.emptyStats();
 		putStat(stats, namespace, stat, value);
 		return stats;
 	}
 
-	public static @Nullable Integer statIn(JsonObject statsJson, String namespace, String stat) {
+	public static @Nullable Long statIn(JsonObject statsJson, String namespace, String stat) {
 		JsonElement stats = statsJson.get("stats");
 		if (stats == null || !stats.getAsJsonObject().has(namespace)) {
 			return null;
 		}
 		JsonElement value = stats.getAsJsonObject().getAsJsonObject(namespace).get(stat);
-		return value == null ? null : value.getAsInt();
+		return value == null ? null : value.getAsLong();
 	}
 
 	/** Creates a local stats file for this player, which the server reads if the stats load provides nothing */
@@ -395,8 +403,8 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 			.get(AWAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 		List<Integer> history = new ArrayList<>();
 		for (String entry : saved) {
-			Integer stat = statIn(JsonParser.parseString(entry).getAsJsonObject(), CUSTOM_STATS, PROGRESS_STAT);
-			history.add(stat == null ? -1 : stat);
+			Long stat = statIn(JsonParser.parseString(entry).getAsJsonObject(), CUSTOM_STATS, PROGRESS_STAT);
+			history.add(stat == null ? -1 : stat.intValue());
 		}
 		return history;
 	}

@@ -27,7 +27,8 @@ little rough around the edges, missing some nice-to-have features.
 
 Here's a list of currently supported things:
 
-- Save playerdata, advancements, stats and scoreboard data to/from Redis
+- Save playerdata, advancements, stats (as 64-bit values) and scoreboard data
+  to/from Redis
 - Function & command block accessible /transferserver command to move players
   between servers on the same bungeecord network
 - /playerhistory to inspect a player's save history
@@ -173,14 +174,18 @@ plugins can rely on, on one shard.
 - **Offline edits** (`getOfflinePlayerData`, then `saveOfflinePlayerData`) are refused, returning
   false, if the player is on this shard, logging in, just leaving, or has saved since the data
   was read. A login waits for an offline edit in flight.
-- **Stats** are saved exactly as the server provides them. A player with no stats in redis loads
-  the server's own stats file if one exists, and their first save copies it into redis. Those
-  files are per shard, so only the stats from the first shard the player joins are kept, unless
-  they are merged into redis beforehand.
+- **Stats** are stored in redis as 64-bit values, though the server only holds ints. A login gives
+  the server each stat wrapped below 2^30 (time_since stats are clamped instead), and each save
+  adds what the server counted since. So the server, and `Player#getStatistic`, see wrapped values;
+  the real ones are in redis. A player with no stats in redis loads the server's own stats file if
+  one exists, and their first save copies it into redis. Those files are per shard, so only the
+  stats from the first shard the player joins are kept, unless they are merged into redis
+  beforehand. Changes are counted as deltas: `Player#setStatistic` to a lower value, on a stat at
+  or past 2^30, subtracts rather than sets.
 - **Stats of players not online here** (`OfflinePlayer#getStatistic` and similar) are read from
-  redis. Changes to them (`OfflinePlayer#incrementStatistic` and similar) are never saved.
-  Instead an exception is thrown, which the server catches and logs with a stack trace naming the
-  responsible plugin; the caller itself sees no error.
+  redis, clamped to what an int can hold. Changes to them (`OfflinePlayer#incrementStatistic` and
+  similar) are never saved. Instead an exception is thrown, which the server catches and logs with
+  a stack trace naming the responsible plugin; the caller itself sees no error.
 - **Restoring data from before stats were saved** (a stash, rollback or offline edit with no
   stats) keeps the player's current stats.
 - **Shutdown** waits for every save and other player data write in flight before closing redis.
@@ -218,6 +223,8 @@ plugins can rely on, on one shard.
   plugin never writes or removes those files. After moving existing players into redis, delete the
   world's `playerdata`, `advancements` and `stats` folders. Otherwise deleting a player's data from
   redis brings back whatever was in those files.
+- **A stat counted past 2^31 - 2^30 in one session** stops at Integer.MAX_VALUE, as the server
+  stops counting there, and the rest of that session's count is lost.
 
 ## Testing
 
@@ -273,7 +280,8 @@ constructors and `MonumentaRedisSync.registerPlayerDataListeners`.
 | `DataHandoffTest` | stash get, rollback and loadFromPlayer |
 | `ShutdownTest` | everything in flight at shutdown commits: final saves, the saves of players still online, other API writes, a rollback mid-write |
 | `OfflineEditTest` | offline edits never bury newer progress |
-| `StatsTest` | offline stats, fake players, players with no stats in redis, stats saves outside a full save |
+| `StatsTest` | 64-bit stats across loads and saves, offline stats, fake players, players with no stats in redis, stats saves outside a full save |
+| `PlayerStatsTest` | the 64-bit stats arithmetic, without a server |
 | `LifecycleFuzzTest` | random sequences of all of the above, checked against a model of the save history |
 
 `LifecycleFuzzTest` runs 8 fixed seeds by default. Run more with
