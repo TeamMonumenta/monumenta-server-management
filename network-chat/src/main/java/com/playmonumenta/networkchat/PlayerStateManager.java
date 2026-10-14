@@ -425,7 +425,7 @@ public class PlayerStateManager implements Listener {
 						}
 					}
 				}.runTaskLater(NetworkChatPlugin.getInstance(), 20 * PlayerChatHistory.MAX_OFFLINE_HISTORY_SECONDS);
-				MMLog.info("Got player chat history successfully");
+				MMLog.debug("Got player chat history successfully");
 			} catch (Exception e) {
 				MMLog.severe("Got " + PlayerChatHistory.NETWORK_CHAT_PLAYER_CHAT_HISTORY + " with invalid data", e);
 			}
