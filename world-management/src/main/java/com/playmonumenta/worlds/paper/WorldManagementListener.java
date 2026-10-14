@@ -309,6 +309,12 @@ public class WorldManagementListener implements Listener {
 		ContentData contentData = event.getContent();
 		Set<Player> others = event.getOthers();
 
+		Map<String, ContentInfo> remoteInfo = WorldManagementPlugin.getRemoteContentInfoByContent(contentData.getId());
+		for (ContentInfo info : remoteInfo.values()) {
+			contentData.setFallbackContentId(info.getFallbackContentName());
+			break;
+		}
+
 		MonumentaRedisSyncAPI.savePlayerContent(player.getUniqueId(), contentData);
 		for (Player other : others) {
 			MonumentaRedisSyncAPI.savePlayerContent(other.getUniqueId(), contentData);
