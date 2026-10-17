@@ -181,11 +181,13 @@ public class ItemHoverReplacement extends InlineReplacement {
 
 				ItemStack displayedItem = new ItemStack(item.getType());
 				ItemMeta meta = displayedItem.getItemMeta();
-				// append to empty italic=false component because otherwise brackets around name show in italics
-				meta.displayName(Component.empty().decoration(TextDecoration.ITALIC, false).append(item.displayName()));
-				meta.lore(lines);
-				meta.addItemFlags(ItemFlag.values());
-				displayedItem.setItemMeta(meta);
+				if (meta != null) {
+					// append name to empty italic=false component because otherwise brackets around name show in italics
+					meta.displayName(Component.empty().decoration(TextDecoration.ITALIC, false).append(item.displayName()));
+					meta.lore(lines);
+					meta.addItemFlags(ItemFlag.values());
+					displayedItem.setItemMeta(meta);
+				}
 				return item.displayName().hoverEvent(displayedItem);
 		    }
 		}
