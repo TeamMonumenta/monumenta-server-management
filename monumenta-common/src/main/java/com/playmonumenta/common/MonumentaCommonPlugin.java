@@ -65,7 +65,6 @@ public class MonumentaCommonPlugin extends JavaPlugin {
 		MMLogPaper.registerCommand(com.playmonumenta.common.utils.MMLog.getLog());
 
 		INSTANCE = this;
-		DateUtils.refreshTime();
 		PluginManager manager = getServer().getPluginManager();
 		manager.registerEvents(new RedisSyncListener(), this);
 		manager.registerEvents(new WorldListener(this), this);
@@ -73,6 +72,7 @@ public class MonumentaCommonPlugin extends JavaPlugin {
 		mZoneManager = ZoneManager.getInstance();
 		mZoneManager.doReload(true);
 
+		DateUtils.refreshTime();
 		TimeWarpManager.load();
 
 		/* Load the config 1 tick later to let other plugins load */
