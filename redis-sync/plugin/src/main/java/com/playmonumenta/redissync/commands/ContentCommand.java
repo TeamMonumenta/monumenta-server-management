@@ -54,15 +54,33 @@ public class ContentCommand {
 
 		new CommandAPICommand("contentdebug")
 			.withPermission(PERMISSION)
-			.withArguments(new EntitySelectorArgument.OnePlayer("player"))
+			.withOptionalArguments(new EntitySelectorArgument.OnePlayer("player"))
 			.executesNative((sender, args) -> {
+				CommandSender caller = sender.getCaller();
 				CommandSender callee = sender.getCallee();
-				Player player = Objects.requireNonNull(args.getUnchecked("player"));
+				Player player = args.getUnchecked("player");
+				if (player == null) {
+					if (callee instanceof Player calleePlayer) {
+						player = calleePlayer;
+					} else {
+						throw CommandAPI.failWithString("Either the player argument must be specified, or the command must run as a player");
+					}
+				}
 
 				String content = MonumentaRedisSyncAPI.getPlayerContentData(player).getId();
-				callee.sendMessage(Component.text("Player's content is ", NamedTextColor.BLUE)
+				caller.sendMessage(Component.text("Player's content is ", NamedTextColor.BLUE)
 					.append(Component.text(content.isEmpty() ? "not set" : content, NamedTextColor.GREEN)));
 			})
+			.register();
+
+		new CommandAPICommand("contenttest")
+			.withPermission(PERMISSION)
+			.withArguments(
+				new StringArgument("content")
+					.replaceSuggestions(ArgumentSuggestions.stringCollection(info -> MonumentaRedisSyncAPI.availableContentIds()))
+			)
+			.withOptionalArguments(new EntitySelectorArgument.OnePlayer("player"))
+			.executesNative(ContentCommand::executeTest)
 			.register();
 	}
 
@@ -96,6 +114,20 @@ public class ContentCommand {
 			data.setMcfunctionOnArrival(optionals.onArrival);
 		}
 		MonumentaRedisSyncAPI.requestPlayerContentDataChange(player, others, data);
+	}
+
+	private static int executeTest(NativeProxyCommandSender sender, CommandArguments args) throws WrapperCommandSyntaxException {
+		String content = Objects.requireNonNull(args.getUnchecked("content"));
+		Player player = args.getUnchecked("player");
+
+		if (player == null) {
+			if (!(sender.getCallee() instanceof Player callee)) {
+				throw CommandAPI.failWithString("Player must be specified, or command must be run as a player");
+			}
+			player = callee;
+		}
+
+		return MonumentaRedisSyncAPI.getPlayerContentData(player).getId().equals(content) ? 1 : 0;
 	}
 
 	private static void restrictedArgumentsCheck() throws WrapperCommandSyntaxException {
