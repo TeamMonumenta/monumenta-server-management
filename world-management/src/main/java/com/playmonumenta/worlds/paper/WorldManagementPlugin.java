@@ -37,6 +37,7 @@ public class WorldManagementPlugin extends JavaPlugin {
 	private static @Nullable WorldManagementPlugin INSTANCE = null;
 
 	private static final boolean FORCE_DISABLE_CONTENT_SORTING;
+	private static final boolean DISABLE_WORLD_PREGEN;
 
 	static {
 		String envForceDisableContentSorting = System.getenv("FORCE_DISABLE_CONTENT_SORTING");
@@ -50,6 +51,19 @@ public class WorldManagementPlugin extends JavaPlugin {
 				val = false;
 			}
 			FORCE_DISABLE_CONTENT_SORTING = val;
+		}
+
+		String envDisableWorldPregen = System.getenv("DISABLE_WORLD_PREGEN");
+		if (envDisableWorldPregen == null || envDisableWorldPregen.isEmpty()) {
+			DISABLE_WORLD_PREGEN = false;
+		} else {
+			boolean val;
+			try {
+				val = Integer.parseInt(envDisableWorldPregen) != 0;
+			} catch (NumberFormatException ignored) {
+				val = false;
+			}
+			DISABLE_WORLD_PREGEN = val;
 		}
 	}
 
@@ -358,6 +372,10 @@ public class WorldManagementPlugin extends JavaPlugin {
 	}
 
 	public static Map<String, Integer> getPregeneratedInstanceLimits() {
+		if (DISABLE_WORLD_PREGEN) {
+			return Map.of();
+		}
+
 		// TODO Expose an unmodifiable map so the world generator can handle this part
 		Map<String, Integer> templatePregenLimits = new HashMap<>();
 		for (ContentInfo contentInfo : mContentInfoMap.values()) {
