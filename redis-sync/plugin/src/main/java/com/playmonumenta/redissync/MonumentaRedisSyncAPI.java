@@ -61,6 +61,8 @@ public class MonumentaRedisSyncAPI {
 		private String mContent;
 		private String mPluginData;
 		private String mHistory;
+		/* Null if the player has no stats saved yet */
+		private @Nullable String mStats = null;
 		/* Whether this was read from redis, and the newest history entry as it was then (null if there was none) */
 		private final boolean mWasRead;
 		private final @Nullable String mReadHistory;
@@ -137,6 +139,14 @@ public class MonumentaRedisSyncAPI {
 
 		public void setHistory(String history) {
 			this.mHistory = history;
+		}
+
+		public @Nullable String getStats() {
+			return mStats;
+		}
+
+		public void setStats(@Nullable String stats) {
+			this.mStats = stats;
 		}
 	}
 
@@ -344,6 +354,7 @@ public class MonumentaRedisSyncAPI {
 				conn.lindex(getRedisPluginDataPath(player), 0);
 				conn.lindex(getRedisContentPath(player), 0);
 				conn.lindex(getRedisHistoryPath(player), 0);
+				conn.lindex(getRedisStatsPath(player), 0);
 			}).whenComplete((readResult, readEx) -> {
 				if (readEx != null) {
 					MMLog.severe("Got exception while reading data for stash put for player '" + player.getName() + "'", readEx);
@@ -357,6 +368,8 @@ public class MonumentaRedisSyncAPI {
 				byte[] plugin = readResult.get(3);
 				byte[] content = Objects.requireNonNullElse(readResult.get(4), DEFAULT_CONTENT_BYTES);
 				byte[] history = readResult.get(5);
+				/* Stats are optional - players may not have any saved yet */
+				byte[] stats = readResult.get(6);
 
 				if (data == null || advance == null || score == null || plugin == null || history == null) {
 					MMLog.severe("Failed to retrieve player's data to stash for player '" + player.getName() + "'");
@@ -372,13 +385,19 @@ public class MonumentaRedisSyncAPI {
 					conn.hset(getStashPath(), saveName + "-plugins", plugin);
 					conn.hset(getStashPath(), saveName + "-content", content);
 					conn.hset(getStashPath(), saveName + "-history", history);
+					if (stats != null) {
+						conn.hset(getStashPath(), saveName + "-stats", stats);
+					} else {
+						/* Don't leave stats from an older stash with the same name */
+						conn.hdel(getStashPath(), saveName + "-stats");
+					}
 				})).whenComplete((writeResult, writeEx) -> {
 					if (writeEx != null) {
 						MMLog.severe("Got exception while committing stash data for player '" + player.getName() + "'", writeEx);
 						player.sendMessage(Component.text("Failed to save stash data: " + writeEx.getMessage(), NamedTextColor.RED));
 						return;
 					}
-					player.sendMessage(Component.text("Data, scores, advancements saved to stash successfully", NamedTextColor.GOLD));
+					player.sendMessage(Component.text("Data, scores, advancements, stats saved to stash successfully", NamedTextColor.GOLD));
 				});
 			});
 		}, true);
@@ -401,15 +420,17 @@ public class MonumentaRedisSyncAPI {
 				conn.hget(getStashPath(), saveName + "-plugins");
 				conn.hget(getStashPath(), saveName + "-content");
 				conn.hget(getStashPath(), saveName + "-history");
+				conn.hget(getStashPath(), saveName + "-stats");
+				conn.lindex(getRedisStatsPath(player), 0);
 			}, missing, "stash@", null, Component.text("Stash data loaded successfully"));
 		});
 	}
 
 	/**
-	 * The end of a data handoff: reads one saved state (the six fields {@code read} queues, in order
-	 * data, advancements, scores, plugin data, content, history), pushes it as the locked player's
-	 * newest save, and kicks them so they rejoin with it. Any failure is reported to {@code notify};
-	 * one before the write releases the lock.
+	 * The end of a data handoff: reads one saved state (the eight fields {@code read} queues, in order
+	 * data, advancements, scores, plugin data, content, history, stats, then the locked player's
+	 * current stats), pushes it as the locked player's newest save, and kicks them so they rejoin
+	 * with it. Any failure is reported to {@code notify}; one before the write releases the lock.
 	 *
 	 * @return the redis work, complete once the state is written or the handoff has failed
 	 */
@@ -431,6 +452,11 @@ public class MonumentaRedisSyncAPI {
 			byte[] plugin = readResult.get(3);
 			byte[] content = Objects.requireNonNullElse(readResult.get(4), DEFAULT_CONTENT_BYTES);
 			byte[] historyRaw = readResult.get(5);
+			/*
+			 * Stats are optional - older saves/stashes don't have them, in which case current stats are kept.
+			 * Current stats are pushed again so the stats list stays lined up with the others for later rollbacks
+			 */
+			byte[] stats = readResult.get(6) != null ? readResult.get(6) : readResult.get(7);
 
 			/* Make sure there's actually data */
 			if (data == null || advance == null || score == null || plugin == null || historyRaw == null) {
@@ -459,6 +485,9 @@ public class MonumentaRedisSyncAPI {
 					conn.lpush(getRedisPluginDataPath(to), plugin);
 					conn.lpush(getRedisContentPath(to), content);
 					conn.lpush(getRedisHistoryPath(to), historyOut);
+					if (stats != null) {
+						conn.lpush(getRedisStatsPath(to), stats);
+					}
 				});
 			} catch (RuntimeException ex) {
 				write = CompletableFuture.failedFuture(ex);
@@ -632,6 +661,8 @@ public class MonumentaRedisSyncAPI {
 			conn.lindex(getRedisPluginDataPath(player), rollbackIndex);
 			conn.lindex(getRedisContentPath(player), rollbackIndex);
 			conn.lindex(getRedisHistoryPath(player), rollbackIndex);
+			conn.lindex(getRedisStatsPath(player), rollbackIndex);
+			conn.lindex(getRedisStatsPath(player), 0);
 		}, Component.text("Failed to retrieve player's rollback data", NamedTextColor.RED), "rollback@",
 			Component.text("Player " + player.getName() + " rolled back successfully", NamedTextColor.GREEN),
 			Component.text("Your player data has been rolled back, and you can now re-join the server")));
@@ -649,6 +680,8 @@ public class MonumentaRedisSyncAPI {
 			conn.lindex(getRedisPluginDataPath(loadFrom), index);
 			conn.lindex(getRedisContentPath(loadFrom), index);
 			conn.lindex(getRedisHistoryPath(loadFrom), index);
+			conn.lindex(getRedisStatsPath(loadFrom), index);
+			conn.lindex(getRedisStatsPath(loadTo), 0);
 		}, Component.text("Failed to retrieve player's data to load", NamedTextColor.RED), "loadfrom@" + loadFrom.getName() + "@",
 			null, Component.text("Data loaded from player " + loadFrom.getName() + " at index " + index + " and you can now re-join the server")));
 	}
@@ -852,6 +885,14 @@ public class MonumentaRedisSyncAPI {
 
 	public static String getRedisScoresPath(UUID uuid) {
 		return String.format("%s:playerdata:%s:scores", CommonConfig.getServerDomain(), uuid.toString());
+	}
+
+	public static String getRedisStatsPath(Player player) {
+		return getRedisStatsPath(player.getUniqueId());
+	}
+
+	public static String getRedisStatsPath(UUID uuid) {
+		return String.format("%s:playerdata:%s:stats", CommonConfig.getServerDomain(), uuid.toString());
 	}
 
 	public static String getStashPath() {
@@ -1192,7 +1233,8 @@ public class MonumentaRedisSyncAPI {
 	/** Future returns non-null if successfully loaded data, null on error */
 	@Nullable
 	private static RedisPlayerData transformPlayerData(UUID uuid,
-		byte[] data, byte[] advancementsBytes, byte[] scoresBytes, byte[] pluginDataBytes, byte[] contentBytes, byte[] historyBytes) {
+		byte[] data, byte[] advancementsBytes, byte[] scoresBytes, byte[] pluginDataBytes, byte[] contentBytes, byte[] historyBytes,
+		byte[] statsBytes) {
 		if (data == null) {
 			MMLog.warning("Failed to retrieve player data; likely player didn't make it past the tutorial");
 			return null;
@@ -1240,8 +1282,13 @@ public class MonumentaRedisSyncAPI {
 				history = new String(historyBytes, StandardCharsets.UTF_8);
 			}
 
-			return new RedisPlayerData(uuid, DataEventListener.getAdapter().retrieveSaveData(data, new JsonObject()), advancements, scores, pluginData, content, history,
+			RedisPlayerData playerData = new RedisPlayerData(uuid, DataEventListener.getAdapter().retrieveSaveData(data, new JsonObject()), advancements, scores, pluginData, content, history,
 				true, historyBytes == null ? null : history);
+			/* Stats are optional - players may not have any saved yet */
+			if (statsBytes != null) {
+				playerData.setStats(new String(statsBytes, StandardCharsets.UTF_8));
+			}
+			return playerData;
 		} catch (Exception e) {
 			MMLog.severe("Failed to parse player data", e);
 			return null;
@@ -1261,8 +1308,9 @@ public class MonumentaRedisSyncAPI {
 			conn.lindex(getRedisPluginDataPath(uuid), 0);
 			conn.lindex(getRedisContentPath(uuid), 0);
 			conn.lindex(getRedisHistoryPath(uuid), 0);
+			conn.lindex(getRedisStatsPath(uuid), 0);
 		}).thenApply(result -> transformPlayerData(uuid,
-			result.get(0), result.get(1), result.get(2), result.get(3), result.get(4), result.get(5)));
+			result.get(0), result.get(1), result.get(2), result.get(3), result.get(4), result.get(5), result.get(6)));
 	}
 
 	/**
@@ -1309,14 +1357,18 @@ public class MonumentaRedisSyncAPI {
 	/*
 	 * Pushes an offline write onto every history list, but only if the newest history entry is still
 	 * the one expected. The check and push are one step, so nothing can save in between.
-	 * KEYS: data, advancements, scores, plugin data, content, history. ARGV 1-6: the values; 7: "any",
-	 * "none" (the history must be empty) or "is" (it must be ARGV 8).
+	 * KEYS: data, advancements, scores, plugin data, content, history, stats. ARGV 1-6: the values;
+	 * 7: "any", "none" (the history must be empty) or "is" (it must be ARGV 8); 9: the stats, or empty
+	 * to push the current stats again (if there are any), keeping the stats list lined up.
 	 */
 	private static final String OFFLINE_WRITE_SCRIPT = """
 		local newest = redis.call('LINDEX', KEYS[6], 0)
 		if ARGV[7] == 'none' and newest then return 0 end
 		if ARGV[7] == 'is' and newest ~= ARGV[8] then return 0 end
+		local stats = ARGV[9]
+		if stats == '' then stats = redis.call('LINDEX', KEYS[7], 0) end
 		for i = 1, 6 do redis.call('LPUSH', KEYS[i], ARGV[i]) end
+		if stats then redis.call('LPUSH', KEYS[7], stats) end
 		return 1
 		""";
 
@@ -1350,10 +1402,11 @@ public class MonumentaRedisSyncAPI {
 			try (RedisAPI.BorrowedCommands<String, byte[]> conn = RedisAPI.borrowStringBytes()) {
 				written = conn.eval(OFFLINE_WRITE_SCRIPT, ScriptOutputType.INTEGER,
 					new String[] {getRedisDataPath(uuid), getRedisAdvancementsPath(uuid), getRedisScoresPath(uuid),
-						getRedisPluginDataPath(uuid), getRedisContentPath(uuid), getRedisHistoryPath(uuid)},
+						getRedisPluginDataPath(uuid), getRedisContentPath(uuid), getRedisHistoryPath(uuid), getRedisStatsPath(uuid)},
 					splitData.getData(), data.getAdvancements().getBytes(StandardCharsets.UTF_8), data.getScores().getBytes(StandardCharsets.UTF_8),
 					data.getPluginData().getBytes(StandardCharsets.UTF_8), data.getContent().getBytes(StandardCharsets.UTF_8),
-					history.getBytes(StandardCharsets.UTF_8), mode.getBytes(StandardCharsets.UTF_8), expected);
+					history.getBytes(StandardCharsets.UTF_8), mode.getBytes(StandardCharsets.UTF_8), expected,
+					Objects.requireNonNullElse(data.getStats(), "").getBytes(StandardCharsets.UTF_8));
 			}
 			written.toCompletableFuture().whenComplete((pushed, ex) -> {
 				if (ex != null) {
