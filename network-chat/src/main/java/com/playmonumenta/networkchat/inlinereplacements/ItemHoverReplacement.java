@@ -10,8 +10,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.JoinConfiguration;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
@@ -66,7 +66,6 @@ public class ItemHoverReplacement extends InlineReplacement {
 		    ItemStack item = isMainHand ? player.getInventory().getItemInMainHand() : player.getInventory().getItemInOffHand();
 			if (!BANNED_MATERIALS.contains(item.getType())) {
 				List<Component> lines = new ArrayList<>();
-				lines.add(item.displayName());
 
 
 				if (item.hasItemMeta()) {
@@ -180,7 +179,16 @@ public class ItemHoverReplacement extends InlineReplacement {
 					}
 				}
 
-				return item.displayName().hoverEvent(Component.join(JoinConfiguration.newlines(), lines));
+				ItemStack displayedItem = new ItemStack(item.getType());
+				ItemMeta meta = displayedItem.getItemMeta();
+				if (meta != null) {
+					// append name to empty italic=false component because otherwise brackets around name show in italics
+					meta.displayName(Component.empty().decoration(TextDecoration.ITALIC, false).append(item.displayName()));
+					meta.lore(lines);
+					meta.addItemFlags(ItemFlag.values());
+					displayedItem.setItemMeta(meta);
+				}
+				return item.displayName().hoverEvent(displayedItem);
 		    }
 		}
 		return Component.text(isMainHand ? "<mainhand>" : "<offhand>");
