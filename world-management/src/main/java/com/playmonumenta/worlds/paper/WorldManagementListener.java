@@ -199,6 +199,11 @@ public class WorldManagementListener implements Listener {
 		}
 
 		ContentData contentData = MonumentaRedisSyncAPI.getPlayerContentData(player);
+		if (WorldManagementPlugin.shouldSetDefaultContent() && contentData.getId().isEmpty()) {
+			contentData = new ContentData(info.getContentName());
+			// Saves as-is, doesn't create a cycle
+			MonumentaRedisSyncAPI.savePlayerContent(player.getUniqueId(), contentData);
+		}
 		World expectedContentWorld;
 		try {
 			expectedContentWorld = getSortWorld(player, info);
@@ -206,7 +211,7 @@ public class WorldManagementListener implements Listener {
 			expectedContentWorld = null;
 		}
 		boolean processContentData = (
-			WorldManagementPlugin.isSortByContent() && contentData != null && contentData.getId().equals(info.getContentName()) &&
+			WorldManagementPlugin.isSortByContent() && contentData.getId().equals(info.getContentName()) &&
 			expectedContentWorld != null && expectedContentWorld.getName().equals(player.getWorld().getName())
 		);
 		if (processContentData) {

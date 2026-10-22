@@ -36,6 +36,38 @@ import org.jetbrains.annotations.Nullable;
 public class WorldManagementPlugin extends JavaPlugin {
 	private static @Nullable WorldManagementPlugin INSTANCE = null;
 
+	private static final boolean FORCE_DISABLE_CONTENT_SORTING;
+	private static final boolean DISABLE_WORLD_PREGEN;
+
+	static {
+		String envForceDisableContentSorting = System.getenv("FORCE_DISABLE_CONTENT_SORTING");
+		if (envForceDisableContentSorting == null || envForceDisableContentSorting.isEmpty()) {
+			FORCE_DISABLE_CONTENT_SORTING = false;
+		} else {
+			boolean val;
+			try {
+				val = Integer.parseInt(envForceDisableContentSorting) != 0;
+			} catch (NumberFormatException ignored) {
+				val = false;
+			}
+			FORCE_DISABLE_CONTENT_SORTING = val;
+		}
+
+		String envDisableWorldPregen = System.getenv("DISABLE_WORLD_PREGEN");
+		if (envDisableWorldPregen == null || envDisableWorldPregen.isEmpty()) {
+			DISABLE_WORLD_PREGEN = false;
+		} else {
+			boolean val;
+			try {
+				val = Integer.parseInt(envDisableWorldPregen) != 0;
+			} catch (NumberFormatException ignored) {
+				val = false;
+			}
+			DISABLE_WORLD_PREGEN = val;
+		}
+	}
+
+	private static boolean mSetDefaultContent = true;
 	private static boolean mSortWorldByContent = false;
 	private static boolean mSortWorldByScoreOnJoin = false;
 	private static boolean mSortWorldByScoreOnRespawn = false;
@@ -52,6 +84,9 @@ public class WorldManagementPlugin extends JavaPlugin {
 	@Override
 	public void onLoad() {
 		MMLog.init(getName());
+		MMLog.info("# Environmental variables:");
+		printEnvVar("FORCE_DISABLE_CONTENT_SORTING", FORCE_DISABLE_CONTENT_SORTING);
+		MMLog.info("# End of environmental variables");
 		WorldStorageAdapters.load();
 		if (WorldCopyTestHarness.isEnabled()) {
 			WorldCopyTestHarness.runAndExit(); // never returns
@@ -126,7 +161,18 @@ public class WorldManagementPlugin extends JavaPlugin {
 			}
 		}
 
+		mSetDefaultContent = config.getBoolean("set-default-content", mSetDefaultContent);
+		if (FORCE_DISABLE_CONTENT_SORTING) {
+			MMLog.info("# Forced to false by environmental variable FORCE_DISABLE_CONTENT_SORTING");
+			mSetDefaultContent = false;
+		}
+		printConfig("set-default-content", mSetDefaultContent);
+
 		mSortWorldByContent = config.getBoolean("sort-world-by-content", mSortWorldByContent);
+		if (FORCE_DISABLE_CONTENT_SORTING) {
+			MMLog.info("# Forced to false by environmental variable FORCE_DISABLE_CONTENT_SORTING");
+			mSortWorldByContent = false;
+		}
 		printConfig("sort-world-by-content", mSortWorldByContent);
 
 		mSortWorldByScoreOnJoin = config.getBoolean("sort-world-by-score-on-join", mSortWorldByScoreOnJoin);
@@ -160,8 +206,19 @@ public class WorldManagementPlugin extends JavaPlugin {
 		MMLog.info(configKey + ":");
 	}
 
+	protected <T> void printEnvVar(String varKey, @Nullable T value) {
+		if (value == null) {
+			MMLog.info("# " + varKey + " not set");
+		}
+		MMLog.info(varKey + "=" + value);
+	}
+
 	protected <T> void printConfig(String configKey, @Nullable T value) {
 		MMLog.info(configKey + "=" + (value == null ? "null" : value));
+	}
+
+	public static boolean shouldSetDefaultContent() {
+		return mSetDefaultContent;
 	}
 
 	public static boolean isSortByContent() {
@@ -315,6 +372,10 @@ public class WorldManagementPlugin extends JavaPlugin {
 	}
 
 	public static Map<String, Integer> getPregeneratedInstanceLimits() {
+		if (DISABLE_WORLD_PREGEN) {
+			return Map.of();
+		}
+
 		// TODO Expose an unmodifiable map so the world generator can handle this part
 		Map<String, Integer> templatePregenLimits = new HashMap<>();
 		for (ContentInfo contentInfo : mContentInfoMap.values()) {
