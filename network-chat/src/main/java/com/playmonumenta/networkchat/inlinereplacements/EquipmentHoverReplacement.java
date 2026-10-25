@@ -1,5 +1,7 @@
 package com.playmonumenta.networkchat.inlinereplacements;
 
+import com.playmonumenta.networkchat.utils.MMLog;
+import com.playmonumenta.networkchat.utils.MessagingUtils;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -11,6 +13,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.intellij.lang.annotations.RegExp;
 
@@ -54,17 +57,24 @@ public class EquipmentHoverReplacement extends InlineReplacement {
 				) {
 					List<Component> lines = new ArrayList<>();
 					lines.add(Component.text(player.getName() + "'s Equipment", NamedTextColor.WHITE, TextDecoration.BOLD));
-					lines.add(inv.getHelmet() != null ? inv.getHelmet().displayName() : Component.text("No Helmet", NamedTextColor.GRAY));
-					lines.add(inv.getChestplate() != null ? inv.getChestplate().displayName() : Component.text("No Chestplate", NamedTextColor.GRAY));
-					lines.add(inv.getLeggings() != null ? inv.getLeggings().displayName() : Component.text("No Leggings", NamedTextColor.GRAY));
-					lines.add(inv.getBoots() != null ? inv.getBoots().displayName() : Component.text("No Boots", NamedTextColor.GRAY));
-					lines.add(inv.getItemInOffHand().getType() != Material.AIR ? inv.getItemInOffHand().displayName() : Component.text("No Offhand", NamedTextColor.GRAY));
-					lines.add(inv.getItemInMainHand().getType() != Material.AIR ? inv.getItemInMainHand().displayName() : Component.text("No Mainhand", NamedTextColor.GRAY));
+					lines.add(formatItem(inv.getHelmet(), "Helmet"));
+					lines.add(formatItem(inv.getChestplate(), "Chestplate"));
+					lines.add(formatItem(inv.getLeggings(), "Leggings"));
+					lines.add(formatItem(inv.getBoots(), "Boots"));
+					lines.add(formatItem(inv.getItemInOffHand(), "Offhand"));
+					lines.add(formatItem(inv.getItemInMainHand(), "Mainhand"));
+					MMLog.info(MessagingUtils.toJson(Component.text("EQUIPMENT").decoration(TextDecoration.BOLD, true)
+						.hoverEvent(Component.join(JoinConfiguration.newlines(), lines))).toString());
 					return Component.text("EQUIPMENT").decoration(TextDecoration.BOLD, true)
 						.hoverEvent(Component.join(JoinConfiguration.newlines(), lines));
 				}
 			}
 			return Component.text("<equipment>");
 		});
+	}
+
+	private static Component formatItem(ItemStack item, String placeholderSlot) {
+		// displayName() contains all the NBT in the hover event, so we set it to null
+		return item == null || item.getType() == Material.AIR ? Component.text("No " + placeholderSlot, NamedTextColor.GRAY) : item.displayName().hoverEvent(null);
 	}
 }
