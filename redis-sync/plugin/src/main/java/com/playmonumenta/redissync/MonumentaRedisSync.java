@@ -93,6 +93,13 @@ public class MonumentaRedisSync extends JavaPlugin {
 			}
 		}
 
+		/* Without these events, registering DataEventListener fails entirely and every player would be saved to local files */
+		try {
+			Class.forName("com.destroystokyo.paper.event.player.ServerStatsDataLoadEvent");
+		} catch (ClassNotFoundException ex) {
+			throw new IllegalStateException("MonumentaRedisSync needs a monumenta-mixins with the player stats load and save events", ex);
+		}
+
 		loadConfig();
 		mRedisAPI = new RedisAPI(BukkitConfigAPI.getRedisHost(), BukkitConfigAPI.getRedisPort());
 		registerPlayerDataListeners(this, mVersionAdapter);

@@ -27,7 +27,7 @@ little rough around the edges, missing some nice-to-have features.
 
 Here's a list of currently supported things:
 
-- Save playerdata, advancements, and scoreboard data to/from Redis
+- Save playerdata, advancements, stats and scoreboard data to/from Redis
 - Function & command block accessible /transferserver command to move players
   between servers on the same bungeecord network
 - /playerhistory to inspect a player's save history
@@ -52,7 +52,6 @@ Here's a list of currently supported things:
 Planned features:
 
 - Automatic config file creation
-- Storage of player stats data
 
 ## Example Dependant Plugin
 
@@ -68,6 +67,11 @@ is a significantly more cumbersome requirement than most plugins. The `1.20.4`
 version loads these patches at runtime with the Mixin bytecode transformation
 framework, which requires using a [fabric mod loader for paper](https://github.com/Floweynt/fabric-paper-modloader)
 as the server software. The mixin implementation is [here](https://github.com/TeamMonumenta/monumenta-mixins).
+
+Stats require a version of monumenta-mixins that provides the stats load and save events
+(`ServerStatsDataLoadEvent`, `ServerStatsDataSaveEvent`); without them this plugin refuses to
+enable. Upgrade monumenta-mixins first: it still works with older versions of this plugin, which
+leave stats in the server's own files.
 
 A fork of paper with these patches (and others) can be found here:
 https://github.com/TeamMonumenta/monumenta-paperfork
@@ -130,10 +134,16 @@ dependencies {
 ## How player data is saved and loaded
 
 Player data lives in redis as per-player history lists, newest first: playerdata (NBT),
-advancements, scores, plugin data, content, and a history line naming who saved it. Each save
-pushes one entry onto every list. Position and world are kept per shard in a hash. How the plugin
-tracks a player and decides when to load and save is described in
-[ARCHITECTURE.md](ARCHITECTURE.md); this section is what other plugins can rely on, on one shard.
+advancements, scores, stats, plugin data, content, and a history line naming who saved it. Each
+save pushes one entry onto every list.
+
+For players who played before stats were stored in redis, the stats history is shorter than the
+others, since it starts at their first save after that. Its entries still line up with the newest
+entries of the other lists.
+
+Position and world are kept per shard in a hash. How the plugin tracks a player and decides when
+to load and save is described in [ARCHITECTURE.md](ARCHITECTURE.md); this section is what other
+plugins can rely on, on one shard.
 
 - **A login always loads the newest save.** If the player's previous connection here has not
   closed, or its last save has not committed, the login waits for it (up to `TIMEOUT_SECONDS`)
@@ -163,6 +173,16 @@ tracks a player and decides when to load and save is described in
 - **Offline edits** (`getOfflinePlayerData`, then `saveOfflinePlayerData`) are refused, returning
   false, if the player is on this shard, logging in, just leaving, or has saved since the data
   was read. A login waits for an offline edit in flight.
+- **Stats** are saved exactly as the server provides them. A player with no stats in redis loads
+  the server's own stats file if one exists, and their first save copies it into redis. Those
+  files are per shard, so only the stats from the first shard the player joins are kept, unless
+  they are merged into redis beforehand.
+- **Stats of players not online here** (`OfflinePlayer#getStatistic` and similar) are read from
+  redis. Changes to them (`OfflinePlayer#incrementStatistic` and similar) are never saved.
+  Instead an exception is thrown, which the server catches and logs with a stack trace naming the
+  responsible plugin; the caller itself sees no error.
+- **Restoring data from before stats were saved** (a stash, rollback or offline edit with no
+  stats) keeps the player's current stats.
 - **Shutdown** waits for every save and other player data write in flight before closing redis.
 
 ### Known limitations
@@ -189,8 +209,15 @@ tracks a player and decides when to load and save is described in
   bytes.
 - **stashPut** stashes the newest save once its own save has committed. If the player saves
   again before then, the stash is of that later save.
+- **Reading the stats of players not online here** blocks the main thread on a redis read each
+  time the server builds their stats, which `OfflinePlayer#getStatistic` does on every call.
 - **Shutdown without monumenta-mixins.** Vanilla Paper disables plugins before it saves the
   players still online, so that save goes to disk, not redis.
+- **Server player files are never removed.** A player with no data of a given type in redis
+  (playerdata, advancements or stats) loads the server's own file for it, if one exists. This
+  plugin never writes or removes those files. After moving existing players into redis, delete the
+  world's `playerdata`, `advancements` and `stats` folders. Otherwise deleting a player's data from
+  redis brings back whatever was in those files.
 
 ## Testing
 
@@ -226,9 +253,10 @@ real server does and never saves in between. `pauseRedisWrites` issues `CLIENT P
 which reproduces the window between a save being made and it committing.
 
 Tests describe a player's state as one number, their "progress", which the harness stores in
-three places: playerdata, which is saved over one redis connection, and a score and
-advancements, which are saved over the other. Reading it back fails if the three disagree, so
-every check of what loaded covers both connections.
+four places: playerdata, which is saved over one redis connection, and a score, a stat and
+advancements, which are saved over the other. Reading it back fails if they disagree, so every
+check of what loaded covers both connections, and every check of the history covers the
+alignment of all four lists.
 
 Other pieces: `TestRedisServer` provides the redis, and `adapters/TestVersionAdapter` stands in
 for the NMS version adapter. The tests are in package `com.playmonumenta.redissync` so they can
@@ -245,6 +273,7 @@ constructors and `MonumentaRedisSync.registerPlayerDataListeners`.
 | `DataHandoffTest` | stash get, rollback and loadFromPlayer |
 | `ShutdownTest` | everything in flight at shutdown commits: final saves, the saves of players still online, other API writes, a rollback mid-write |
 | `OfflineEditTest` | offline edits never bury newer progress |
+| `StatsTest` | offline stats, fake players, players with no stats in redis, stats saves outside a full save |
 | `LifecycleFuzzTest` | random sequences of all of the above, checked against a model of the save history |
 
 `LifecycleFuzzTest` runs 8 fixed seeds by default. Run more with

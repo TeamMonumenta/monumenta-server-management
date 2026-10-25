@@ -7,6 +7,8 @@ import be.seeseemelk.mockbukkit.entity.PlayerMock;
 import com.destroystokyo.paper.event.player.PlayerAdvancementDataLoadEvent;
 import com.destroystokyo.paper.event.player.PlayerConnectionCloseEvent;
 import com.destroystokyo.paper.event.player.PlayerDataLoadEvent;
+import com.destroystokyo.paper.event.player.ServerStatsDataLoadEvent;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.playmonumenta.redissync.adapters.TestVersionAdapter;
@@ -26,7 +28,9 @@ import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -73,14 +77,14 @@ import org.junit.jupiter.api.extension.ParameterResolver;
  * jar's bytecode:
  * <ul>
  * <li>Login: AsyncPlayerPreLoginEvent on an async thread. Then on the main thread the ServerPlayer
- * is constructed (PlayerAdvancementDataLoadEvent), PlayerLoginEvent fires, and any player already
+ * is constructed (ServerStatsDataLoadEvent, then PlayerAdvancementDataLoadEvent), PlayerLoginEvent fires, and any player already
  * in the game with the same UUID is kicked ({@link #verifyLogin}). The configuration phase
  * follows, at least a tick during which the player has no game connection, so a kick does
  * nothing, as with CraftPlayer.kick. Then placeNewPlayer runs ({@link #placePlayer}):
  * PlayerDataLoadEvent, the player becomes visible to Bukkit, PlayerJoinEvent.</li>
  * <li>Disconnect ({@code Connection.handleDisconnection}): {@code PlayerList.remove} fires
- * PlayerQuitEvent, saves the player synchronously (PlayerDataSaveEvent, then
- * PlayerAdvancementDataSaveEvent), and removes them from the server. Only after that returns
+ * PlayerQuitEvent, saves the player synchronously (PlayerDataSaveEvent, ServerStatsDataSaveEvent,
+ * then PlayerAdvancementDataSaveEvent), and removes them from the server. Only after that returns
  * does PlayerConnectionCloseEvent fire.</li>
  * <li>Kick: {@code PlayerList.remove} runs immediately, and the connection is torn down (firing
  * PlayerConnectionCloseEvent) on a later network tick.</li>
@@ -113,16 +117,23 @@ import org.junit.jupiter.api.extension.ParameterResolver;
  * </ul>
  *
  * <h2>Progress</h2>
- * A player's data is stored in three places, written over two redis connections that are not
- * ordered against each other: playerdata (bytes), and scores and advancements (strings).
- * {@link #setProgress} sets one number in all three, and {@link #progress} reads it back, failing
+ * A player's data is stored in four places, written over two redis connections that are not
+ * ordered against each other: playerdata (bytes), and scores, stats and advancements (strings).
+ * {@link #setProgress} sets one number in all four, and {@link #progress} reads it back, failing
  * if they disagree, so a test that checks progress after a login checks both connections.
+ *
+ * <h2>Stats</h2>
+ * The server holds stats as ints in its stats counter, which {@link TestVersionAdapter#getLiveStats}
+ * stands in for: whatever the stats load provided, or its own stats file
+ * ({@link #setLocalStatsFile}) if the load provided nothing.
  */
 public final class RedisSyncTestHarness implements AutoCloseable {
 	/** Long enough to cover a local redis round trip, short enough to fail fast. */
 	private static final long AWAIT_TIMEOUT_MS = 15_000;
 	private static final File UNUSED_PATH = new File("unused-in-tests");
 	private static final String PROGRESS_OBJECTIVE = "Progress";
+	public static final String CUSTOM_STATS = "minecraft:custom";
+	public static final String PROGRESS_STAT = "test:progress";
 	/* Real time between the ticks of the harness's waits */
 	private static final long TICK_MS = 20;
 
@@ -134,6 +145,8 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 	/* The harness's own connection, so pausing redis or reading what it holds never queues behind the plugin */
 	private final RedisClient mControlClient;
 	private final StatefulRedisConnection<String, String> mControlConnection;
+	/* The server's own stats files, which it reads when a stats load provides nothing */
+	private final Map<UUID, JsonObject> mLocalStatsFiles = new ConcurrentHashMap<>();
 
 	public RedisSyncTestHarness() throws Exception {
 		mRedis = TestRedisServer.get();
@@ -243,19 +256,30 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 
 	/**
 	 * Sets the player's progress to {@code value} in their live state, everywhere it is stored:
-	 * playerdata (XpLevel), a score, and advancements. The next save writes it.
+	 * playerdata (XpLevel), a score, a stat, and advancements. The next save writes it.
 	 */
 	public void setProgress(Player player, int value) {
 		mAdapter.getLiveData(player).addProperty("XpLevel", value);
 		mProgressObjective.getScore(player.getName()).setScore(value);
+		setStat(player, CUSTOM_STATS, PROGRESS_STAT, value);
 		mAdapter.setLiveAdvancements(player, advancementsFor(value));
 	}
 
 	/**
 	 * The player's progress in their live state (after a login, what was loaded), or -1 if nothing
-	 * was. Fails if playerdata, score and advancements disagree.
+	 * was. Fails if playerdata, score, stat and advancements disagree.
 	 */
 	public int progress(Player player) {
+		int progress = progressExceptStats(player);
+		int stat = statProgress(player);
+		if (progress != stat) {
+			throw new AssertionError(player.getName() + "'s progress is torn: playerdata=" + progress + " stat=" + stat);
+		}
+		return progress;
+	}
+
+	/** As {@link #progress}, but ignoring stats, for players whose stats are expected to differ */
+	public int progressExceptStats(Player player) {
 		JsonObject live = mAdapter.getLiveData(player);
 		int data = live.has("XpLevel") ? live.get("XpLevel").getAsInt() : -1;
 		var score = mProgressObjective.getScore(player.getName());
@@ -269,6 +293,82 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 		return data;
 	}
 
+	/** The player's progress as their live stats have it, or -1 if they do not have it */
+	public int statProgress(Player player) {
+		Integer stat = statIn(mAdapter.getLiveStats(player), CUSTOM_STATS, PROGRESS_STAT);
+		return stat == null ? -1 : stat;
+	}
+
+	/** A stat in the player's live stats, as the server holds it, or null if it has none */
+	public @Nullable Integer stat(Player player, String namespace, String stat) {
+		return statIn(mAdapter.getLiveStats(player), namespace, stat);
+	}
+
+	public void setStat(Player player, String namespace, String stat, int value) {
+		putStat(mAdapter.getLiveStats(player), namespace, stat, value);
+	}
+
+	/** Sets a stat in stats JSON */
+	public static void putStat(JsonObject statsJson, String namespace, String stat, int value) {
+		JsonObject stats = statsJson.getAsJsonObject("stats");
+		if (!stats.has(namespace)) {
+			stats.add(namespace, new JsonObject());
+		}
+		stats.getAsJsonObject(namespace).addProperty(stat, value);
+	}
+
+	/** A stat in the player's newest committed stats save, or null if it has none */
+	public @Nullable Integer savedStat(Player player, String namespace, String stat) throws Exception {
+		String saved = redisListEntry(MonumentaRedisSyncAPI.getRedisStatsPath(player), 0);
+		return saved == null ? null : statIn(JsonParser.parseString(saved).getAsJsonObject(), namespace, stat);
+	}
+
+	/** Stats JSON holding just the given stat, as the server would write it */
+	public static JsonObject statsWith(String namespace, String stat, int value) {
+		JsonObject stats = TestVersionAdapter.emptyStats();
+		putStat(stats, namespace, stat, value);
+		return stats;
+	}
+
+	public static @Nullable Integer statIn(JsonObject statsJson, String namespace, String stat) {
+		JsonElement stats = statsJson.get("stats");
+		if (stats == null || !stats.getAsJsonObject().has(namespace)) {
+			return null;
+		}
+		JsonElement value = stats.getAsJsonObject().getAsJsonObject(namespace).get(stat);
+		return value == null ? null : value.getAsInt();
+	}
+
+	/** Creates a local stats file for this player, which the server reads if the stats load provides nothing */
+	public void setLocalStatsFile(UUID uuid, JsonObject stats) {
+		mLocalStatsFiles.put(uuid, stats);
+	}
+
+	/**
+	 * What CraftOfflinePlayer's stat methods do for a player not online here: construct a stats
+	 * counter, which fires the stats load. Returns the stats the server would read.
+	 */
+	public JsonObject offlineStats(UUID uuid) {
+		return loadStats(uuid);
+	}
+
+	/* The server's stats counter for a player: whatever the stats load provides, or else its own stats file */
+	private JsonObject loadStats(UUID uuid) {
+		ServerStatsDataLoadEvent load = new ServerStatsDataLoadEvent(TestVersionAdapter.statsFile(uuid));
+		callEvent(load);
+		String json = load.getJsonData();
+		if (json == null) {
+			JsonObject local = mLocalStatsFiles.get(uuid);
+			return local == null ? TestVersionAdapter.emptyStats() : local.deepCopy();
+		}
+		try {
+			return JsonParser.parseString(json).getAsJsonObject();
+		} catch (RuntimeException ex) {
+			/* The server logs the parse failure and starts with empty stats */
+			return TestVersionAdapter.emptyStats();
+		}
+	}
+
 	/** Whether the local scoreboard holds any of the player's scores */
 	public boolean hasScores(Player player) {
 		return mProgressObjective.getScore(player.getName()).isScoreSet();
@@ -276,11 +376,33 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 
 	/**
 	 * The progress of each save in redis, newest first, as committed. Fails unless the playerdata,
-	 * scores and advancements history lists hold the same number of entries, and each entry pairs
-	 * with the same save on all three, which rollback, stash and loadFromPlayer rely on, as they
-	 * read every list at one index.
+	 * scores, stats and advancements history lists hold the same number of entries, and each entry
+	 * pairs with the same save on all four, which rollback, stash and loadFromPlayer rely on, as
+	 * they read every list at one index.
 	 */
 	public List<Integer> savedProgressHistory(Player player) throws Exception {
+		List<Integer> history = savedProgressHistoryExceptStats(player);
+		List<Integer> stats = savedStatProgressHistory(player);
+		if (!history.equals(stats)) {
+			throw new AssertionError("Stats history " + stats + " is not aligned with the others " + history);
+		}
+		return history;
+	}
+
+	/** The progress each entry of the stats history list holds, newest first, or -1 for an entry without it */
+	public List<Integer> savedStatProgressHistory(Player player) throws Exception {
+		List<String> saved = mControlConnection.async().lrange(MonumentaRedisSyncAPI.getRedisStatsPath(player), 0, -1)
+			.get(AWAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+		List<Integer> history = new ArrayList<>();
+		for (String entry : saved) {
+			Integer stat = statIn(JsonParser.parseString(entry).getAsJsonObject(), CUSTOM_STATS, PROGRESS_STAT);
+			history.add(stat == null ? -1 : stat);
+		}
+		return history;
+	}
+
+	/** As {@link #savedProgressHistory}, but leaving out the stats list */
+	public List<Integer> savedProgressHistoryExceptStats(Player player) throws Exception {
 		String dataPath = MonumentaRedisSyncAPI.getRedisDataPath(player);
 		String scoresPath = MonumentaRedisSyncAPI.getRedisScoresPath(player);
 		String advancementsPath = MonumentaRedisSyncAPI.getRedisAdvancementsPath(player);
@@ -508,7 +630,7 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 	}
 
 	/**
-	 * The login's VERIFYING step: the ServerPlayer is constructed (advancement load), PlayerLoginEvent
+	 * The login's VERIFYING step: the ServerPlayer is constructed (stats load, then advancement load), PlayerLoginEvent
 	 * fires, and then, as {@code PlayerList.disconnectAllPlayersWithProfile} does, any player
 	 * already online with this UUID is kicked. Afterwards the connection is in the configuration
 	 * phase, which {@link #placePlayer} ends.
@@ -517,6 +639,13 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 	 */
 	@SuppressWarnings("ReferenceEquality") // Connections are distinct objects for the same UUID
 	public boolean verifyLogin(TestPlayer player) {
+		/* PlayerList.getPlayerStats shares the stats of a player already in the game with this UUID, rather than loading */
+		Player inGame = mServer.getPlayer(player.getUniqueId());
+		if (inGame instanceof TestPlayer other && other != player && other.mPlaced) {
+			mAdapter.setLiveStats(player, mAdapter.getLiveStats(other));
+		} else {
+			mAdapter.setLiveStats(player, loadStats(player.getUniqueId()));
+		}
 		PlayerAdvancementDataLoadEvent advancementLoad = new PlayerAdvancementDataLoadEvent(player, UNUSED_PATH);
 		callEvent(advancementLoad);
 		player.mLoadedAdvancements = advancementLoad.getJsonData();
@@ -703,6 +832,14 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 	/** Replaces a key with a plain string, so any list command on it fails with WRONGTYPE. */
 	public void redisBreakKey(String path) throws Exception {
 		mControlConnection.async().set(path, "not a list").get(AWAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+	}
+
+	public void redisHashDelete(String path, String field) throws Exception {
+		mControlConnection.async().hdel(path, field).get(AWAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+	}
+
+	public void redisDelete(String path) throws Exception {
+		mControlConnection.async().del(path).get(AWAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 	}
 
 	public void redisRename(String from, String to) throws Exception {
