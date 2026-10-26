@@ -37,7 +37,7 @@ public class ChatPlayerProfileMessageCommand {
 					} else {
 						target.sendMessage(Component.text("Your profile message is:", NamedTextColor.GRAY));
 						target.sendMessage(state.profileMessageComponent()
-							.clickEvent(ClickEvent.suggestCommand("/" + ChatCommand.COMMAND + " profilemessage set " + profileMessage)));
+							.clickEvent(ClickEvent.suggestCommand("/" + ChatCommand.COMMAND + " player profilemessage set " + profileMessage)));
 					}
 				}
 				return profileMessage.length();
