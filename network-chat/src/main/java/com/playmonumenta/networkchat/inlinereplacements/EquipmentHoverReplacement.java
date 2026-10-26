@@ -1,7 +1,5 @@
 package com.playmonumenta.networkchat.inlinereplacements;
 
-import com.playmonumenta.networkchat.utils.MMLog;
-import com.playmonumenta.networkchat.utils.MessagingUtils;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
