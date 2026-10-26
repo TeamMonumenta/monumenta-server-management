@@ -63,8 +63,6 @@ public class EquipmentHoverReplacement extends InlineReplacement {
 					lines.add(formatItem(inv.getBoots(), "Boots"));
 					lines.add(formatItem(inv.getItemInOffHand(), "Offhand"));
 					lines.add(formatItem(inv.getItemInMainHand(), "Mainhand"));
-					MMLog.info(MessagingUtils.toJson(Component.text("EQUIPMENT").decoration(TextDecoration.BOLD, true)
-						.hoverEvent(Component.join(JoinConfiguration.newlines(), lines))).toString());
 					return Component.text("EQUIPMENT").decoration(TextDecoration.BOLD, true)
 						.hoverEvent(Component.join(JoinConfiguration.newlines(), lines));
 				}
@@ -74,7 +72,6 @@ public class EquipmentHoverReplacement extends InlineReplacement {
 	}
 
 	private static Component formatItem(ItemStack item, String placeholderSlot) {
-		// displayName() contains all the NBT in the hover event, so we set it to null
 		return item == null || item.getType() == Material.AIR ? Component.text("No " + placeholderSlot, NamedTextColor.GRAY) : item.displayName().hoverEvent(null);
 	}
 }

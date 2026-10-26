@@ -181,7 +181,6 @@ public class ItemHoverReplacement extends InlineReplacement {
 				ItemStack displayedItem = new ItemStack(item.getType());
 				ItemMeta meta = displayedItem.getItemMeta();
 				if (meta != null) {
-					// item.displayName() returns a component in square brackets with the item's entire NBT in the hover event
 					meta.displayName(item.getItemMeta().displayName());
 					meta.lore(lines);
 					meta.addItemFlags(ItemFlag.values());
