@@ -555,7 +555,17 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 
 	/** The client closes the connection: all of Connection.handleDisconnection at once. */
 	public void disconnect(TestPlayer player) {
+		leaveGame(player);
+		closeConnection(player);
+	}
+
+	/** The first half of {@link #disconnect}: the player is out of the game, and the connection's close is still to come. */
+	public void leaveGame(TestPlayer player) {
 		player.disconnectFromWorld();
+	}
+
+	/** The second half of {@link #disconnect}, after {@link #leaveGame} */
+	public void closeConnection(TestPlayer player) {
 		player.closeConnection();
 	}
 

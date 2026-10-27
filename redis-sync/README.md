@@ -143,7 +143,9 @@ tracks a player and decides when to load and save is described in
   own state in their join handlers. No save is made while the player is transferring, after their
   load failed, or after a data handoff replaced their data.
 - **Only the `Player` object of the current connection counts.** A plugin holding one from an
-  earlier connection cannot save its state over the current one, and `sendPlayer` throws for it.
+  earlier connection cannot save its state over the current one or lock it. `sendPlayer` through
+  one, or through a `Player` that has left the game, logs a warning and does nothing else: no
+  transfer events fire. Stash get, rollback and loadFromPlayer throw for it.
 - **Fake players** (NPC plugins) load as usual but are never saved, since they are not logins.
 - **A failed load** refuses or kicks the player, and nothing they do is saved. They can log in
   again once whatever broke is fixed. A player online without a session, such as after a plugin
