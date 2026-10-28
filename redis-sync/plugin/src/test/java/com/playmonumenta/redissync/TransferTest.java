@@ -145,14 +145,64 @@ public class TransferTest {
 		assertEquals(pos, JsonParser.parseString(String.valueOf(shardData)).getAsJsonObject().get("Pos"), "saved where the player is");
 	}
 
-	/** A plugin holding a Player from an earlier connection cannot lock the current one, which would skip its saves. */
+	/**
+	 * A plugin holding a Player from an earlier connection cannot lock the current one, which would
+	 * skip its saves. No transfer events fire for it either, since no fail event would follow them.
+	 */
 	@Test
-	void transferThroughAnEarlierConnectionIsRefused(RedisSyncTestHarness harness) throws Exception {
+	void transferThroughAnEarlierConnectionDoesNothing(RedisSyncTestHarness harness) throws Exception {
+		AtomicInteger transfers = harness.countEvents(PlayerServerTransferEvent.class);
 		TestPlayer stale = harness.join("Tester");
 		harness.disconnect(stale);
 		TestPlayer current = harness.join("Tester");
 
-		Exception refused = assertThrows(Exception.class, () -> MonumentaRedisSyncAPI.sendPlayer(stale, TARGET));
+		MonumentaRedisSyncAPI.sendPlayer(stale, TARGET);
+		harness.tick(5);
+		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(current));
+		assertEquals(0, transfers.get());
+		assertTrue(stale.getPluginMessages().isEmpty(), "proxy never told to move the earlier connection");
+		assertTrue(current.getPluginMessages().isEmpty(), "proxy never told to move the current connection");
+	}
+
+	/** A task scheduled before the connection closed finds nothing to transfer */
+	@Test
+	void transferAfterTheConnectionClosedDoesNothing(RedisSyncTestHarness harness) throws Exception {
+		AtomicInteger transfers = harness.countEvents(PlayerServerTransferEvent.class);
+		TestPlayer player = harness.join("Tester");
+		harness.disconnect(player);
+
+		MonumentaRedisSyncAPI.sendPlayer(player, TARGET);
+		harness.tick(5);
+		assertEquals(0, transfers.get());
+		assertTrue(player.getPluginMessages().isEmpty(), "proxy never told to move them");
+	}
+
+	/** Out of the game but not yet closed, the session is still open, yet there is no one left to move and the final save is already made */
+	@Test
+	void transferBetweenQuitAndConnectionCloseDoesNothing(RedisSyncTestHarness harness) throws Exception {
+		AtomicInteger transfers = harness.countEvents(PlayerServerTransferEvent.class);
+		TestPlayer player = harness.join("Tester");
+		harness.setProgress(player, 11);
+		harness.leaveGame(player);
+		harness.setProgress(player, 12);
+
+		MonumentaRedisSyncAPI.sendPlayer(player, TARGET);
+		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(player), "not locked, so no transfer save was made");
+		harness.closeConnection(player);
+		harness.tick(5);
+		assertEquals(0, transfers.get());
+		assertTrue(player.getPluginMessages().isEmpty(), "proxy never told to move them");
+		assertEquals(11, harness.progress(harness.join("Tester")), "the final save is what the next login gets");
+	}
+
+	/** A lock taken directly through an earlier connection, as a data handoff takes one, is still refused outright */
+	@Test
+	void lockThroughAnEarlierConnectionIsRefused(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer stale = harness.join("Tester");
+		harness.disconnect(stale);
+		TestPlayer current = harness.join("Tester");
+
+		Exception refused = assertThrows(Exception.class, () -> PlayerSessions.lock(stale));
 		assertTrue(String.valueOf(refused.getMessage()).contains("not this player's current connection"), refused.getMessage());
 		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(current));
 	}

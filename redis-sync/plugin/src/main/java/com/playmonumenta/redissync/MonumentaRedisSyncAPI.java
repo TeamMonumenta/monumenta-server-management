@@ -268,9 +268,19 @@ public class MonumentaRedisSyncAPI {
 		sendPlayer(player, target, returnLoc, rotation == null ? null : rotation.getNormalizedYaw(), rotation == null ? null : rotation.getNormalizedPitch());
 	}
 
-	@SuppressWarnings("deprecation")
+	@SuppressWarnings({"deprecation", "ReferenceEquality"}) // Which connection's Player object is the question
 	public static void sendPlayer(Player player, String target, @Nullable Location returnLoc, @Nullable Float returnYaw, @Nullable Float returnPitch) throws Exception {
 		Plugin mrs = DataEventListener.getPlugin();
+
+		/*
+		 * A Player held past its disconnect (by a task scheduled before it, say) has nothing left to
+		 * transfer. The transfer events must not fire for it either: no fail event would follow, so
+		 * listeners would keep treating the player as transferring.
+		 */
+		if (Bukkit.getPlayer(player.getUniqueId()) != player) {
+			MMLog.warning("Not transferring player=" + player.getName() + " to " + target + " because that connection is no longer in the game on this shard");
+			return;
+		}
 
 		/* Before the transfer events fire, which they must not for a player already locked */
 		if (PlayerSessions.isLocked(player)) {

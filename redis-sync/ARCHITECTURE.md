@@ -56,7 +56,9 @@ A `PlayerSession` covers one connection, from its first load event until Paper's
 `PlayerConnectionCloseEvent`. It belongs to one `Player` object, and Paper creates a new one per
 connection. Events are matched to their session by object identity, not UUID. A plugin holding a
 `Player` from an earlier connection therefore cannot save its stale state over the current
-connection, or lock it. Waiting for saves, by contrast, goes by UUID, so that a login can wait
+connection, or lock it. `sendPlayer` checks first that the `Player` is still the one in the game,
+and does nothing for one that is not, so no transfer events fire for a transfer that cannot
+happen. Waiting for saves, by contrast, goes by UUID, so that a login can wait
 for the previous connection's.
 
 ```mermaid
