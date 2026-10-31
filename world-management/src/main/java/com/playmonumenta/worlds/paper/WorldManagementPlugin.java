@@ -176,9 +176,17 @@ public class WorldManagementPlugin extends JavaPlugin {
 		printConfig("sort-world-by-content", mSortWorldByContent);
 
 		mSortWorldByScoreOnJoin = config.getBoolean("sort-world-by-score-on-join", mSortWorldByScoreOnJoin);
+		if (FORCE_DISABLE_CONTENT_SORTING) {
+			MMLog.info("# Forced to false by environmental variable FORCE_DISABLE_CONTENT_SORTING");
+			mSortWorldByScoreOnJoin = false;
+		}
 		printConfig("sort-world-by-score-on-join", mSortWorldByScoreOnJoin);
 
 		mSortWorldByScoreOnRespawn = config.getBoolean("sort-world-by-score-on-respawn", mSortWorldByScoreOnRespawn);
+		if (FORCE_DISABLE_CONTENT_SORTING) {
+			MMLog.info("# Forced to false by environmental variable FORCE_DISABLE_CONTENT_SORTING");
+			mSortWorldByScoreOnRespawn = false;
+		}
 		printConfig("sort-world-by-score-on-respawn", mSortWorldByScoreOnRespawn);
 
 		mAllowInstanceAutocreation = config.getBoolean("allow-instance-autocreation", mAllowInstanceAutocreation);
