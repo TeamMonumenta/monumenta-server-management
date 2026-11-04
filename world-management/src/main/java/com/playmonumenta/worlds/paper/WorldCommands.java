@@ -323,8 +323,11 @@ public class WorldCommands {
 	public static void teleportToWorld(Collection<Entity> targets, String world, Location loc, float yaw, float pitch) throws Exception {
 		World actualWorld = MonumentaWorldManagementAPI.ensureWorldLoaded(world, null);
 		Location newLoc = new Location(actualWorld, loc.getX(), loc.getY(), loc.getZ(), yaw, pitch);
-		for (Entity player : targets) {
-			player.teleport(newLoc);
+		for (Entity entity : targets) {
+			if (entity instanceof Player player) {
+				player.closeInventory();
+			}
+			entity.teleport(newLoc);
 		}
 	}
 
