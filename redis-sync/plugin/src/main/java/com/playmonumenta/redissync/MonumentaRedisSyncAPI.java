@@ -1015,6 +1015,7 @@ public class MonumentaRedisSyncAPI {
 		}
 
 		public void applyToPlayer(Player player) {
+			player.closeInventory();
 			player.teleport(mPlayerLoc);
 			player.setVelocity(mMotion);
 			player.setFlying(mFlying && player.getAllowFlight());
