@@ -110,6 +110,25 @@ interface MonumentaExtension {
         softDepends: List<String> = listOf()
     )
 
+    /**
+     * Builds the plugin project as a Velocity plugin. Can be combined with [paper] to produce
+     * one jar that loads on both.
+     *
+     * Velocity reads its plugin metadata from a `@Plugin` annotation on the main class, and
+     * velocity-api's annotation processor turns that into `velocity-plugin.json`. This adds
+     * velocity-api as both a compile-only dependency and that annotation processor.
+     *
+     * Annotation values must be compile-time constants, so the build version is supplied as a
+     * generated class, `<buildConstantsPackage>.BuildConstants`, with a `VERSION` field set to
+     * this project's version. Use it as `@Plugin(id = "...", version = BuildConstants.VERSION)`.
+     * The class is regenerated whenever the version changes.
+     *
+     * @param apiVersion The velocity-api version to compile against, e.g. `"3.3.0-SNAPSHOT"`.
+     * @param buildConstantsPackage The package for the generated `BuildConstants` class,
+     *     usually the plugin's root package.
+     */
+    fun velocity(apiVersion: String, buildConstantsPackage: String)
+
     fun versionAdapterApi(name: String, paper: String? = null, config: Project.() -> Unit = {})
     fun versionAdapterUnsupported(name: String, config: Project.() -> Unit = {})
     fun versionAdapter(name: String, devBundle: String, config: Project.() -> Unit = {})
