@@ -9,6 +9,7 @@ import net.minecrell.pluginyml.bungee.BungeePluginDescription
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.api.plugins.BasePluginExtension
+import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.plugins.quality.Checkstyle
 import org.gradle.api.plugins.quality.CheckstyleExtension
@@ -216,6 +217,7 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
     private var mavenPassword: String? = System.getenv("TOKEN")
     private var isBukkitConfigured: Boolean = false
     private var isBungeeConfigured: Boolean = false
+    private var isVelocityConfigured: Boolean = false
     private var pluginName: String? = null
     private var pluginId: String? = null
     private var disableMaven: Boolean = false
@@ -382,6 +384,32 @@ internal class MonumentaExtensionImpl(private val target: Project) : MonumentaEx
             }
 
             pluginProject.addCompileOnly("io.github.waterfallmc:waterfall-api:$apiVersion-R0.1-SNAPSHOT")
+        }
+    }
+
+    override fun velocity(apiVersion: String, buildConstantsPackage: String) {
+        if (isVelocityConfigured) {
+            throw IllegalStateException("Velocity can't be configured multiple times")
+        }
+
+        isVelocityConfigured = true
+
+        deferActions {
+            val velocityApi = "com.velocitypowered:velocity-api:$apiVersion"
+            pluginProject.addCompileOnly(velocityApi)
+            pluginProject.dependencies.add(JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME, velocityApi)
+
+            val project = pluginProject
+            val task = project.tasks.register("generateBuildConstants", GenerateBuildConstants::class.java) {
+                it.packageName.set(buildConstantsPackage)
+                it.className.set("BuildConstants")
+                it.constants.put("VERSION", project.provider { project.version.toString() })
+                it.outputDir.set(project.layout.buildDirectory.dir("generated/sources/buildConstants/java/main"))
+            }
+            // Adding the task itself, not just its output directory, makes compileJava and
+            // sourcesJar depend on it.
+            project.extensions.getByType(JavaPluginExtension::class.java)
+                .sourceSets.getByName("main").java.srcDir(task)
         }
     }
 

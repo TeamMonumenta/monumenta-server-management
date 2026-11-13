@@ -98,6 +98,42 @@ monumenta {
 }
 ```
 
+### Velocity plugins
+
+Call `velocity(apiVersion, buildConstantsPackage)` to build the plugin for Velocity. It can be
+combined with `paper(...)` to produce one jar that loads on both:
+
+```kotlin
+monumenta {
+    id("MyPlugin")
+    name("MyPlugin")
+    paper("com.example.myplugin.paper.MyPluginPaper", BukkitPluginDescription.PluginLoadOrder.POSTWORLD, "1.20")
+    velocity("3.3.0-SNAPSHOT", "com.example.myplugin")
+}
+```
+
+This adds `com.velocitypowered:velocity-api` as a compile-only dependency and as the annotation
+processor that writes `velocity-plugin.json` from the main class's `@Plugin` annotation, so
+there is no need to also declare velocity-api in the project's own dependencies. With a version
+catalog, pass the version from it: `velocity(libs.versions.velocity.get(), "com.example.myplugin")`.
+
+Annotation values must be compile-time constants, so `@Plugin(version = ...)` cannot use a value
+computed by the build directly. `velocity(...)` therefore generates `<buildConstantsPackage>.BuildConstants`,
+with `VERSION` set to the project's git-derived version, for the annotation to reference:
+
+```java
+import com.example.myplugin.BuildConstants;
+
+@Plugin(id = "my-plugin", name = "MyPlugin", version = BuildConstants.VERSION)
+public class MyPluginVelocity {
+```
+
+The class is written to `build/generated/sources/buildConstants/java/main` by the
+`generateBuildConstants` task, which `compileJava` and `sourcesJar` depend on, and is
+regenerated whenever the version changes. Code can read `BuildConstants.VERSION` at runtime too.
+An IDE that imports the Gradle project without building it shows `BuildConstants` as unresolved
+until the first build.
+
 ### Per-project Checkstyle suppressions
 
 Place a standard Checkstyle suppression file at `config/checkstyle/suppressions.xml` relative to the project root. It will be loaded automatically with `optional="true"` - projects without this file are unaffected.
