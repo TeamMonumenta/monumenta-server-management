@@ -199,7 +199,7 @@ public final class RemotePlayerManagerVelocity extends RemotePlayerManagerAbstra
 	}
 
 	@Subscribe(priority = 16383)
-	public void destOfflineEvent(DestOnlineEventGeneric event) {
+	public void destOfflineEvent(DestOfflineEventGeneric event) {
 		String remoteShardName = event.getDest();
 		if (getServerId().equals(remoteShardName)) {
 			return;
