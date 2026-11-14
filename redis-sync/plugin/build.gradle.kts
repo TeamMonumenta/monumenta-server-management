@@ -10,9 +10,6 @@ dependencies {
 	compileOnly(libs.commandapi)
 	compileOnly(libs.brigadier)
 
-	// velocity dependencies
-	compileOnly(libs.velocity)
-	annotationProcessor(libs.velocity)
 
 	/*
 	 * Test deps. paper-api and commandapi are compileOnly above, so the test source set must

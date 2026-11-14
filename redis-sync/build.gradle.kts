@@ -25,5 +25,6 @@ monumenta {
 			compileOnly(mixinapi)
 		}
 	}
+	velocity(libs.versions.velocity.get(), "com.playmonumenta.redissync")
 	gitPrefix("redis-sync/")
 }

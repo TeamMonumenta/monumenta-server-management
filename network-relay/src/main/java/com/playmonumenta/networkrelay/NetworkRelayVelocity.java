@@ -27,7 +27,7 @@ import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 @Plugin(
 	id = "monumenta-network-relay",
 	name = "MonumentaNetworkRelay",
-	version = "",
+	version = BuildConstants.VERSION,
 	url = "",
 	description = "",
 	authors = {""},

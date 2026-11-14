@@ -9,7 +9,7 @@ import com.velocitypowered.api.proxy.ProxyServer;
 @Plugin(
 	id = "monumenta-common",
 	name = "MonumentaCommon",
-	version = "",
+	version = BuildConstants.VERSION,
 	url = "",
 	description = "",
 	authors = {""}
