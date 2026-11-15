@@ -18,8 +18,6 @@ dependencies {
 	compileOnly(libs.commandapi)
 	compileOnly(libs.dynmap)
 	compileOnly(libs.log4j.core)
-	compileOnly(libs.velocity)
-	annotationProcessor(libs.velocity)
 }
 
 monumenta {
@@ -32,5 +30,6 @@ monumenta {
 		depends = listOf("CommandAPI"),
 		softDepends = listOf("dynmap")
 	)
+	velocity(libs.versions.velocity.get(), "com.playmonumenta.common")
 	gitPrefix("monumenta-common/")
 }

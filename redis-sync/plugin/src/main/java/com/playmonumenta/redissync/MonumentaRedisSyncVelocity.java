@@ -24,7 +24,7 @@ import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 @Plugin(
 	id = "monumenta-redisapi",
 	name = "Monumenta-RedisAPI",
-	version = "",
+	version = BuildConstants.VERSION,
 	url = "",
 	description = "",
 	authors = {""},

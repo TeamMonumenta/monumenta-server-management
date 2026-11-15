@@ -24,9 +24,7 @@ dependencies {
 	compileOnly(libs.commandapi)
 	compileOnly(libs.log4j.core)
 	compileOnly(libs.placeholderapi)
-	compileOnly(libs.velocity)
 	compileOnly(libs.viaversion)
-	annotationProcessor(libs.velocity)
 	implementation(libs.slf4j)
 }
 
@@ -49,5 +47,6 @@ monumenta {
 			"ViaVersion"
 		)
 	)
+	velocity(libs.versions.velocity.get(), "com.playmonumenta.networkrelay")
 	gitPrefix("network-relay/")
 }
