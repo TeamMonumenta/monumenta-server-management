@@ -25,9 +25,9 @@ import org.junit.jupiter.api.Test;
  * Every login must load the newest, in all three places progress is stored, and at the end redis
  * must hold the model's newest entries, aligned across the history lists.
  *
- * <p>Whether a save lands depends on whether the player is locked for a transfer, which the model
- * takes from the plugin rather than predicting: lock timing is covered by {@link TransferTest} and
- * {@link DataHandoffTest}.
+ * <p>A transfer only asks the proxy, which does nothing here, so it times out. A data handoff asks
+ * the proxy to reconnect the player, which the run then does itself: the player leaves (their final
+ * save lands), and the replacement is pushed after it.
  *
  * <p>Seeds are fixed so a failure reproduces, though not exactly: redis timing is real. Run more
  * with {@code ./gradlew test -Pmrs.fuzz.seeds=200}, or one with {@code -Pmrs.fuzz.seed=N}. A
@@ -126,23 +126,21 @@ public class LifecycleFuzzTest {
 				TestPlayer first = mHarness.newPlayer("Tester");
 				TestPlayer second = mHarness.newPlayer("Tester");
 				check(mHarness.preLogin(first) == AsyncPlayerPreLoginEvent.Result.ALLOWED, "first pre-login allowed");
-				check(mHarness.preLogin(second) == AsyncPlayerPreLoginEvent.Result.ALLOWED, "second pre-login allowed");
+				/* The first holds the session lease, so the second never gets past pre-login, and leaves no trace */
+				check(mHarness.preLogin(second) != AsyncPlayerPreLoginEvent.Result.ALLOWED, "second pre-login refused");
 				check(mHarness.verifyLogin(first), "first login allowed");
-				mHarness.tick();
-				mHarness.closeUnplacedConnection(second);
 				mHarness.tick();
 				mHarness.placePlayer(first);
 				mHarness.tick(2);
-				/* Its session cannot be told from the dropped one's, so it is refused */
-				check(!first.isPlaced(), "first connection refused");
+				check(first.isPlaced(), "first connection plays");
+				joined(first);
 			} else if (roll < 88) {
 				log("two logins at once");
 				TestPlayer first = mHarness.newPlayer("Tester");
 				TestPlayer second = mHarness.newPlayer("Tester");
 				check(mHarness.preLogin(first) == AsyncPlayerPreLoginEvent.Result.ALLOWED, "first pre-login allowed");
-				check(mHarness.preLogin(second) == AsyncPlayerPreLoginEvent.Result.ALLOWED, "second pre-login allowed");
+				check(mHarness.preLogin(second) != AsyncPlayerPreLoginEvent.Result.ALLOWED, "second pre-login refused: the first holds the lease");
 				check(mHarness.completeLogin(first) == AsyncPlayerPreLoginEvent.Result.ALLOWED, "first login completes");
-				check(mHarness.completeLogin(second) != AsyncPlayerPreLoginEvent.Result.ALLOWED, "second login refused");
 				mHarness.tick();
 				check(first.isPlaced(), "first connection still in the game");
 				joined(first);
@@ -157,20 +155,20 @@ public class LifecycleFuzzTest {
 			if (roll < 20) {
 				setProgress(mNextValue++);
 			} else if (roll < 28) {
-				log("save" + (transferring(current) ? " (transferring, skipped)" : ""));
-				saving(current);
+				log("save");
+				saving();
 				MonumentaRedisSyncAPI.savePlayer(current);
 			} else if (roll < 34) {
 				log("disconnect");
 				disconnect(current);
 			} else if (roll < 37) {
 				log("disconnect, close event off the main thread");
-				saving(current);
+				saving();
 				mHarness.disconnectWithCloseOffMainThread(current);
 				mCurrent = null;
 			} else if (roll < 41) {
 				log("kick");
-				saving(current);
+				saving();
 				current.kick(Component.text("fuzz"));
 				mCurrent = null;
 			} else if (roll < 46) {
@@ -179,39 +177,32 @@ public class LifecycleFuzzTest {
 				login();
 			} else if (roll < 51) {
 				log("reconnect while the old connection is still in the game");
-				/*
-				 * The old connection is kicked inside the login, which ticks the server while it
-				 * waits, so a transfer lock can time out first. A lock can only go away, not appear.
-				 */
-				boolean wasTransferring = transferring(current);
 				int savesBefore = mSaves.getOrDefault(current, 0);
 				TestPlayer next = mHarness.newPlayer("Tester");
 				check(mHarness.login(next) == AsyncPlayerPreLoginEvent.Result.ALLOWED, "re-entrant login allowed");
 				check(!current.isPlaced(), "old connection closed");
 				int saved = mSaves.getOrDefault(current, 0) - savesBefore;
-				check(wasTransferring ? saved <= 1 : saved == 1, "the old connection saved " + saved + " times");
-				if (saved == 1) {
-					mHistory.add(mLive);
-				}
+				check(saved == 1, "the old connection saved " + saved + " times");
+				mHistory.add(mLive);
 				mHarness.tick();
 				joined(next);
 			} else if (roll < 54) {
 				if (!transferring(current)) {
-					log("transfer (never completes; the lock times out)");
-					saving(current);
+					/* Only asks the proxy, which never acts here; nothing is saved */
+					log("transfer (never completes; it times out)");
 					MonumentaRedisSyncAPI.sendPlayer(current, TARGET);
 				}
 			} else if (roll < 57) {
 				/* While transferring, the reload would load back the transfer save's advancements: correct, but not this model */
 				if (!transferring(current)) {
 					log("datapack reload");
-					saving(current);
+					saving();
 					mHarness.reloadDatapacks();
 				}
 			} else if (roll < 60) {
 				if (!transferring(current)) {
 					log("stash put");
-					saving(current);
+					saving();
 					/* The stash is of the newest save once stash put's own save has committed; nothing else happens until then */
 					long confirmations = stashConfirmations(current);
 					MonumentaRedisSyncAPI.stashPut(current, null);
@@ -222,21 +213,17 @@ public class LifecycleFuzzTest {
 				Integer stash = mStash;
 				if (stash != null && !transferring(current)) {
 					log("stash get (" + stash + ")");
-					saving(current);
 					MonumentaRedisSyncAPI.stashGet(current, null);
-					mHistory.add(stash);
-					awaitKicked(current);
+					reconnectForHandoff(current, stash);
 				}
 			} else if (roll < 66) {
 				int index = mRandom.nextInt(3);
-				/* Rollback first saves, then counts back from the save before that one */
-				if (!transferring(current) && mHistory.size() >= index + 2) {
-					saving(current);
-					int restored = mHistory.get(mHistory.size() - 2 - index);
+				/* Counts back from the newest save made before the call */
+				if (!transferring(current) && mHistory.size() >= index + 1) {
+					int restored = mHistory.get(mHistory.size() - 1 - index);
 					log("rollback index " + index + " (" + restored + ")");
 					MonumentaRedisSyncAPI.playerRollback(mModerator, current, index);
-					mHistory.add(restored);
-					awaitKicked(current);
+					reconnectForHandoff(current, restored);
 				}
 			} else {
 				timeStep();
@@ -266,7 +253,7 @@ public class LifecycleFuzzTest {
 		}
 
 		private void disconnect(TestPlayer current) {
-			saving(current);
+			saving();
 			mHarness.disconnect(current);
 			mCurrent = null;
 		}
@@ -278,9 +265,12 @@ public class LifecycleFuzzTest {
 			joined(player);
 		}
 
-		private void awaitKicked(TestPlayer current) throws InterruptedException {
-			mHarness.awaitWithTicks("kicked to apply the handoff", () -> !current.isPlaced());
-			mCurrent = null;
+		/* Once the handoff has asked the proxy to reconnect the player, does what the proxy would: they leave, saving, and the replacement follows */
+		private void reconnectForHandoff(TestPlayer current, int replacement) throws InterruptedException {
+			mHarness.awaitWithTicks("proxy asked to reconnect for the handoff", () -> transferring(current));
+			log("proxy reconnects");
+			disconnect(current);
+			mHistory.add(replacement);
 		}
 
 		/* A connection has just finished joining: it must have loaded the newest save */
@@ -291,11 +281,9 @@ public class LifecycleFuzzTest {
 			mLive = loaded;
 		}
 
-		/* The connection is about to save: unless it is transferring, what it has now is what must load next */
-		private void saving(TestPlayer current) {
-			if (!transferring(current)) {
-				mHistory.add(mLive);
-			}
+		/* The connection is about to save: what it has now is what must load next */
+		private void saving() {
+			mHistory.add(mLive);
 		}
 
 		/* Redis holds the model's newest saves, newest first, aligned across the history lists */

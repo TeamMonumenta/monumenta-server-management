@@ -469,7 +469,7 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 	}
 
 	@Override
-	public void distributeMessage(Message message) {
+	protected void distributeMessage(Message message, Collection<PlayerState> recipients) {
 		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
 
 		JsonObject extraData = message.getExtraData();
@@ -488,15 +488,15 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 		if (senderUuid == null) {
 			senderUuid = new UUID(0L, 0L);
 		}
-		distributeMessageToPlayer(receiverUuid, senderUuid, message);
+		distributeMessageToPlayer(receiverUuid, senderUuid, message, recipients);
 		if (!senderUuid.equals(receiverUuid)) {
-			distributeMessageToPlayer(senderUuid, receiverUuid, message);
+			distributeMessageToPlayer(senderUuid, receiverUuid, message, recipients);
 		}
 	}
 
-	private void distributeMessageToPlayer(UUID playerId, UUID otherId, Message message) {
+	private void distributeMessageToPlayer(UUID playerId, UUID otherId, Message message, Collection<PlayerState> recipients) {
 		PlayerState state = PlayerStateManager.getPlayerState(playerId);
-		if (state == null) {
+		if (state == null || !recipients.contains(state)) {
 			MMLog.trace("Receiver not on this shard.");
 			return;
 		}

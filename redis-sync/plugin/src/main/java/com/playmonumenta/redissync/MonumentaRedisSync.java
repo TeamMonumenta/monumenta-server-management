@@ -60,6 +60,7 @@ public class MonumentaRedisSync extends JavaPlugin {
 		 * These need to register immediately on load to prevent function loading errors
 		 */
 		TransferServer.register();
+		SessionLeaseCommand.register();
 		Stash.register();
 		PlayerHistory.register(this);
 		PlayerRollback.register();
@@ -102,6 +103,7 @@ public class MonumentaRedisSync extends JavaPlugin {
 		}
 
 		this.getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
+		this.getServer().getMessenger().registerOutgoingPluginChannel(this, CleanSwitchListener.RECONNECT_CHANNEL);
 	}
 
 	@Override
@@ -122,7 +124,6 @@ public class MonumentaRedisSync extends JavaPlugin {
 		PlayerSessions sessions = new PlayerSessions(plugin, adapter);
 		plugin.getServer().getPluginManager().registerEvents(sessions, plugin);
 		plugin.getServer().getPluginManager().registerEvents(new DataEventListener(plugin, adapter, sessions), plugin);
-		plugin.getServer().getPluginManager().registerEvents(new LockedPlayerListener(), plugin);
 	}
 
 	public static MonumentaRedisSync getInstance() {

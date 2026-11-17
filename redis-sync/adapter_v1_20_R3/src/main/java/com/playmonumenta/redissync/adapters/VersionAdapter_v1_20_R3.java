@@ -147,6 +147,11 @@ public class VersionAdapter_v1_20_R3 implements VersionAdapter {
 	}
 
 	@Override
+	public boolean isConnected(Player player) {
+		return player.isConnected();
+	}
+
+	@Override
 	public Object upgradePlayerData(Object nbtCompoundTag) {
 		CompoundTag nbt = (CompoundTag) nbtCompoundTag;
 		int i = nbt.contains("DataVersion", 3) ? nbt.getInt("DataVersion") : -1;

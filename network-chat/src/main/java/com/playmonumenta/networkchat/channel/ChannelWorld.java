@@ -24,7 +24,7 @@ import dev.jorel.commandapi.arguments.MultiLiteralArgument;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import dev.jorel.commandapi.wrappers.NativeProxyCommandSender;
 import java.time.Instant;
-import java.util.Map;
+import java.util.Collection;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
@@ -248,7 +248,7 @@ public class ChannelWorld extends Channel implements ChannelAutoJoin, ChannelPer
 	}
 
 	@Override
-	public void distributeMessage(Message message) {
+	protected void distributeMessage(Message message, Collection<PlayerState> recipients) {
 		JsonObject extraData = message.getExtraData();
 		if (extraData == null) {
 			MMLog.warning("Got world chat message with no fromShard, ignoring.");
@@ -286,8 +286,7 @@ public class ChannelWorld extends Channel implements ChannelAutoJoin, ChannelPer
 		fromWorld = fromWorldJsonPrimitive.getAsString();
 
 		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
-		for (Map.Entry<UUID, PlayerState> playerStateEntry : PlayerStateManager.getPlayerStates().entrySet()) {
-			PlayerState state = playerStateEntry.getValue();
+		for (PlayerState state : recipients) {
 			Player player = state.getPlayer();
 			if (player == null || !player.getWorld().getName().equals(fromWorld) || !mayListen(player)) {
 				continue;

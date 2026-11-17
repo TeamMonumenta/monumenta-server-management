@@ -22,8 +22,8 @@ import dev.jorel.commandapi.arguments.StringArgument;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -302,10 +302,9 @@ public class ChannelParty extends Channel implements ChannelInviteOnly {
 	}
 
 	@Override
-	public void distributeMessage(Message message) {
+	protected void distributeMessage(Message message, Collection<PlayerState> recipients) {
 		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
-		for (Map.Entry<UUID, PlayerState> playerStateEntry : PlayerStateManager.getPlayerStates().entrySet()) {
-			PlayerState state = playerStateEntry.getValue();
+		for (PlayerState state : recipients) {
 			Player player = state.getPlayer();
 			if (player == null || !mayListen(player)) {
 				continue;

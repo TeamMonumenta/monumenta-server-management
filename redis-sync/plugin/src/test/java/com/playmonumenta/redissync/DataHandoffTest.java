@@ -1,189 +1,193 @@
 package com.playmonumenta.redissync;
 
-import com.playmonumenta.common.event.PlayerTransferFailEvent;
 import com.playmonumenta.redissync.RedisSyncTestHarness.TestPlayer;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
-import org.bukkit.event.player.PlayerKickEvent;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Stash get, rollback and loadFromPlayer replace a player's saved data while they are online:
- * save, lock the player, wait for the save to commit, write the replacement, then kick them so
- * they rejoin with it. Nothing the player does after the lock may be saved over the replacement.
+ * Stash get, rollback and loadFromPlayer replace a player's saved data while they are online. The
+ * replacement is read first, while the player plays on; then the proxy is asked to reconnect them
+ * (which the tests do themselves, by disconnecting the player). As they leave, their final save is
+ * made as usual, and the replacement is pushed after it once it has committed, so it is what the
+ * reconnect loads and the final save stays in history as a way back.
  */
 @ExtendWith(RedisSyncTestHarness.PerTest.class)
 public class DataHandoffTest {
-	/**
-	 * Stash the player, change them, load the stash, and leave and come straight back before the
-	 * stash's write has committed. The login waits for that write, or the player would load their
-	 * old state and their next save would bury the stash.
-	 */
+	/** What the player does until they leave is in their final save, just below the replacement */
 	@Test
-	void stashGetIsWhatTheNextLoginLoadsEvenIfItIsStillBeingWritten(RedisSyncTestHarness harness) throws Exception {
+	void stashGetIsPushedAfterTheFinalSave(RedisSyncTestHarness harness) throws Exception {
 		TestPlayer first = harness.join("Tester");
 		harness.setProgress(first, 20);
 		stashPut(harness, first);
-
 		harness.setProgress(first, 21);
+
 		MonumentaRedisSyncAPI.stashGet(first, null);
-		harness.awaitSavedWithoutTicking(first);
-		/* The next tick reads the stash and hands redis the write, which the pause holds */
-		harness.pauseRedisWrites(1000);
-		harness.tick();
-		assertTrue(PlayerSessions.hasPendingSaves(first), "the stash is still being written");
+		awaitReconnectAsked(harness, first);
+		harness.setProgress(first, 22);
 		harness.disconnect(first);
+
+		TestPlayer next = harness.join("Tester");
+		assertEquals(20, harness.progress(next));
+		assertEquals(List.of(20, 22), harness.savedProgressHistory(next).subList(0, 2), "the final save is just below the stash");
+	}
+
+	/** The reconnect gets the replacement even if it is still being written: the login waits for the session lease */
+	@Test
+	void reconnectWaitsForTheReplacementWrite(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer first = harness.join("Tester");
+		harness.setProgress(first, 20);
+		stashPut(harness, first);
+		harness.setProgress(first, 21);
+
+		MonumentaRedisSyncAPI.stashGet(first, null);
+		awaitReconnectAsked(harness, first);
+		harness.pauseRedisWrites(1000);
+		harness.disconnect(first);
+		assertTrue(PlayerSessions.hasPendingSaves(first), "the final save and the stash are still being written");
 
 		assertEquals(20, harness.progress(harness.join("Tester")));
 	}
 
-	/**
-	 * A command inside a stash get's write fails without failing the transaction, so the rest lands.
-	 * The player's in-memory state can no longer be saved over what is there, so they are kicked to
-	 * rejoin with whatever redis holds, and told it failed rather than that it worked.
-	 */
+	/** A write that fails part way is reported; the reconnect loads whatever redis holds */
 	@Test
-	void stashGetWhoseWritePartlyFailsKicksThePlayerAndSaysSo(RedisSyncTestHarness harness) throws Exception {
+	void stashGetWhoseWriteFailsSaysSo(RedisSyncTestHarness harness) throws Exception {
 		TestPlayer first = harness.join("Tester");
 		stashPut(harness, first);
 
 		MonumentaRedisSyncAPI.stashGet(first, null);
-		harness.awaitSavedWithoutTicking(first);
-		/* The stash is read from its own hash; only the write touches the player's history list */
+		awaitReconnectAsked(harness, first);
+		harness.leaveGame(first);
+		harness.awaitSaved(first);
+		/* Broken after the final save, so only the stash's write fails */
 		harness.redisBreakKey(MonumentaRedisSyncAPI.getRedisHistoryPath(first));
-		harness.awaitWithTicks("player kicked", () -> !first.isPlaced());
-		assertTrue(first.wasTold("Failed to load stash data"), "told it failed: " + first.getChat());
-		assertFalse(first.wasTold("loaded successfully"));
+		harness.closeConnection(first);
+		harness.awaitWithTicks("told it failed", () -> first.wasTold("Failed to load stash data"));
 	}
 
-	/** A handoff with nothing to hand off unlocks the player straight away, rather than when the lock times out. */
+	/** Nothing to hand off: the player is told, and nothing else happens */
 	@Test
-	void stashGetWithNoStashUnlocksThePlayerAtOnce(RedisSyncTestHarness harness) throws Exception {
+	void stashGetWithNoStashChangesNothing(RedisSyncTestHarness harness) throws Exception {
 		TestPlayer player = harness.join("Tester");
 		MonumentaRedisSyncAPI.stashGet(player, "no_such_stash");
-		assertTrue(MonumentaRedisSyncAPI.isPlayerTransferring(player));
-
-		harness.awaitWithTicks("player unlocked", () -> !MonumentaRedisSyncAPI.isPlayerTransferring(player), 150);
+		harness.awaitWithTicks("told there is no stash", () -> player.wasTold("No stash data found"));
+		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(player));
+		assertTrue(player.getPluginMessages().isEmpty(), "proxy never asked to reconnect them");
 		assertTrue(player.isPlaced());
 	}
 
 	@Test
-	void rollbackPastTheEndOfHistoryUnlocksThePlayerAtOnce(RedisSyncTestHarness harness) throws Exception {
+	void rollbackPastTheEndOfHistoryChangesNothing(RedisSyncTestHarness harness) throws Exception {
 		TestPlayer moderator = harness.join("Moderator");
 		TestPlayer player = harness.join("Tester");
 		MonumentaRedisSyncAPI.playerRollback(moderator, player, 50);
-
-		harness.awaitWithTicks("player unlocked", () -> !MonumentaRedisSyncAPI.isPlayerTransferring(player), 150);
-		assertTrue(player.isPlaced());
+		harness.awaitWithTicks("moderator told", () -> moderator.wasTold("Failed to retrieve player's rollback data"));
+		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(player));
+		assertTrue(player.getPluginMessages().isEmpty());
 	}
 
 	/**
-	 * The index counts back from the newest save as it was when the rollback was asked for. Rollback
-	 * first saves the current state as a way back and accounts for that entry, which it can only do
-	 * once that save has committed, so redis is stalled to make sure it waits.
+	 * The index counts back from the newest save made before the call, including one still being
+	 * written, so redis is stalled to make sure the rollback reads after it.
 	 */
 	@Test
 	void rollbackRestoresTheRequestedSave(RedisSyncTestHarness harness) throws Exception {
 		TestPlayer moderator = harness.join("Moderator");
 		TestPlayer first = savedTwice(harness, 30, 31);
-
 		harness.setProgress(first, 32);
-		harness.pauseRedisWrites(1000);
-		MonumentaRedisSyncAPI.playerRollback(moderator, first, 1);
-		/* A rollback that did not wait would act on one of these ticks */
-		harness.tick(5);
-		harness.awaitSavedWithoutTicking(first);
-		harness.awaitWithTicks("player kicked to apply the rollback", () -> !first.isPlaced());
-
-		assertEquals(30, harness.progress(harness.join("Tester")));
-	}
-
-	/** If rollback's own save is skipped (here because the player is still joining), it must not count it. */
-	@Test
-	void rollbackWhoseOwnSaveWasSkippedRestoresTheRequestedSave(RedisSyncTestHarness harness) throws Exception {
-		TestPlayer moderator = harness.join("Moderator");
-		for (int progress = 40; progress <= 41; progress++) {
-			TestPlayer player = harness.join("Tester");
-			harness.setProgress(player, progress);
-			harness.disconnect(player);
-		}
-
-		TestPlayer joining = harness.newPlayer("Tester");
-		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.login(joining));
-		MonumentaRedisSyncAPI.playerRollback(moderator, joining, 1);
-		harness.awaitWithTicks("player kicked to apply the rollback", () -> !joining.isPlaced());
-
-		assertEquals(40, harness.progress(harness.join("Tester")), "index 1 counts back from the newest save, 41");
-	}
-
-	/**
-	 * Once a rollback has started writing, the player stays locked until it is done, even past the
-	 * lock's timeout. Unlocked, they would save again, and the kick that applies the rollback would
-	 * save their current state right back over it while the moderator is told it worked.
-	 */
-	@Test
-	void rollbackStalledPastTheLockTimeoutStillApplies(RedisSyncTestHarness harness) throws Exception {
-		AtomicInteger failures = harness.countEvents(PlayerTransferFailEvent.class);
-		TestPlayer moderator = harness.join("Moderator");
-		TestPlayer first = savedTwice(harness, 30, 31);
-
-		MonumentaRedisSyncAPI.playerRollback(moderator, first, 1);
-		harness.awaitSavedWithoutTicking(first);
-		/* The next tick starts the rollback's read and write; the pause holds the write past the timeout */
-		harness.pauseRedisWrites(3000);
-		harness.tick();
-		harness.tick(SessionLock.TIMEOUT_TICKS + 5);
-		assertTrue(MonumentaRedisSyncAPI.isPlayerTransferring(first), "still locked while the rollback is being written");
-		assertEquals(0, failures.get());
-
-		harness.awaitWithTicks("player kicked to apply the rollback", () -> !first.isPlaced());
-		assertEquals(30, harness.progress(harness.join("Tester")));
-	}
-
-	/**
-	 * Another plugin cancels the kick that applies a rollback, so the player stays online with their
-	 * old state in memory. They stay locked, nothing of it may be saved over the rollback, and every
-	 * save it would make tries the kick again.
-	 */
-	@Test
-	void rollbackSurvivesItsKickBeingCancelled(RedisSyncTestHarness harness) throws Exception {
-		AtomicBoolean cancelKicks = new AtomicBoolean(true);
-		harness.onEvent(PlayerKickEvent.class, event -> event.setCancelled(cancelKicks.get()));
-		TestPlayer moderator = harness.join("Moderator");
-		TestPlayer first = savedTwice(harness, 30, 31);
-
-		MonumentaRedisSyncAPI.playerRollback(moderator, first, 1);
-		harness.awaitWithTicks("rollback written", () -> moderator.wasTold("rolled back successfully"));
-		harness.tick(SessionLock.TIMEOUT_TICKS + 5);
-		assertTrue(first.isPlaced(), "the kick was cancelled");
-		assertTrue(MonumentaRedisSyncAPI.isPlayerTransferring(first), "still locked: their data is no longer theirs to play with");
-		assertFalse(first.wasTold("Transferring timed out"), "a handoff that wrote has not failed");
-
-		cancelKicks.set(false);
+		harness.pauseRedisWrites(500);
 		MonumentaRedisSyncAPI.savePlayer(first);
-		harness.tick();
-		assertFalse(first.isPlaced(), "kicked again once kicks go through");
-		assertEquals(30, harness.progress(harness.join("Tester")));
+
+		MonumentaRedisSyncAPI.playerRollback(moderator, first, 1);
+		awaitReconnectAsked(harness, first);
+		harness.setProgress(first, 33);
+		harness.disconnect(first);
+		harness.awaitWithTicks("moderator told", () -> moderator.wasTold("rolled back successfully"));
+
+		TestPlayer next = harness.join("Tester");
+		assertEquals(31, harness.progress(next));
+		assertEquals(List.of(31, 33, 32, 31, 30), harness.savedProgressHistory(next).subList(0, 5));
+	}
+
+	/** The proxy never acts on the reconnect: the request times out, and the player's data stays theirs */
+	@Test
+	void handoffTheProxyNeverActsOnTimesOut(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer first = harness.join("Tester");
+		harness.setProgress(first, 20);
+		stashPut(harness, first);
+
+		MonumentaRedisSyncAPI.stashGet(first, null);
+		awaitReconnectAsked(harness, first);
+		harness.tick(MonumentaRedisSyncAPI.TRANSFER_TIMEOUT_TICKS + 5);
+		assertTrue(first.wasTold("Loading stash data timed out"));
+		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(first));
+
+		harness.setProgress(first, 21);
+		harness.disconnect(first);
+		assertEquals(21, harness.progress(harness.join("Tester")));
+	}
+
+	/** The player leaves while the replacement is still being read: nothing is replaced */
+	@Test
+	void handoffForAPlayerWhoLeftDuringTheReadDoesNothing(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer first = harness.join("Tester");
+		harness.setProgress(first, 20);
+		stashPut(harness, first);
+		harness.setProgress(first, 21);
+
+		MonumentaRedisSyncAPI.stashGet(first, null);
+		harness.disconnect(first);
+		harness.awaitWithTicks("told it was not loaded", () -> first.wasTold("Not loading stash data"));
+		assertEquals(21, harness.progress(harness.join("Tester")));
 	}
 
 	@Test
-	void loadFromPlayerCopiesTheOtherPlayersSave(RedisSyncTestHarness harness) throws Exception {
+	void loadFromPlayerCopiesTheOtherPlayersNewestSave(RedisSyncTestHarness harness) throws Exception {
 		TestPlayer source = harness.join("Source");
 		TestPlayer target = harness.join("Target");
 		harness.setProgress(source, 40);
 		harness.setProgress(target, 2);
 
+		harness.pauseRedisWrites(300);
 		MonumentaRedisSyncAPI.savePlayer(source);
 		MonumentaRedisSyncAPI.playerLoadFromPlayer(target, source, 0);
-		harness.awaitWithTicks("target kicked to load the copy", () -> !target.isPlaced());
+		awaitReconnectAsked(harness, target);
+		harness.disconnect(target);
 
 		assertEquals(40, harness.progress(harness.join("Target")));
+	}
+
+	/** A data handoff can't start while a transfer is pending */
+	@Test
+	void noHandoffWhileTransferring(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer player = harness.join("Tester");
+		MonumentaRedisSyncAPI.sendPlayer(player, "other_shard");
+		Exception refused = assertThrows(Exception.class, () -> MonumentaRedisSyncAPI.stashGet(player, null));
+		assertTrue(String.valueOf(refused.getMessage()).contains("transferring"), refused.getMessage());
+	}
+
+	/** A data handoff through an earlier connection is refused outright */
+	@Test
+	void handoffThroughAnEarlierConnectionIsRefused(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer stale = harness.join("Tester");
+		harness.disconnect(stale);
+		TestPlayer current = harness.join("Tester");
+
+		Exception refused = assertThrows(Exception.class, () -> MonumentaRedisSyncAPI.stashGet(stale, null));
+		assertTrue(String.valueOf(refused.getMessage()).contains("not this player's current connection"), refused.getMessage());
+		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(current));
+	}
+
+	/* The handoff has read its replacement and asked the proxy to reconnect the player */
+	private static void awaitReconnectAsked(RedisSyncTestHarness harness, TestPlayer player) throws InterruptedException {
+		harness.awaitWithTicks("proxy asked to reconnect", () -> MonumentaRedisSyncAPI.isPlayerTransferring(player));
+		assertTrue(player.getPluginMessages().stream().anyMatch(message -> message.startsWith(CleanSwitchListener.RECONNECT_CHANNEL)),
+			"reconnect sent: " + player.getPluginMessages());
 	}
 
 	/* A player whose newest two saves have the given progress, newest last, and who is still online */

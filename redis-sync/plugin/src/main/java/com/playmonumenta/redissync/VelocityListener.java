@@ -109,7 +109,7 @@ public class VelocityListener {
 		});
 	}
 
-	private String locationsKey() {
+	static String locationsKey() {
 		return String.format("%s:bungee:locations", CommonConfig.getServerDomain());
 	}
 }

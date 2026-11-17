@@ -40,8 +40,9 @@ Here's a list of currently supported things:
   use the same player data. No data transfer is possible between domains
   (useful if you have different types of servers)
 - Exposes the Redis API (via Lettuce) for access by other plugins
-- Also loads on Bungeecord, though currently does nothing there besides provide
-  access to the Lettuce API
+- Also loads on Velocity, where it makes every server switch a clean one: the
+  player leaves their server completely before the next one loads them (see
+  [ARCHITECTURE.md](ARCHITECTURE.md#the-proxy-clean-switches))
 - An API to allow plugins to save additional information about the player for
   transfer
 - An API and in-game commands to access a global redis scoreboard (the 'rboard')
@@ -131,21 +132,27 @@ dependencies {
 
 Player data lives in redis as per-player history lists, newest first: playerdata (NBT),
 advancements, scores, plugin data, content, and a history line naming who saved it. Each save
-pushes one entry onto every list. Position and world are kept per shard in a hash. How the plugin
-tracks a player and decides when to load and save is described in
-[ARCHITECTURE.md](ARCHITECTURE.md); this section is what other plugins can rely on, on one shard.
+pushes one entry onto every list. Position and world are kept per shard in a hash. How it all
+works, including the proxy's part, is described in [ARCHITECTURE.md](ARCHITECTURE.md); this
+section is what other plugins can rely on.
 
-- **A login always loads the newest save.** If the player's previous connection here has not
-  closed, or its last save has not committed, the login waits for it (up to `TIMEOUT_SECONDS`)
-  and is refused if it does not finish. If the old connection is still open, the newest login
-  wins: the old one is kicked, or, if still loading, never saved and kicked once it joins.
+- **A login always loads the newest save, on any shard.** A player's data has one owner at a
+  time: the session holding their **session lease** in redis (`<domain>:session:<uuid>`). A login
+  takes it in pre-login, waiting up to 20 seconds for the previous holder, on this shard or any
+  other, to finish saving and release it, and is refused ("Your previous session is still
+  saving") if it does not. If the player's previous connection here is still open, the newest
+  login wins: the old one is kicked, or, if still loading, never saved and kicked once it joins.
+- **A lease never outlives its shard for long.** It expires 90 seconds after its shard stops
+  renewing it, so a crashed or hung shard locks its players out for at most that.
+  `/sessionlease <player> [clear]` shows or deletes one. Every save checks the lease in the same
+  script that writes it, so a session that has lost it writes nothing, and is kicked.
 - **Saves are made only from the tick after PlayerJoinEvent**, so other plugins can load their
-  own state in their join handlers. No save is made while the player is transferring, after their
-  load failed, or after a data handoff replaced their data.
+  own state in their join handlers. No save is made after a load failed. A player who is
+  transferring, or waiting for a data handoff, is saved as usual until they leave.
 - **Only the `Player` object of the current connection counts.** A plugin holding one from an
-  earlier connection cannot save its state over the current one or lock it. `sendPlayer` through
-  one, or through a `Player` that has left the game, logs a warning and does nothing else: no
-  transfer events fire. Stash get, rollback and loadFromPlayer throw for it.
+  earlier connection cannot save its state over the current one. `sendPlayer` through one, or
+  through a `Player` that has left the game, logs a warning and does nothing else: no transfer
+  events fire. Stash get, rollback and loadFromPlayer throw for it.
 - **Fake players** (NPC plugins) load as usual but are never saved, since they are not logins.
 - **A failed load** refuses or kicks the player, and nothing they do is saved. They can log in
   again once whatever broke is fixed. A player online without a session, such as after a plugin
@@ -153,42 +160,54 @@ tracks a player and decides when to load and save is described in
 - **Without a session**, `getPlayerPluginData` and `getPlayerShardData` return null,
   `getPlayerContentData` returns a fresh empty object that is not kept, and `savePlayerContent` is
   ignored with a warning.
-- **`sendPlayer`** saves and locks the player, and tells the proxy to move them only once that
-  save has committed. The lock times out after 10 seconds, or 25 ticks if network relay does not
-  list the target as online. A transfer that times out, or whose save is too slow to commit,
-  unlocks the player and fires PlayerTransferFailEvent.
-- **Stash get, rollback and loadFromPlayer** save and lock the player, wait for the save, write
-  the replacement and kick the player to rejoin with it. If the replacement is missing or cannot
-  be read, the player is unlocked, and the player (or the moderator, for a rollback) is told.
-  Once it is being written, the player is never saved again and is kicked until they leave, even
-  if another plugin cancels the kick.
+- **`sendPlayer`** only asks the proxy to move the player (BungeeCord "Connect"), and applies the
+  return location, if any, to their saves from then on. The proxy takes the player off this shard
+  first and holds their client on its "Reconfiguring..." screen: here they log out as usual, and
+  their final save, made after PlayerQuitEvent (so quit handlers' changes are in it), is what the
+  target loads. `isPlayerTransferring` is true from the request until they leave, including in
+  PlayerQuitEvent. If they are still here after 10 seconds (25 ticks if network relay does not list
+  the target as online), the request is dropped and PlayerTransferFailEvent fires. Once they have
+  left, a failed transfer is the proxy's to handle: it sends them back to where they came from, as
+  an ordinary login, or disconnects them.
+- **Every server switch through the proxy is a clean one**: transfers, Velocity's `/send` and
+  `/server`, other plugins. Logins and redirects after a kick, which have no server to leave, are
+  left alone.
+- **Stash get, rollback and loadFromPlayer** read the replacement first; if it is missing, the
+  player (or the moderator) is told and nothing else happens. Otherwise the proxy reconnects the
+  player to this shard: as they leave, their final save is made, the replacement is pushed after
+  it, and they come back with it. The final save stays in history just below, as a way back. A
+  rollback index counts back from the newest save made before the call. `playerrollback` can be
+  run from the console.
 - **Offline edits** (`getOfflinePlayerData`, then `saveOfflinePlayerData`) are refused, returning
-  false, if the player is on this shard, logging in, just leaving, or has saved since the data
-  was read. A login waits for an offline edit in flight.
-- **Shutdown** waits for every save and other player data write in flight before closing redis.
+  false, if the player is online anywhere (holds a lease), is logging in here, or has saved since
+  the data was read. A login here waits for an offline edit in flight.
+- **Shutdown** writes pending handoffs, then waits for every save and other player data write in
+  flight before closing redis, and releases the leases whose saves committed.
 
 ### Known limitations
 
-- **Other shards.** All of the above is within one shard. Nothing stops a player reaching
-  another shard by some other route (a proxy `/server`, or a kick redirect) while their last
-  save here is still committing. Closing that would need a per-player lock in redis.
+- **The proxy plugin is required, and must be deployed before or with the shards.** Without it,
+  Velocity's own switch connects to the target before leaving the source, so the target's login
+  waits for a lease the source only releases after that login, and is refused after 20 seconds.
+  The proxy plugin finds the Velocity internals it needs by reflection at startup ("Clean server
+  switches enabled"); if they are missing, a switch asks the player to reconnect instead, with
+  their login server set to the target.
 - **Two connections for one account at once.** Velocity never gives one backend two live
-  connections for a player, but a proxy bug could. If two logins pass pre-login together, the
-  second to load is refused. If one drops while the other is still configuring, its close
-  cannot be told apart from the other's (the event carries only a UUID), so the other is refused
-  too. The worst case is a refused login, never unsaved play. Telling connections apart for
-  certain would need a monumenta-mixins hook giving the close event a connection identity.
+  connections for a player, but a proxy bug could. The second login waits for the first's lease
+  and is refused. Should both get through anyway (the lease vanished), the second to load is
+  refused. If one drops while the other is still configuring, its close cannot be told apart
+  from the other's (the event carries only a UUID), so the other is refused too. The worst case
+  is a refused login, never unsaved play.
 - **A dead connection stuck in configuration** cannot be kicked through the Bukkit API. A
   reconnect waits up to `TIMEOUT_SECONDS` for Paper to time it out, and is refused if it has
   not.
-- **Changes made in the join tick** are not saved by a transfer or handoff started in that same
-  tick, because saves open on the next tick. Rollback accounts for its own skipped save.
-- **Failed saves are not retried.** A reconnect after one loads the save before it. A MULTI that
-  may have partly applied cannot safely be retried.
-- **A crash, or the shutdown wait running out,** loses whatever had not committed. A save is two
-  transactions on two connections, so it can be torn between them. Making each save one
-  transaction on one connection would close that, at the cost of encoding the string data as
-  bytes.
+- **Changes made in the join tick** are not saved by a transfer or handoff in that same tick,
+  because saves open on the next tick.
+- **Failed saves are not retried.** A reconnect after one loads the save before it. A script that
+  failed part way may have partly applied, so it cannot safely be retried.
+- **A crash, or the shutdown wait running out,** loses whatever had not committed. Each save is
+  one atomic script (then advancements, as a second script on the same connection), so a save is
+  never torn across the main lists.
 - **stashPut** stashes the newest save once its own save has committed. If the player saves
   again before then, the stash is of that later save.
 - **Shutdown without monumenta-mixins.** Vanilla Paper disables plugins before it saves the
@@ -228,9 +247,8 @@ real server does and never saves in between. `pauseRedisWrites` issues `CLIENT P
 which reproduces the window between a save being made and it committing.
 
 Tests describe a player's state as one number, their "progress", which the harness stores in
-three places: playerdata, which is saved over one redis connection, and a score and
-advancements, which are saved over the other. Reading it back fails if the three disagree, so
-every check of what loaded covers both connections.
+three places: playerdata, a score and advancements, each saved by a different part of a save.
+Reading it back fails if the three disagree, so every check of what loaded covers all of them.
 
 Other pieces: `TestRedisServer` provides the redis, and `adapters/TestVersionAdapter` stands in
 for the NMS version adapter. The tests are in package `com.playmonumenta.redissync` so they can
@@ -243,18 +261,19 @@ constructors and `MonumentaRedisSync.registerPlayerDataListeners`.
 | `SessionLifecycleTest` | when a session starts and ends, and which saves it accepts |
 | `LoadFailureTest` | a failed load is neither played nor saved over, and does not lock the player out |
 | `ReconnectTest` | reconnects inside the commit window, reconnects over a connection that is still open, and overlapping or dropped logins |
-| `TransferTest` | the proxy is told to move a player only once their save has committed; lock timeouts |
-| `DataHandoffTest` | stash get, rollback and loadFromPlayer |
-| `ShutdownTest` | everything in flight at shutdown commits: final saves, the saves of players still online, other API writes, a rollback mid-write |
+| `TransferTest` | a transfer only asks the proxy; the logout save, with the return location, is what the target loads; timeouts, including one racing the proxy |
+| `SessionLeaseTest` | taking, waiting for, renewing, fencing and releasing the session lease |
+| `DataHandoffTest` | stash get, rollback and loadFromPlayer: read first, replacement pushed after the final save, timeouts |
+| `ShutdownTest` | everything in flight at shutdown commits: final saves, the saves of players still online, other API writes, a pending rollback |
 | `OfflineEditTest` | offline edits never bury newer progress |
 | `LifecycleFuzzTest` | random sequences of all of the above, checked against a model of the save history |
 
 `LifecycleFuzzTest` runs 8 fixed seeds by default. Run more with
 `./gradlew :redis-sync:redissync:test --tests '*LifecycleFuzzTest' -Pmrs.fuzz.seeds=200`, or one
 with `-Pmrs.fuzz.seed=N`. Redis timing is real, so a seed reproduces a failure's operations but
-not always the failure. Whether a save should land depends on whether the player is locked for a
-transfer, which the fuzz test asks the plugin rather than predicting, so lock timing is covered
-by `TransferTest` and `DataHandoffTest` alone.
+not always the failure. The proxy side of a transfer is not covered by unit tests; the tests
+stand in for the proxy by disconnecting the player. It is tested end to end with simulated and
+real players against a running proxy and shards: see monumenta-testbot's `TESTING.md`.
 
 The plugin keeps its state in static singletons, so the tests must run sequentially in one JVM.
 That is JUnit's default; do not enable parallel execution. `MonumentaRedisSyncAPI`'s player name

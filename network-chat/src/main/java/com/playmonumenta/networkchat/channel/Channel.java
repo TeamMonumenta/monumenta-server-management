@@ -15,7 +15,9 @@ import com.playmonumenta.networkchat.utils.MMLog;
 import com.playmonumenta.networkchat.utils.MessagingUtils;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
@@ -281,7 +283,17 @@ public abstract class Channel {
 
 	// Distributes a received message to the appropriate local player chat states. May be local or remote messages.
 	// Note that sending to player chat state allows chat to be paused.
-	public abstract void distributeMessage(Message message);
+	public final void distributeMessage(Message message) {
+		distributeMessage(message, PlayerStateManager.getPlayerStates().values());
+	}
+
+	// Distributes a message to those of these player chat states that should receive it
+	protected abstract void distributeMessage(Message message, Collection<PlayerState> recipients);
+
+	// Shows a message to one player who missed it while moving between shards, if this shard would have shown it to them
+	public final void replayMessage(Message message, PlayerState state) {
+		distributeMessage(message, List.of(state));
+	}
 
 	// Returns the shard that originated this message, or null for network-wide channels.
 	public @Nullable String getOriginShard(Message message) {

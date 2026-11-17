@@ -4,7 +4,6 @@ import com.destroystokyo.paper.event.player.PlayerConnectionCloseEvent;
 import com.destroystokyo.paper.profile.PlayerProfile;
 import com.google.gson.JsonObject;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
-import com.playmonumenta.redissync.adapters.VersionAdapter.ReturnParams;
 import com.playmonumenta.redissync.data.ContentData;
 import com.playmonumenta.redissync.utils.MMLog;
 import java.util.HashMap;
@@ -49,7 +48,7 @@ import org.jetbrains.annotations.Nullable;
  * where not, the first is refused too. The worst case is a refused login, never unsaved play.
  *
  * <p>The static methods are the entry points for the rest of the plugin; the instance methods
- * serve {@link DataEventListener} and {@link SessionLock}.
+ * serve {@link DataEventListener}.
  */
 public final class PlayerSessions implements Listener {
 	private static final Component LOAD_ERROR_MSG =
@@ -70,18 +69,23 @@ public final class PlayerSessions implements Listener {
 	 * player with the UUID start a session that never ends. Guarded by this.
 	 */
 	private final Map<UUID, Long> mExpectedLogins = new HashMap<>();
+	/* Session leases taken at pre-login, until the session that loads takes them over. Guarded by this */
+	private final Map<UUID, String> mPendingLeases = new HashMap<>();
+	/* The lease token this thread's pre-login took, from acquireLease to expectLogin (same thread) */
+	private final ThreadLocal<String> mPreLoginToken = new ThreadLocal<>();
 	private long mExpectedLoginTimeoutMillis = 60_000;
 	/* Offline data writes in flight; one and a login for the same player never both go ahead. Claimed under this */
 	private final ConcurrentMap<UUID, CompletableFuture<?>> mOfflineWrites = new ConcurrentHashMap<>();
 	/* Player data writes outside any session (location setters, stashes, offline edits), for shutdown to wait on */
 	private final Set<CompletableFuture<?>> mOtherWrites = ConcurrentHashMap.newKeySet();
-	/* Shoulder entities of locked players, which SessionLock registers */
-	private final ConcurrentMap<UUID, SessionLock> mLockedShoulderEntities = new ConcurrentHashMap<>();
 
 	PlayerSessions(Plugin plugin, VersionAdapter adapter) {
 		mPlugin = plugin;
 		mAdapter = adapter;
 		INSTANCE = this;
+
+		/* From the main thread, so a hung shard stops renewing too */
+		Bukkit.getScheduler().runTaskTimer(plugin, this::renewLeases, SessionLease.HEARTBEAT_TICKS, SessionLease.HEARTBEAT_TICKS);
 
 		/* Anyone online as the plugin starts (it was reloaded under them) has no session, so would never be saved */
 		if (!BukkitConfigAPI.getSavingDisabled() && !Bukkit.getOnlinePlayers().isEmpty()) {
@@ -90,6 +94,7 @@ public final class PlayerSessions implements Listener {
 				for (Player player : Bukkit.getOnlinePlayers()) {
 					if (current(player) == null) {
 						player.kick(LOAD_ERROR_MSG);
+						SessionLease.releaseIfHeldByThisShard(player.getUniqueId());
 					}
 				}
 			});
@@ -98,10 +103,6 @@ public final class PlayerSessions implements Listener {
 
 	Plugin getPlugin() {
 		return mPlugin;
-	}
-
-	ConcurrentMap<UUID, SessionLock> getLockedShoulderEntities() {
-		return mLockedShoulderEntities;
 	}
 
 	/** Schedules work on the main thread from any thread, unless the plugin is being disabled, when there is no one left to do it for */
@@ -156,7 +157,15 @@ public final class PlayerSessions implements Listener {
 			/* Pre-login waits for these, so this is a bug; the previous session stays, for the next login to wait on */
 			return refuse(player, "the previous session's saves are still in flight, so loading now would read stale data");
 		}
-		PlayerSession session = new PlayerSession(player);
+		String leaseToken;
+		synchronized (this) {
+			leaseToken = mPendingLeases.remove(uuid);
+		}
+		if (leaseToken == null && !BukkitConfigAPI.getSavingDisabled()) {
+			/* Pre-login takes the lease before expecting the login, so this is a bug */
+			return refuse(player, "the login holds no session lease");
+		}
+		PlayerSession session = new PlayerSession(player, leaseToken);
 		/* Stored before the expectation is removed, so an offline write always sees one or the other */
 		mSessions.put(uuid, session);
 		synchronized (this) {
@@ -197,16 +206,7 @@ public final class PlayerSessions implements Listener {
 		switch (session.getState()) {
 			case LOADING -> MMLog.debug("Skipping " + what + " save for player=" + playerName + " because their playerdata is still loading");
 			case FAILED -> MMLog.warning("Skipping " + what + " save for player=" + playerName + " because their playerdata failed to load");
-			case PLAYING -> {
-				SessionLock lock = session.getLock();
-				if (lock != null && lock.isHandedOff()) {
-					MMLog.warning("Skipping " + what + " save for player=" + playerName + " because their data has been replaced and they must rejoin");
-					runOnMainThread(lock::kickHandedOff);
-				} else {
-					MMLog.trace("Skipping " + what + " save for player=" + playerName + " because their data is moving elsewhere");
-				}
-			}
-			default -> throw new IllegalStateException("current() never returns an ended session");
+			default -> throw new IllegalStateException("current() never returns an ended session, and a playing one saves");
 		}
 		return null;
 	}
@@ -279,11 +279,59 @@ public final class PlayerSessions implements Listener {
 		session.getPlayer().kick(Component.translatable("multiplayer.disconnect.duplicate_login"), PlayerKickEvent.Cause.DUPLICATE_LOGIN);
 	}
 
+	/* Waits for the previous session anywhere to release the lease; after waitForPreviousSession, whose release it may need */
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+	public void acquireLease(AsyncPlayerPreLoginEvent event) {
+		UUID uuid = event.getPlayerProfile().getId();
+		if (uuid == null || event.getLoginResult() != AsyncPlayerPreLoginEvent.Result.ALLOWED || BukkitConfigAPI.getSavingDisabled()) {
+			return;
+		}
+		String token = SessionLease.newToken();
+		long startTime = System.currentTimeMillis();
+		String holder;
+		try {
+			holder = SessionLease.acquire(uuid, token);
+		} catch (Exception ex) {
+			MMLog.severe("Refusing login for uuid=" + uuid + " name=" + event.getName() + ": could not take their session lease", ex);
+			event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, Component.text("Could not reach the player data store, please try again", NamedTextColor.RED));
+			return;
+		}
+		long waited = System.currentTimeMillis() - startTime;
+		if (holder != null) {
+			MMLog.warning("Refusing login for uuid=" + uuid + " name=" + event.getName() + ": their session lease is still held by " + holder + " after " + waited + "ms");
+			event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, Component.text("Your previous session is still saving. Please try again in a minute.", NamedTextColor.RED));
+			return;
+		}
+		MMLog.debug(() -> "Took session lease for " + event.getName() + " token=" + token + " after waiting " + waited + "ms");
+		String replaced;
+		synchronized (this) {
+			replaced = mPendingLeases.put(uuid, token);
+		}
+		mPreLoginToken.set(token);
+		if (replaced != null) {
+			/* Only one login can take the lease, so this cannot happen; released to be safe */
+			SessionLease.release(uuid, replaced);
+		}
+	}
+
 	/* Last, once nothing else will refuse the login: from here its load events may start a session */
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
 	public void expectLogin(AsyncPlayerPreLoginEvent event) {
 		UUID uuid = event.getPlayerProfile().getId();
-		if (uuid == null || event.getLoginResult() != AsyncPlayerPreLoginEvent.Result.ALLOWED) {
+		String token = mPreLoginToken.get();
+		mPreLoginToken.remove();
+		if (uuid == null) {
+			return;
+		}
+		if (event.getLoginResult() != AsyncPlayerPreLoginEvent.Result.ALLOWED) {
+			/* Refused after taking the lease: nothing will load to release it */
+			if (token != null) {
+				synchronized (this) {
+					mPendingLeases.remove(uuid, token);
+				}
+				MMLog.debug(() -> "Releasing session lease for refused login uuid=" + uuid);
+				SessionLease.release(uuid, token);
+			}
 			return;
 		}
 		CompletableFuture<?> offlineWrite;
@@ -305,9 +353,58 @@ public final class PlayerSessions implements Listener {
 		Long expectedUntil = mExpectedLogins.get(uuid);
 		if (expectedUntil != null && expectedUntil < System.currentTimeMillis()) {
 			mExpectedLogins.remove(uuid);
+			releasePendingLease(uuid);
 			return null;
 		}
 		return expectedUntil;
+	}
+
+	/* A login that never loaded leaves its lease here. Guarded by this */
+	private void releasePendingLease(UUID uuid) {
+		String token = mPendingLeases.remove(uuid);
+		if (token != null) {
+			MMLog.debug(() -> "Releasing session lease of a login that never loaded uuid=" + uuid);
+			SessionLease.release(uuid, token);
+		}
+	}
+
+	/* The heartbeat: renews every lease held here (ended sessions' too, until released) and pending logins', in one script */
+	private void renewLeases() {
+		Map<UUID, String> leases = new HashMap<>();
+		synchronized (this) {
+			for (UUID uuid : Set.copyOf(mExpectedLogins.keySet())) {
+				expectedLogin(uuid);
+			}
+			leases.putAll(mPendingLeases);
+		}
+		for (PlayerSession session : mSessions.values()) {
+			String token = session.getLeaseToken();
+			if (token != null) {
+				leases.put(session.getPlayer().getUniqueId(), token);
+			}
+		}
+		long startTime = System.currentTimeMillis();
+		SessionLease.renew(leases).whenComplete((lost, ex) -> {
+			if (ex != null) {
+				MMLog.severe("Failed to renew " + leases.size() + " session leases", ex);
+				return;
+			}
+			MMLog.trace(() -> "Renewed " + leases.size() + " session leases in " + (System.currentTimeMillis() - startTime) + "ms");
+			if (!lost.isEmpty()) {
+				runOnMainThread(() -> lost.forEach(uuid -> leaseLost(uuid, leases.get(uuid))));
+			}
+		});
+	}
+
+	/** The session holding {@code token} has lost the lease to another session: fail and kick it */
+	void leaseLost(UUID uuid, @Nullable String token) {
+		PlayerSession session = active(uuid);
+		if (session == null || token == null || !token.equals(session.getLeaseToken())) {
+			return;
+		}
+		MMLog.severe("Session lease for player=" + session.getName() + " is held by another session; kicking them, and none of their saves here can be written");
+		session.fail();
+		session.getPlayer().kick(Component.text("Your session moved to another server. Please reconnect.", NamedTextColor.RED));
 	}
 
 	/*
@@ -389,50 +486,91 @@ public final class PlayerSessions implements Listener {
 		}
 
 		MMLog.debug(() -> "Ending session " + session);
-		/* First, so that nothing below failing can leave the next login waiting on this one forever */
+		if (session.getDeparture() instanceof PlayerSession.Replacement replacement) {
+			try {
+				writeReplacement(session, replacement);
+			} catch (RuntimeException ex) {
+				MMLog.severe("Failed to write " + replacement.what() + " for player=" + session.getName(), ex);
+			}
+		}
+		/* Before anything else that could fail, so the next login can never wait on this one forever */
 		session.end();
-		/* Only this session: a new login may already have replaced it */
-		session.finished().whenComplete((ignored, ex) -> mSessions.remove(uuid, session));
+		session.finished().whenComplete((ignored, ex) -> {
+			String token = session.getLeaseToken();
+			if (token != null) {
+				SessionLease.release(uuid, token).whenComplete((released, releaseEx) -> {
+					if (releaseEx != null) {
+						MMLog.severe("Failed to release session lease for player=" + session.getName() + "; it expires on its own", releaseEx);
+					} else {
+						MMLog.debug(() -> "Released session lease for player=" + session.getName() + " released=" + released);
+					}
+				});
+			}
+			/* Only this session: a new login may already have replaced it */
+			mSessions.remove(uuid, session);
+		});
 		if (BukkitConfigAPI.getScoreboardCleanupEnabled()) {
 			mAdapter.resetPlayerScores(session.getName(), Bukkit.getScoreboardManager().getMainScoreboard());
 		}
 	}
 
-	/* ******************* Locks ******************* */
-
-	static SessionLock lock(Player player) throws Exception {
-		return lock(player, SessionLock.TIMEOUT_TICKS, null);
+	/* After the session's final save, and tracked as a save, so the lease is released only once it is written */
+	private void writeReplacement(PlayerSession session, PlayerSession.Replacement replacement) {
+		UUID uuid = session.getPlayer().getUniqueId();
+		String token = session.getLeaseToken();
+		MMLog.info(() -> "Writing " + replacement.what() + " for player=" + session.getName() + " as they leave");
+		CompletableFuture<Long> write = token == null
+			? CompletableFuture.failedFuture(new IllegalStateException("the session holds no lease"))
+			: session.savesCommitted().thenCompose(ignored -> SessionLease.fencedWrite(uuid, token, replacement.write()));
+		session.setDeparture(null);
+		session.trackSave(write, () -> "Failed to write " + replacement.what() + " for player=" + session.getName());
+		write.whenComplete((ignored, ex) -> replacement.onWritten().accept(ex));
 	}
+
+	/* ******************* Departures ******************* */
 
 	/**
-	 * Saves and locks the player's session for a transfer or data handoff; see {@link SessionLock}.
+	 * Asks the proxy, over the player's own connection, to take them off this shard for
+	 * {@code departure}. If they are still here and connected after {@code timeoutTicks}, the proxy
+	 * never acted: the departure is dropped and {@code onTimeout} runs. Main thread only.
 	 *
-	 * @throws Exception if the player is already locked, the save threw, or {@code player} is not
-	 *                   the player's current connection: a lock taken through a stale Player object
-	 *                   would lock the current one
+	 * @throws RuntimeException if the message could not be sent; then nothing is left pending
 	 */
-	static SessionLock lock(Player player, int timeoutTicks, @Nullable ReturnParams returnParams) throws Exception {
-		PlayerSession session = INSTANCE.current(player);
-		if (session == null) {
-			throw new Exception("Player " + player.getName() + " is not this player's current connection on this shard");
+	@SuppressWarnings("ReferenceEquality") // The same departure, not an equal one
+	static void depart(PlayerSession session, PlayerSession.Departure departure, String channel, byte[] message, int timeoutTicks, Runnable onTimeout) {
+		Player player = session.getPlayer();
+		MMLog.debug(() -> "Asking the proxy to move player=" + session.getName() + " for " + departure);
+		session.setDeparture(departure);
+		try {
+			player.sendPluginMessage(INSTANCE.mPlugin, channel, message);
+		} catch (RuntimeException ex) {
+			session.setDeparture(null);
+			throw ex;
 		}
-		return SessionLock.take(INSTANCE, session, timeoutTicks, returnParams);
+		Bukkit.getScheduler().runTaskLater(INSTANCE.mPlugin, () -> {
+			if (session.getDeparture() != departure || INSTANCE.current(player) != session) {
+				return;
+			}
+			if (!INSTANCE.mAdapter.isConnected(player)) {
+				/* The proxy has acted; the quit is on its way */
+				return;
+			}
+			MMLog.warning("Proxy did not act on " + departure + " for player=" + session.getName() + " in time");
+			session.setDeparture(null);
+			onTimeout.run();
+		}, timeoutTicks);
 	}
 
-	static boolean isLocked(Player player) {
-		PlayerSession session = INSTANCE.current(player);
-		return session != null && session.isLocked();
-	}
-
-	static boolean isLockedShoulderEntity(UUID entity) {
-		return INSTANCE.mLockedShoulderEntities.containsKey(entity);
+	/** The open session for this exact Player object, or null */
+	static @Nullable PlayerSession currentSession(Player player) {
+		return INSTANCE.current(player);
 	}
 
 	/* ******************* Waiting for saves ******************* */
 
 	/** Completes once every save made so far for this player, by their current or just-ended session, has committed */
-	CompletableFuture<Void> savesCommitted(Player player) {
-		PlayerSession session = mSessions.get(player.getUniqueId());
+	static CompletableFuture<Void> savesCommitted(Player player) {
+		PlayerSession session = INSTANCE.mSessions.get(player.getUniqueId());
 		return session == null ? CompletableFuture.completedFuture(null) : session.savesCommitted();
 	}
 
@@ -442,7 +580,7 @@ public final class PlayerSessions implements Listener {
 			MMLog.warning("Got request to wait for save commit but no pending save operations found. This might be a bug with the plugin that uses MonumentaRedisSync");
 		}
 		long startTime = System.currentTimeMillis();
-		INSTANCE.savesCommitted(player).orTimeout(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS).whenComplete((ignored, ex) -> {
+		savesCommitted(player).orTimeout(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS).whenComplete((ignored, ex) -> {
 			if (ex != null) {
 				MMLog.severe("Got timeout waiting to commit transactions for player '" + player.getName() + "'. This is very bad!", ex);
 			}
@@ -458,12 +596,6 @@ public final class PlayerSessions implements Listener {
 	static boolean hasPendingSaves(Player player) {
 		PlayerSession session = INSTANCE.mSessions.get(player.getUniqueId());
 		return session != null && session.hasPendingSaves();
-	}
-
-	/* For tests: see PlayerSession.hasUnsettledSaves */
-	static boolean hasUnsettledSaves(Player player) {
-		PlayerSession session = INSTANCE.mSessions.get(player.getUniqueId());
-		return session != null && session.hasUnsettledSaves();
 	}
 
 	/** Records a player data write made outside any session's saves, so shutdown waits for it. Returns it. */
@@ -504,6 +636,12 @@ public final class PlayerSessions implements Listener {
 		if (INSTANCE == null) {
 			return;
 		}
+		/* Sessions removed at shutdown get no close event, so their pending handoffs are written here */
+		for (PlayerSession session : INSTANCE.mSessions.values()) {
+			if (!session.isEnded() && session.getDeparture() instanceof PlayerSession.Replacement replacement) {
+				INSTANCE.writeReplacement(session, replacement);
+			}
+		}
 		CompletableFuture<?>[] writes = Stream.concat(
 				INSTANCE.mSessions.values().stream().map(PlayerSession::savesCommitted),
 				INSTANCE.mOtherWrites.stream())
@@ -514,6 +652,24 @@ public final class PlayerSessions implements Listener {
 			MMLog.info(() -> "Waited " + (System.currentTimeMillis() - startTime) + "ms for player data writes to commit before closing redis");
 		} catch (InterruptedException | ExecutionException | TimeoutException ex) {
 			MMLog.severe("Player data writes still in flight when closing redis may be lost", ex);
+		}
+
+		/* Sessions removed at shutdown get no close event, so never released their leases */
+		Map<UUID, String> leases = new HashMap<>();
+		synchronized (INSTANCE) {
+			leases.putAll(INSTANCE.mPendingLeases);
+		}
+		for (PlayerSession session : INSTANCE.mSessions.values()) {
+			/* One whose saves may still land must expire instead, or a login elsewhere could load before them */
+			if (session.getLeaseToken() != null && !session.hasPendingSaves()) {
+				leases.put(session.getPlayer().getUniqueId(), session.getLeaseToken());
+			}
+		}
+		try {
+			long released = SessionLease.release(leases).get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
+			MMLog.info(() -> "Released " + released + " of " + leases.size() + " session leases at shutdown");
+		} catch (InterruptedException | ExecutionException | TimeoutException ex) {
+			MMLog.severe("Failed to release session leases at shutdown; they expire on their own in " + SessionLease.TTL_MILLIS / 1000 + "s", ex);
 		}
 	}
 

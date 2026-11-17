@@ -23,7 +23,7 @@ import dev.jorel.commandapi.arguments.LiteralArgument;
 import dev.jorel.commandapi.arguments.MultiLiteralArgument;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.time.Instant;
-import java.util.Map;
+import java.util.Collection;
 import java.util.Objects;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
@@ -232,7 +232,7 @@ public class ChannelLocal extends Channel implements ChannelAutoJoin, ChannelPer
 	}
 
 	@Override
-	public void distributeMessage(Message message) {
+	protected void distributeMessage(Message message, Collection<PlayerState> recipients) {
 		JsonObject extraData = message.getExtraData();
 		if (extraData == null) {
 			MMLog.warning("Got local chat message with no fromShard, ignoring.");
@@ -253,8 +253,7 @@ public class ChannelLocal extends Channel implements ChannelAutoJoin, ChannelPer
 			return;
 		}
 		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
-		for (Map.Entry<UUID, PlayerState> playerStateEntry : PlayerStateManager.getPlayerStates().entrySet()) {
-			PlayerState state = playerStateEntry.getValue();
+		for (PlayerState state : recipients) {
 			Player player = state.getPlayer();
 			if (player == null || !mayListen(player)) {
 				continue;

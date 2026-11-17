@@ -63,6 +63,10 @@ public class MonumentaRedisSyncVelocity {
 	public void onEnable(ProxyInitializeEvent event) {
 		com.playmonumenta.common.MMLogVelocity.registerCommand(MMLog.getLog(), mServer.getCommandManager(), this);
 		mServer.getEventManager().register(this, new VelocityListener(this));
+		if (VelocityInternals.check(mServer.getClass().getClassLoader())) {
+			mLogger.info("Clean server switches enabled");
+		}
+		mServer.getEventManager().register(this, new CleanSwitchListener(this));
 	}
 
 	// we use ProxyShutdownEvent because ListenerCloseEvent might fire too early
