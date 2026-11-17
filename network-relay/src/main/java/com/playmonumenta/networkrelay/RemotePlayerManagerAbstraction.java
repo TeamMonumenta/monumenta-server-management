@@ -348,16 +348,17 @@ public abstract class RemotePlayerManagerAbstraction {
 		}
 
 		MMLog.debug(() -> "Unregistering server ID " + serverId);
-		String serverType = RabbitMQManager.getInstance().getOnlineDestinationType(serverId);
-		if (serverType == null) {
-			throw new IllegalStateException("ERROR: Server type for server ID cleared before unregistering players from that server: id:" + serverId);
-		}
+		// Identify each player's entry for this server by its server ID rather than looking up the server's type
+		// from RabbitMQManager. On Velocity, DestOfflineEvent is delivered asynchronously, by which point
+		// RabbitMQManager has already forgotten the offline server's type.
 		for (RemotePlayerData allPlayerData : remotePlayers.values()) {
-			RemotePlayerAbstraction oldPlayerData = allPlayerData.get(serverType);
-			if (oldPlayerData == null) {
-				continue;
+			for (String serverType : allPlayerData.getServerTypes()) {
+				RemotePlayerAbstraction oldPlayerData = allPlayerData.get(serverType);
+				if (oldPlayerData == null || !serverId.equals(oldPlayerData.getServerId())) {
+					continue;
+				}
+				updateLocalPlayer(oldPlayerData.asOffline(), isRemote);
 			}
-			updateLocalPlayer(oldPlayerData.asOffline(), isRemote);
 		}
 		return true;
 	}
