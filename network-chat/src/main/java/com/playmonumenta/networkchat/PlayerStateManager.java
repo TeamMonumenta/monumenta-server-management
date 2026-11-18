@@ -27,11 +27,9 @@ import com.playmonumenta.networkrelay.RemotePlayerData;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.RedisAPI;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
-import com.playmonumenta.redissync.event.PlayerSessionEndEvent;
 import com.viaversion.viaversion.api.Via;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import io.papermc.paper.event.player.AsyncChatEvent;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -310,7 +308,6 @@ public class PlayerStateManager implements Listener {
 			MMLog.info("Refreshing chat during login event");
 			playerState.refreshChat();
 		}
-		replayMissedMessages(playerId);
 
 		// TODO Send login messages here (once implemented)
 	}
@@ -324,12 +321,6 @@ public class PlayerStateManager implements Listener {
 		if (playerState != null) {
 			event.setPluginData(IDENTIFIER, playerState.toJson());
 		}
-	}
-
-	/* After the final save, which still needs the state */
-	@EventHandler(ignoreCancelled = false, priority = EventPriority.MONITOR)
-	public void playerSessionEndEvent(PlayerSessionEndEvent event) {
-		mPlayerStates.remove(event.getPlayer().getUniqueId());
 	}
 
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
@@ -347,6 +338,8 @@ public class PlayerStateManager implements Listener {
 				}
 			}
 		}
+		// delete the data one tick later, as the save event still needs it (and is fired after the quit event)
+		Bukkit.getScheduler().runTaskLater(NetworkChatPlugin.getInstance(), () -> mPlayerStates.remove(playerId), 1);
 
 		// Broadcast the player's current chat history
 		@Nullable PlayerChatHistory oldChatHistory = mPlayerChatHistories.get(playerId);
@@ -403,34 +396,6 @@ public class PlayerStateManager implements Listener {
 		event.setCancelled(true);
 	}
 
-	/*
-	 * Shows a player who has just arrived the channel messages sent while the proxy held them between
-	 * shards. Messages already in their history are skipped, so the margin for shard clocks is free.
-	 */
-	private static void replayMissedMessages(UUID playerId) {
-		PlayerState playerState = mPlayerStates.get(playerId);
-		PlayerChatHistory history = mPlayerChatHistories.get(playerId);
-		if (playerState == null || history == null) {
-			return;
-		}
-		Instant leftAt = history.takeLeftAt();
-		if (leftAt == null) {
-			return;
-		}
-		int replayed = 0;
-		for (Message message : MessageManager.recentMessagesSince(leftAt.minusSeconds(2))) {
-			Channel channel = message.getChannel();
-			if (message.isDeleted() || history.hasMessage(message.getUniqueId())
-				|| channel == null || channel instanceof ChannelLoading || channel instanceof ChannelFuture) {
-				continue;
-			}
-			channel.replayMessage(message, playerState);
-			replayed++;
-		}
-		int count = replayed;
-		MMLog.debug(() -> "Replayed " + count + " messages missed between shards for " + playerId);
-	}
-
 	// This should only happen when a player logs out on another shard on the network.
 	// If they log in here, their chat history will be loaded.
 	// If they log in elsewhere, or don't log back in, the history is discarded after a delay.
@@ -448,10 +413,6 @@ public class PlayerStateManager implements Listener {
 						MMLog.info("Refreshing chat due to received RemoteChatHistory");
 						playerState.refreshChat();
 					}
-				}
-				/* The history arrived after the player had already joined here */
-				if (mPlayerStates.containsKey(playerId)) {
-					replayMissedMessages(playerId);
 				}
 
 				// Failsafe in case the proxy data was outdated, and the player was just leaving

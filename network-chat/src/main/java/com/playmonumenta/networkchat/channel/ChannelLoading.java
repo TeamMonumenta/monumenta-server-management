@@ -12,7 +12,6 @@ import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -114,7 +113,7 @@ public class ChannelLoading extends Channel {
 
 	// Messages will be replayed for anyone triggering the channel to load, nothing to do.
 	@Override
-	protected void distributeMessage(Message message, Collection<PlayerState> recipients) {
+	public void distributeMessage(Message message) {
 	}
 
 	// The channel is loading - we don't know how to display this message yet!

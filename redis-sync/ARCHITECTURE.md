@@ -409,19 +409,6 @@ support (3.3.0):
 If any is missing, a switch stores the target as the player's login server and disconnects them
 with "Please reconnect".
 
-## Chat across a transfer
-
-While the proxy holds a player, no shard has them, so no shard shows them chat. network-chat
-covers this itself (`PlayerStateManager`, `MessageManager`):
-
-- As a player leaves a shard, their chat history is broadcast to every shard with the time they
-  left (`leftAt`). Shards keep it for 120 seconds for the player to arrive.
-- Every shard keeps the channel messages it has seen in the last 120 seconds.
-- On join, once the history is there, the messages sent after `leftAt` (less 2 seconds, for shard
-  clocks) and not already in the history are replayed through the channel's own distribution
-  (`Channel.replayMessage`), so each channel's rules (world, team, party, ignore list) decide as
-  they would have.
-
 ## When things go wrong
 
 | Situation | What happens |

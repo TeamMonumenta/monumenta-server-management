@@ -3,17 +3,14 @@ package com.playmonumenta.networkchat;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Stream;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.jetbrains.annotations.Nullable;
 
 // Container for chat messages to be replayed if a message is deleted.
 // This is discarded if the player has been offline long enough.
@@ -22,12 +19,9 @@ public class PlayerChatHistory {
 
 	// From vanilla client limits
 	public static final int MAX_DISPLAYED_MESSAGES = 100;
-	/* How long history and recent messages are kept for a player arriving from another shard: longer than the proxy holds them */
-	protected static final long MAX_OFFLINE_HISTORY_SECONDS = 120;
+	protected static final long MAX_OFFLINE_HISTORY_SECONDS = 10;
 
 	private final UUID mPlayerId;
-	/* When the player left the shard that sent this history, until what they missed has been replayed */
-	private @Nullable Instant mLeftAt = null;
 	private boolean mIsReplayingChat = false;
 	private boolean mIsDisplayingMessage = false;
 	// Messages the player has seen
@@ -42,11 +36,6 @@ public class PlayerChatHistory {
 	}
 
 	public void updateFromJson(JsonObject obj) {
-		JsonElement leftAtJson = obj.get("leftAt");
-		if (leftAtJson != null && leftAtJson.isJsonPrimitive()) {
-			mLeftAt = Instant.ofEpochMilli(leftAtJson.getAsLong());
-		}
-
 		JsonArray seenMessagesJson = obj.getAsJsonArray("seenMessages");
 		if (seenMessagesJson != null) {
 			mSeenMessages = new ArrayList<>(MAX_DISPLAYED_MESSAGES);
@@ -108,24 +97,11 @@ public class PlayerChatHistory {
 
 		JsonObject result = new JsonObject();
 		result.addProperty("playerId", mPlayerId.toString());
-		result.addProperty("leftAt", Instant.now().toEpochMilli());
 		result.add("seenMessages", seenMessages);
 		result.add("unseenMessages", unseenMessages);
 		result.add("unprocessedMessages", unprocessedMessages);
 
 		return result;
-	}
-
-	/** When the player left their previous shard, once: for replaying what they missed in between */
-	public @Nullable Instant takeLeftAt() {
-		Instant leftAt = mLeftAt;
-		mLeftAt = null;
-		return leftAt;
-	}
-
-	public boolean hasMessage(UUID messageId) {
-		return Stream.of(mSeenMessages, mUnseenMessages, mUnprocessedMessages)
-			.anyMatch(messages -> messages.stream().anyMatch(message -> messageId.equals(message.getUniqueId())));
 	}
 
 	public Player getPlayer() {

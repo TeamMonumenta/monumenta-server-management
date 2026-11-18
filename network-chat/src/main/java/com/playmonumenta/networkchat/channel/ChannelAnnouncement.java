@@ -20,7 +20,7 @@ import dev.jorel.commandapi.arguments.LiteralArgument;
 import dev.jorel.commandapi.arguments.MultiLiteralArgument;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.time.Instant;
-import java.util.Collection;
+import java.util.Map;
 import java.util.UUID;
 import me.clip.placeholderapi.PlaceholderAPI;
 import net.kyori.adventure.text.Component;
@@ -218,9 +218,10 @@ public class ChannelAnnouncement extends Channel implements ChannelAutoJoin, Cha
 	}
 
 	@Override
-	protected void distributeMessage(Message message, Collection<PlayerState> recipients) {
+	public void distributeMessage(Message message) {
 		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
-		for (PlayerState state : recipients) {
+		for (Map.Entry<UUID, PlayerState> playerStateEntry : PlayerStateManager.getPlayerStates().entrySet()) {
+			PlayerState state = playerStateEntry.getValue();
 			Player player = state.getPlayer();
 			if (player == null || !mayListen(player)) {
 				continue;

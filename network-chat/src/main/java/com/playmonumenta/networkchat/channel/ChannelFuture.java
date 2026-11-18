@@ -2,13 +2,11 @@ package com.playmonumenta.networkchat.channel;
 
 import com.google.gson.JsonObject;
 import com.playmonumenta.networkchat.Message;
-import com.playmonumenta.networkchat.PlayerState;
 import com.playmonumenta.networkchat.channel.property.ChannelAccess;
 import com.playmonumenta.networkchat.channel.property.ChannelSettings;
 import com.playmonumenta.networkchat.utils.CommandUtils;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
@@ -84,7 +82,7 @@ public class ChannelFuture extends Channel {
 
 	// Messages will be replayed for anyone triggering the channel to load, nothing to do.
 	@Override
-	protected void distributeMessage(Message message, Collection<PlayerState> recipients) {
+	public void distributeMessage(Message message) {
 	}
 
 	// The channel is from a future version - we can't determine how to display this!
