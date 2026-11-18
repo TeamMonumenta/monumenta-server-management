@@ -169,39 +169,3 @@ target. A player who logs out and back in within 120 seconds gets the same repla
 | `com.playmonumenta.networkchat.config_update` | Formats, filters, defaults or visibility change | Reloads the config |
 
 network-relay processes received messages on the main thread, in the order they arrived.
-
-## What this branch changes
-
-Before: a message sent while the proxy held a player between shards was shown to no one, since
-no shard had the player. Each channel copied the same distribution loop, and the first whisper
-between two players on different shards could be lost.
-
-```mermaid
-flowchart LR
-    subgraph before["Before"]
-        direction TB
-        b1["player leaves A"] --> b2["held by the proxy"]
-        b2 --> b3["joins B"]
-        m1(["chat sent during the hold"]) -. "shown to no one" .-> b2
-    end
-    subgraph after["After"]
-        direction TB
-        a1["player leaves A:<br/>final save has leftAt"] --> a2["held by the proxy"]
-        a2 --> a3["joins B"]
-        m2(["chat sent during the hold"]) --> k["B keeps recent messages"]
-        k --> a4["end of join: replay messages<br/>after leftAt through isAudience"]
-        a3 --> a4
-    end
-```
-
-- **Replay across held switches:** recent messages on every shard, `leftAt` in the final save,
-  replay at the end of the join.
-- **One delivery path:** `Channel.distributeMessage` and `replayMessage` are final over one loop;
-  channels override `isAudience` (and Whisper `onDeliver`) instead of copying the loop.
-- **Player state dropped at `PlayerSessionEndEvent`** (after the final save) instead of a tick
-  after quit.
-- **Channel loading:** channel updates are applied when they arrive instead of a tick later, and
-  whichever load replaces a `ChannelLoading` delivers what it queued. Fixes the first whisper of
-  a new conversation across shards being lost.
-- **monumenta-plugins:** players are added to the `players` team during the join itself, so the
-  replay sees them on their team.
