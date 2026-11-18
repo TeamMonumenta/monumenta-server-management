@@ -412,15 +412,8 @@ with "Please reconnect".
 ## Chat across a transfer
 
 While the proxy holds a player, no shard has them, so no shard shows them chat. network-chat
-covers this itself (`PlayerStateManager`, `MessageManager`):
-
-- Every shard keeps the channel messages it has seen in the last 120 seconds.
-- The final save records when the player quit (`leftAt` in network-chat's plugin data). The lease
-  guarantees that save is what the next shard loads.
-- At the end of the join (`MONITOR`, once every plugin has set the player up on the shard, such
-  as their team), messages sent after `leftAt` are replayed through the same audience check as
-  live delivery (`Channel.replayMessage`), so each channel's rules (world, team, party, ignore
-  list) decide as they would have.
+replays what they missed on arrival, from the quit time it writes into the final save: see
+[network-chat's ARCHITECTURE.md](../network-chat/ARCHITECTURE.md#moving-between-shards).
 
 ## When things go wrong
 
