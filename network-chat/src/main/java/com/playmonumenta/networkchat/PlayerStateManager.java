@@ -27,9 +27,11 @@ import com.playmonumenta.networkrelay.RemotePlayerData;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.RedisAPI;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
+import com.playmonumenta.redissync.event.PlayerSessionEndEvent;
 import com.viaversion.viaversion.api.Via;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import io.papermc.paper.event.player.AsyncChatEvent;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -53,12 +55,15 @@ import org.jetbrains.annotations.Nullable;
 
 public class PlayerStateManager implements Listener {
 	private static final String IDENTIFIER = "NetworkChat";
+	private static final String LEFT_AT_KEY = "leftAt";
 	private static final String REDIS_PLAYER_EVENT_SETTINGS_KEY = "player_event_settings";
 	private static final int VERSION_REQUIRES_REFRESHING_CHAT = 765;
 
 	private static @Nullable PlayerStateManager INSTANCE = null;
 	private static final Map<UUID, PlayerState> mPlayerStates = new HashMap<>();
 	private static final Map<UUID, PlayerChatHistory> mPlayerChatHistories = new HashMap<>();
+	/* When players quit, until their session ends: written into their final save */
+	private static final Map<UUID, Instant> mLeftAt = new HashMap<>();
 	private static MessageVisibility mMessageVisibility = new MessageVisibility();
 	private static boolean mIsDefaultChatPlugin = true;
 
@@ -319,14 +324,34 @@ public class PlayerStateManager implements Listener {
 
 		PlayerState playerState = mPlayerStates.get(player.getUniqueId());
 		if (playerState != null) {
-			event.setPluginData(IDENTIFIER, playerState.toJson());
+			JsonObject data = playerState.toJson();
+			Instant leftAt = mLeftAt.get(player.getUniqueId());
+			if (leftAt != null) {
+				// The final save commits before the player can join anywhere; that shard replays what follows
+				data.addProperty(LEFT_AT_KEY, leftAt.toEpochMilli());
+			}
+			event.setPluginData(IDENTIFIER, data);
 		}
+	}
+
+	/* Once every plugin has set the player up on this shard (teams, world), so channels judge them as they now are */
+	@EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
+	public void playerJoinEventReplay(PlayerJoinEvent event) {
+		replayMissedMessages(event.getPlayer());
+	}
+
+	/* After the final save, which still needs the state */
+	@EventHandler(ignoreCancelled = false, priority = EventPriority.MONITOR)
+	public void playerSessionEndEvent(PlayerSessionEndEvent event) {
+		mPlayerStates.remove(event.getPlayer().getUniqueId());
+		mLeftAt.remove(event.getPlayer().getUniqueId());
 	}
 
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
 	public void playerQuitEvent(PlayerQuitEvent event) {
 		Player player = event.getPlayer();
 		UUID playerId = player.getUniqueId();
+		mLeftAt.put(playerId, Instant.now());
 
 		PlayerState oldState = mPlayerStates.get(playerId);
 		if (oldState != null) {
@@ -338,8 +363,6 @@ public class PlayerStateManager implements Listener {
 				}
 			}
 		}
-		// delete the data one tick later, as the save event still needs it (and is fired after the quit event)
-		Bukkit.getScheduler().runTaskLater(NetworkChatPlugin.getInstance(), () -> mPlayerStates.remove(playerId), 1);
 
 		// Broadcast the player's current chat history
 		@Nullable PlayerChatHistory oldChatHistory = mPlayerChatHistories.get(playerId);
@@ -394,6 +417,28 @@ public class PlayerStateManager implements Listener {
 			MessagingUtils.sendStackTrace(player, ex);
 		}
 		event.setCancelled(true);
+	}
+
+	/* Shows a player who has just arrived the channel messages sent since their previous shard's final save */
+	private static void replayMissedMessages(Player player) {
+		PlayerState playerState = mPlayerStates.get(player.getUniqueId());
+		JsonObject data = MonumentaRedisSyncAPI.getPlayerPluginData(player.getUniqueId(), IDENTIFIER);
+		JsonElement leftAtJson = data == null ? null : data.get(LEFT_AT_KEY);
+		if (playerState == null || leftAtJson == null || !leftAtJson.isJsonPrimitive()) {
+			return;
+		}
+		Instant leftAt = Instant.ofEpochMilli(leftAtJson.getAsLong());
+		if (leftAt.isBefore(Instant.now().minusSeconds(MessageManager.RECENT_MESSAGE_SECONDS))) {
+			return;
+		}
+		List<Message> messages = MessageManager.recentMessagesSince(leftAt);
+		for (Message message : messages) {
+			Channel channel = message.getChannel();
+			if (channel != null && !message.isDeleted()) {
+				channel.replayMessage(message, playerState);
+			}
+		}
+		MMLog.debug(() -> "Replayed up to " + messages.size() + " messages missed between shards for " + player.getName());
 	}
 
 	// This should only happen when a player logs out on another shard on the network.

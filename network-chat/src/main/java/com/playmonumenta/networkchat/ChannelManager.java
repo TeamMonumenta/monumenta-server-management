@@ -574,31 +574,34 @@ public class ChannelManager implements Listener {
 	}
 
 	private static void loadChannelApply(UUID channelId, String channelData) {
-		Channel channel = mChannels.get(channelId);
-
-		Gson gson = new Gson();
-		ChannelLoading loadingChannel = null;
-		if (channel instanceof ChannelLoading) {
-			loadingChannel = (ChannelLoading) channel;
-		}
 		if (channelData == null) {
-			// No channel was found, alert the player it was deleted.
-			MMLog.warning("Channel " + channelId.toString() + " was not found.");
-			mChannels.remove(channelId);
-			PlayerStateManager.unregisterChannel(channelId);
+			// No channel was found, alert the player it was deleted (unless a channel update registered it meanwhile)
+			if (mChannels.get(channelId) instanceof ChannelLoading loadingChannel) {
+				MMLog.warning("Channel " + channelId.toString() + " was not found.");
+				mChannels.remove(channelId);
+				PlayerStateManager.unregisterChannel(channelId);
+				loadingChannel.finishLoading();
+			}
 		} else {
 			// Channel was found. Attempt to register it.
-			JsonObject channelJson = gson.fromJson(channelData, JsonObject.class);
-			loadChannelApply(channelId, channelJson);
-		}
-		if (loadingChannel != null) {
-			loadingChannel.finishLoading();
+			loadChannelApply(channelId, new Gson().fromJson(channelData, JsonObject.class));
 		}
 	}
 
+	// Registers channel data from Redis or a channel update; whichever replaces a loading channel delivers what it queued
 	private static void loadChannelApply(UUID channelId, JsonObject channelJson) {
-		Set<PlayerState> playersToNotify = new HashSet<>();
 		Channel oldChannel = mChannels.get(channelId);
+		try {
+			registerChannelJson(channelId, channelJson, oldChannel);
+		} finally {
+			if (oldChannel instanceof ChannelLoading loadingChannel) {
+				loadingChannel.finishLoading();
+			}
+		}
+	}
+
+	private static void registerChannelJson(UUID channelId, JsonObject channelJson, @Nullable Channel oldChannel) {
+		Set<PlayerState> playersToNotify = new HashSet<>();
 		if (oldChannel != null) {
 			for (PlayerState state : PlayerStateManager.getPlayerStates().values()) {
 				if (state.isWatchingChannelId(channelId)) {
@@ -792,13 +795,11 @@ public class ChannelManager implements Listener {
 			return;
 		}
 
-		Bukkit.getScheduler().runTask(NetworkChatPlugin.getInstance(), () -> {
-			if (channelData == null) {
-				deleteChannelLocally(channelId);
-			} else {
-				loadChannelApply(channelId, channelData);
-			}
-		});
+		if (channelData == null) {
+			deleteChannelLocally(channelId);
+		} else {
+			loadChannelApply(channelId, channelData);
+		}
 	}
 
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.LOW)
