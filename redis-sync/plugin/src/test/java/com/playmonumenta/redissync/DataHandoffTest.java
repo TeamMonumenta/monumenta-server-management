@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -76,7 +76,7 @@ public class DataHandoffTest {
 		TestPlayer player = harness.join("Tester");
 		MonumentaRedisSyncAPI.stashGet(player, "no_such_stash");
 		harness.awaitWithTicks("told there is no stash", () -> player.wasTold("No stash data found"));
-		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(player));
+		assertNull(MonumentaRedisSyncAPI.getDeparture(player));
 		assertTrue(player.getPluginMessages().isEmpty(), "proxy never asked to reconnect them");
 		assertTrue(player.isPlaced());
 	}
@@ -87,7 +87,7 @@ public class DataHandoffTest {
 		TestPlayer player = harness.join("Tester");
 		MonumentaRedisSyncAPI.playerRollback(moderator, player, 50);
 		harness.awaitWithTicks("moderator told", () -> moderator.wasTold("Failed to retrieve player's rollback data"));
-		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(player));
+		assertNull(MonumentaRedisSyncAPI.getDeparture(player));
 		assertTrue(player.getPluginMessages().isEmpty());
 	}
 
@@ -125,7 +125,7 @@ public class DataHandoffTest {
 		awaitReconnectAsked(harness, first);
 		harness.tick(MonumentaRedisSyncAPI.TRANSFER_TIMEOUT_TICKS + 5);
 		assertTrue(first.wasTold("Loading stash data timed out"));
-		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(first));
+		assertNull(MonumentaRedisSyncAPI.getDeparture(first));
 
 		harness.setProgress(first, 21);
 		harness.disconnect(first);
@@ -180,12 +180,12 @@ public class DataHandoffTest {
 
 		Exception refused = assertThrows(Exception.class, () -> MonumentaRedisSyncAPI.stashGet(stale, null));
 		assertTrue(String.valueOf(refused.getMessage()).contains("not this player's current connection"), refused.getMessage());
-		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(current));
+		assertNull(MonumentaRedisSyncAPI.getDeparture(current));
 	}
 
 	/* The handoff has read its replacement and asked the proxy to reconnect the player */
 	private static void awaitReconnectAsked(RedisSyncTestHarness harness, TestPlayer player) throws InterruptedException {
-		harness.awaitWithTicks("proxy asked to reconnect", () -> MonumentaRedisSyncAPI.isPlayerTransferring(player));
+		harness.awaitWithTicks("proxy asked to reconnect", () -> MonumentaRedisSyncAPI.getDeparture(player) != null);
 		assertTrue(player.getPluginMessages().stream().anyMatch(message -> message.startsWith(CleanSwitchListener.RECONNECT_CHANNEL)),
 			"reconnect sent: " + player.getPluginMessages());
 	}

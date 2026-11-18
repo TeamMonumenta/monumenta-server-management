@@ -27,6 +27,7 @@ import com.playmonumenta.networkrelay.RemotePlayerData;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
 import com.playmonumenta.redissync.RedisAPI;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
+import com.playmonumenta.redissync.event.PlayerSessionEndEvent;
 import com.viaversion.viaversion.api.Via;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import io.papermc.paper.event.player.AsyncChatEvent;
@@ -325,6 +326,12 @@ public class PlayerStateManager implements Listener {
 		}
 	}
 
+	/* After the final save, which still needs the state */
+	@EventHandler(ignoreCancelled = false, priority = EventPriority.MONITOR)
+	public void playerSessionEndEvent(PlayerSessionEndEvent event) {
+		mPlayerStates.remove(event.getPlayer().getUniqueId());
+	}
+
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
 	public void playerQuitEvent(PlayerQuitEvent event) {
 		Player player = event.getPlayer();
@@ -340,8 +347,6 @@ public class PlayerStateManager implements Listener {
 				}
 			}
 		}
-		// delete the data one tick later, as the save event still needs it (and is fired after the quit event)
-		Bukkit.getScheduler().runTaskLater(NetworkChatPlugin.getInstance(), () -> mPlayerStates.remove(playerId), 1);
 
 		// Broadcast the player's current chat history
 		@Nullable PlayerChatHistory oldChatHistory = mPlayerChatHistories.get(playerId);

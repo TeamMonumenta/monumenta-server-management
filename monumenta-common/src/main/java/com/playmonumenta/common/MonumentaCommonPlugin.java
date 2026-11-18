@@ -9,7 +9,6 @@ import com.playmonumenta.common.zones.ZoneManager;
 import com.playmonumenta.common.zones.commands.DebugZones;
 import com.playmonumenta.common.zones.commands.ShowZones;
 import com.playmonumenta.common.zones.commands.TestZone;
-import com.playmonumenta.common.zones.listeners.RedisSyncListener;
 import com.playmonumenta.common.zones.listeners.WorldListener;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.PluginManager;
@@ -67,7 +66,6 @@ public class MonumentaCommonPlugin extends JavaPlugin {
 		INSTANCE = this;
 		DateUtils.refreshTime();
 		PluginManager manager = getServer().getPluginManager();
-		manager.registerEvents(new RedisSyncListener(), this);
 		manager.registerEvents(new WorldListener(this), this);
 
 		mZoneManager = ZoneManager.getInstance();

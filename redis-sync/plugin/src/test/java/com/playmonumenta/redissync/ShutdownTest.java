@@ -72,7 +72,7 @@ public class ShutdownTest {
 		harness.setProgress(player, 31);
 
 		MonumentaRedisSyncAPI.playerRollback(moderator, player, 0);
-		harness.awaitWithTicks("proxy asked to reconnect", () -> MonumentaRedisSyncAPI.isPlayerTransferring(player));
+		harness.awaitWithTicks("proxy asked to reconnect", () -> MonumentaRedisSyncAPI.getDeparture(player) != null);
 		harness.pauseRedisWrites(500);
 
 		long start = System.currentTimeMillis();

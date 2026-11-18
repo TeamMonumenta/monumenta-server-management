@@ -34,8 +34,10 @@ Here's a list of currently supported things:
 - /playerrollback to roll them back to a previous version
 - /stash [put|get|info] to temporarily save and load your playerdata
 - A plugin API to use those features directly from other plugins
-- A player transfer event, which allows plugins to manipulate player data prior
-  to a player transferring servers
+- `getDeparture` and `PlayerSessionEndEvent`, which tell plugins why a player is
+  leaving and when their connection's state can be dropped. The old transfer
+  events (`PlayerServerTransferEvent`, `PlayerTransferFailEvent`) and
+  `isPlayerTransferring` remain only as deprecated bridges, scheduled for removal
 - Support for multiple different "domains". Each server in the same domain will
   use the same player data. No data transfer is possible between domains
   (useful if you have different types of servers)
@@ -151,8 +153,7 @@ section is what other plugins can rely on.
   transferring, or waiting for a data handoff, is saved as usual until they leave.
 - **Only the `Player` object of the current connection counts.** A plugin holding one from an
   earlier connection cannot save its state over the current one. `sendPlayer` through one, or
-  through a `Player` that has left the game, logs a warning and does nothing else: no transfer
-  events fire. Stash get, rollback and loadFromPlayer throw for it.
+  through a `Player` that has left the game, logs a warning and does nothing else. Stash get, rollback and loadFromPlayer throw for it.
 - **Fake players** (NPC plugins) load as usual but are never saved, since they are not logins.
 - **A failed load** refuses or kicks the player, and nothing they do is saved. They can log in
   again once whatever broke is fixed. A player online without a session, such as after a plugin
@@ -160,15 +161,36 @@ section is what other plugins can rely on.
 - **Without a session**, `getPlayerPluginData` and `getPlayerShardData` return null,
   `getPlayerContentData` returns a fresh empty object that is not kept, and `savePlayerContent` is
   ignored with a warning.
-- **`sendPlayer`** only asks the proxy to move the player (BungeeCord "Connect"), and applies the
-  return location, if any, to their saves from then on. The proxy takes the player off this shard
-  first and holds their client on its "Reconfiguring..." screen: here they log out as usual, and
-  their final save, made after PlayerQuitEvent (so quit handlers' changes are in it), is what the
-  target loads. `isPlayerTransferring` is true from the request until they leave, including in
-  PlayerQuitEvent. If they are still here after 10 seconds (25 ticks if network relay does not list
-  the target as online), the request is dropped and PlayerTransferFailEvent fires. Once they have
-  left, a failed transfer is the proxy's to handle: it sends them back to where they came from, as
-  an ordinary login, or disconnects them.
+- **A connection's life, as plugins see it:** PlayerJoinEvent (`getPlayerPluginData` holds what
+  the last save stored), then saves (PlayerSaveEvent, where plugins store theirs), then
+  PlayerQuitEvent, the final PlayerSaveEvent, and PlayerSessionEndEvent. PlayerSessionEndEvent is
+  where to drop whatever a plugin keeps for the player: it comes after the final save, and before
+  the player can join any shard again, this one included (a rollback or stash get reconnects them
+  here within a second). No timer is needed, and join handlers find nothing left from the
+  previous connection. A player who never had a session here (saving disabled) gets it at their
+  quit. It does not fire at shutdown, when plugins are disabled before players are removed.
+- **`getDeparture`** says why the player is leaving: `Departure.Transfer` (target shard, and the
+  content the transfer was requested with, if any) or `Departure.Handoff` (stash get, rollback,
+  loadFromPlayer). It holds from the request until they have left, so in PlayerQuitEvent and the
+  final save, and PlayerSessionEndEvent carries it. Null means an ordinary logout, including a
+  switch the proxy started on its own, such as `/send` (a debugging tool, disabled in
+  production).
+- **`sendPlayer`** only asks the proxy to move the player (BungeeCord "Connect"), after requesting
+  the content passed to it, if any, and applies the return location, if any, to their saves from
+  then on. The proxy takes the player off this shard first and holds their client on its
+  "Reconfiguring..." screen: here they log out as usual, and their final save, made after
+  PlayerQuitEvent (so quit handlers' changes are in it), is what the target loads. Nothing is
+  frozen in between, so anything a transfer must enforce in that save (dropping items,
+  dismounting) belongs in PlayerQuitEvent, checked with `getDeparture`. A vehicle ridden by the
+  player alone as they leave travels with them (vanilla saves it with the player). If they are
+  still here after 10 seconds (25 ticks if network relay does not list the target as online), the
+  request is dropped and the player told. Once they have left, a failed transfer is the proxy's to
+  handle: it sends them back to where they came from, as an ordinary login, or disconnects them.
+- **Deprecated, scheduled for removal:** `PlayerServerTransferEvent`, `PlayerTransferFailEvent`
+  (redis-sync and MonumentaCommon copies) and `isPlayerTransferring` still work, so plugins built
+  against older versions load, but they no longer mean the player is frozen. The transfer event
+  fires at the `sendPlayer` request (cancelling it cancels the transfer); the fail event fires only
+  if the request times out or throws. Use `getDeparture` and PlayerSessionEndEvent instead.
 - **Every server switch through the proxy is a clean one**: transfers, Velocity's `/send` and
   `/server`, other plugins. Logins and redirects after a kick, which have no server to leave, are
   left alone.

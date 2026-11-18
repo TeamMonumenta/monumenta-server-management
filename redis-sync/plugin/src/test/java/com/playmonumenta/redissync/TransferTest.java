@@ -2,11 +2,15 @@ package com.playmonumenta.redissync;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
-import com.playmonumenta.common.event.PlayerServerTransferEvent;
-import com.playmonumenta.common.event.PlayerTransferFailEvent;
 import com.playmonumenta.redissync.RedisSyncTestHarness.TestPlayer;
-import java.util.concurrent.atomic.AtomicInteger;
+import com.playmonumenta.redissync.data.ContentData;
+import com.playmonumenta.redissync.event.PlayerSaveEvent;
+import com.playmonumenta.redissync.event.PlayerSessionEndEvent;
+import java.util.ArrayList;
+import java.util.List;
 import org.bukkit.Location;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -30,13 +34,11 @@ public class TransferTest {
 
 	@Test
 	void proxyIsAskedAtOnce(RedisSyncTestHarness harness) throws Exception {
-		AtomicInteger failures = harness.countEvents(PlayerTransferFailEvent.class);
 		TestPlayer player = harness.join("Tester");
 		MonumentaRedisSyncAPI.sendPlayer(player, TARGET);
 		assertEquals(1, player.getPluginMessages().size(), "Connect sent straight away");
 		assertTrue(player.getPluginMessages().get(0).contains(TARGET));
-		assertTrue(MonumentaRedisSyncAPI.isPlayerTransferring(player));
-		assertEquals(0, failures.get());
+		assertTrue(transferring(player));
 	}
 
 	/** The save made as the player leaves is the one the next login gets, with whatever they did after the request */
@@ -67,19 +69,17 @@ public class TransferTest {
 	/** A completed transfer ends with the connection closing, which must cancel the timeout rather than report a failure */
 	@Test
 	void completedTransferIsNotReportedAsFailed(RedisSyncTestHarness harness) throws Exception {
-		AtomicInteger failures = harness.countEvents(PlayerTransferFailEvent.class);
 		TestPlayer player = harness.join("Tester");
 		startTransfer(player);
 		harness.disconnect(player);
 
 		harness.tick(MonumentaRedisSyncAPI.OFFLINE_TARGET_TRANSFER_TIMEOUT_TICKS + 20);
-		assertEquals(0, failures.get());
+		assertFalse(player.wasTold("Transferring timed out"));
 	}
 
 	/** A transfer the proxy never carries out times out: the player is told, and the return location is dropped */
 	@Test
 	void transferThatNeverHappensTimesOut(RedisSyncTestHarness harness) throws Exception {
-		AtomicInteger failures = harness.countEvents(PlayerTransferFailEvent.class);
 		TestPlayer player = harness.join("Tester");
 		JsonArray pos = new JsonArray();
 		pos.add(5.0);
@@ -89,8 +89,7 @@ public class TransferTest {
 		MonumentaRedisSyncAPI.sendPlayer(player, TARGET, new Location(player.getWorld(), 1000, 64, 1000));
 
 		harness.tick(MonumentaRedisSyncAPI.OFFLINE_TARGET_TRANSFER_TIMEOUT_TICKS);
-		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(player));
-		assertEquals(1, failures.get());
+		assertFalse(transferring(player));
 		assertTrue(player.wasTold("Transferring timed out"));
 
 		harness.setProgress(player, 12);
@@ -108,13 +107,11 @@ public class TransferTest {
 	 */
 	@Test
 	void timeoutWhileTheConnectionIsClosingIsNotAFailure(RedisSyncTestHarness harness) throws Exception {
-		AtomicInteger failures = harness.countEvents(PlayerTransferFailEvent.class);
 		TestPlayer player = harness.join("Tester");
 		MonumentaRedisSyncAPI.sendPlayer(player, TARGET, new Location(player.getWorld(), 1000, 64, 1000));
 		player.loseConnection();
 		harness.tick(MonumentaRedisSyncAPI.OFFLINE_TARGET_TRANSFER_TIMEOUT_TICKS + 5);
-		assertEquals(0, failures.get());
-		assertTrue(MonumentaRedisSyncAPI.isPlayerTransferring(player));
+		assertTrue(transferring(player));
 
 		harness.disconnect(player);
 		String shardData = harness.redisHashGet(MonumentaRedisSyncAPI.getRedisPerShardDataPath(player),
@@ -126,11 +123,9 @@ public class TransferTest {
 	/** A second request while one is pending does nothing */
 	@Test
 	void secondRequestIsIgnored(RedisSyncTestHarness harness) throws Exception {
-		AtomicInteger transfers = harness.countEvents(PlayerServerTransferEvent.class);
 		TestPlayer player = harness.join("Tester");
 		MonumentaRedisSyncAPI.sendPlayer(player, TARGET);
 		MonumentaRedisSyncAPI.sendPlayer(player, "third_shard");
-		assertEquals(1, transfers.get());
 		assertEquals(1, player.getPluginMessages().size());
 	}
 
@@ -140,42 +135,19 @@ public class TransferTest {
 		TestPlayer player = harness.join("Tester");
 		player.failPluginMessages();
 		assertThrows(RuntimeException.class, () -> MonumentaRedisSyncAPI.sendPlayer(player, TARGET));
-		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(player));
+		assertFalse(transferring(player));
 	}
 
-	/** A transfer another plugin cancels must not leave its return location on the player, or every later save would put them there. */
-	@Test
-	void cancelledTransferLeavesNoReturnLocationBehind(RedisSyncTestHarness harness) throws Exception {
-		harness.onEvent(PlayerServerTransferEvent.class, event -> event.setCancelled(true));
-		TestPlayer player = harness.join("Tester");
-		JsonArray pos = new JsonArray();
-		pos.add(5.0);
-		pos.add(64.0);
-		pos.add(5.0);
-		harness.getAdapter().getLiveData(player).add("Pos", pos);
-
-		MonumentaRedisSyncAPI.sendPlayer(player, TARGET, new Location(player.getWorld(), 1000, 64, 1000));
-		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(player));
-		MonumentaRedisSyncAPI.savePlayer(player);
-		harness.awaitSaved(player);
-
-		String shardData = harness.redisHashGet(MonumentaRedisSyncAPI.getRedisPerShardDataPath(player),
-			MonumentaRedisSyncAPI.getRedisPerShardDataWorldKey(player.getWorld()));
-		assertEquals(pos, JsonParser.parseString(String.valueOf(shardData)).getAsJsonObject().get("Pos"), "saved where the player is");
-	}
-
-	/** A plugin holding a Player from an earlier connection cannot transfer the current one, and no transfer events fire */
+	/** A plugin holding a Player from an earlier connection cannot transfer the current one */
 	@Test
 	void transferThroughAnEarlierConnectionDoesNothing(RedisSyncTestHarness harness) throws Exception {
-		AtomicInteger transfers = harness.countEvents(PlayerServerTransferEvent.class);
 		TestPlayer stale = harness.join("Tester");
 		harness.disconnect(stale);
 		TestPlayer current = harness.join("Tester");
 
 		MonumentaRedisSyncAPI.sendPlayer(stale, TARGET);
 		harness.tick(5);
-		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(current));
-		assertEquals(0, transfers.get());
+		assertFalse(transferring(current));
 		assertTrue(stale.getPluginMessages().isEmpty(), "proxy never told to move the earlier connection");
 		assertTrue(current.getPluginMessages().isEmpty(), "proxy never told to move the current connection");
 	}
@@ -183,32 +155,50 @@ public class TransferTest {
 	/** A task scheduled before the connection closed finds nothing to transfer */
 	@Test
 	void transferAfterTheConnectionClosedDoesNothing(RedisSyncTestHarness harness) throws Exception {
-		AtomicInteger transfers = harness.countEvents(PlayerServerTransferEvent.class);
 		TestPlayer player = harness.join("Tester");
 		harness.disconnect(player);
 
 		MonumentaRedisSyncAPI.sendPlayer(player, TARGET);
 		harness.tick(5);
-		assertEquals(0, transfers.get());
 		assertTrue(player.getPluginMessages().isEmpty(), "proxy never told to move them");
 	}
 
 	/** Out of the game but not yet closed, the session is still open, yet there is no one left to move and the final save is already made */
 	@Test
 	void transferBetweenQuitAndConnectionCloseDoesNothing(RedisSyncTestHarness harness) throws Exception {
-		AtomicInteger transfers = harness.countEvents(PlayerServerTransferEvent.class);
 		TestPlayer player = harness.join("Tester");
 		harness.setProgress(player, 11);
 		harness.leaveGame(player);
 		harness.setProgress(player, 12);
 
 		MonumentaRedisSyncAPI.sendPlayer(player, TARGET);
-		assertFalse(MonumentaRedisSyncAPI.isPlayerTransferring(player));
+		assertFalse(transferring(player));
 		harness.closeConnection(player);
 		harness.tick(5);
-		assertEquals(0, transfers.get());
 		assertTrue(player.getPluginMessages().isEmpty(), "proxy never told to move them");
 		assertEquals(11, harness.progress(harness.join("Tester")), "the final save is what the next login gets");
+	}
+
+	/** Where the player is going holds through their quit and final save, and reaches the session end, which comes before they can join again */
+	@Test
+	void departureHoldsUntilTheSessionEnds(RedisSyncTestHarness harness) throws Exception {
+		List<String> seen = new ArrayList<>();
+		harness.onEvent(PlayerQuitEvent.class, event -> seen.add("quit " + MonumentaRedisSyncAPI.getDeparture(event.getPlayer())));
+		harness.onEvent(PlayerSaveEvent.class, event -> seen.add("save " + MonumentaRedisSyncAPI.getDeparture(event.getPlayer())));
+		harness.onEvent(PlayerSessionEndEvent.class, event -> seen.add("end " + event.getDeparture()));
+		harness.onEvent(PlayerJoinEvent.class, event -> seen.add("join"));
+		TestPlayer player = harness.join("Tester");
+		seen.clear();
+		MonumentaRedisSyncAPI.sendPlayer(player, TARGET, new ContentData("dungeon"), null, null, null);
+		Departure.Transfer expected = new Departure.Transfer(TARGET, "dungeon");
+		assertEquals(expected, MonumentaRedisSyncAPI.getDeparture(player));
+		harness.disconnect(player);
+		harness.join("Tester");
+		assertEquals(List.of("quit " + expected, "save " + expected, "end " + expected, "join"), seen);
+	}
+
+	private static boolean transferring(TestPlayer player) {
+		return MonumentaRedisSyncAPI.getDeparture(player) != null;
 	}
 
 	private static void startTransfer(TestPlayer player) throws Exception {

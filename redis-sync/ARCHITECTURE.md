@@ -120,9 +120,11 @@ stateDiagram-v2
   was still loading, or another session took its lease. Never saved, since that would put partial
   or stale data over the real thing. The player is refused at PlayerLoginEvent if that is still
   to come, and kicked otherwise.
-- **ENDED.** The connection has closed. An ended session stays registered until every save it
-  made has committed, so a reconnect here can wait for it. Then its lease is released and it is
-  removed.
+- **ENDED.** The connection has closed. PlayerSessionEndEvent fires just before, for plugins to
+  drop what they keep for the player: every later login of the player waits for this session to
+  end (here, directly; elsewhere, through the lease), so no plugin needs a timer to tell a stale
+  cache from a new one. An ended session stays registered until every save it made has
+  committed, so a reconnect here can wait for it. Then its lease is released and it is removed.
 
 Everything the plugin caches for the player (plugin data, shard data, content data) lives on the
 session, so it disappears when the connection closes.
@@ -185,7 +187,7 @@ sequenceDiagram
     P->>D: PlayerQuitEvent, then the final save
     D->>R: fenced write (tracked)
     P->>S: PlayerConnectionCloseEvent
-    S->>S: ENDED
+    S->>S: PlayerSessionEndEvent, ENDED
     R-->>S: final save committed
     S->>R: release the lease
 ```
@@ -274,7 +276,7 @@ stateDiagram-v2
 
 ## Leaving a shard: transfers and handoffs
 
-A session can be waiting on one **departure** (`PlayerSession.Departure`): the proxy has been
+A session can be waiting on one **departure** (`PlayerSession.Leaving`): the proxy has been
 asked to take the player off this shard, and has not yet. There are two kinds:
 
 - **`Transfer`** to another shard (`sendPlayer`), with an optional return location.
@@ -282,12 +284,13 @@ asked to take the player off this shard, and has not yet. There are two kinds:
   player's saved data and brings them straight back to this shard.
 
 Either way nothing is locked or frozen. The player plays on, and is saved as usual, until the
-proxy takes them off, which takes milliseconds. `isPlayerTransferring` is true while a departure
-is pending, including during PlayerQuitEvent. If the player is still here and still connected
-after the timeout (10 seconds; 25 ticks for a transfer to a shard network relay does not list as
-online), the proxy never acted: the departure is dropped, and the player is told. A transfer also
-fires PlayerTransferFailEvent. A player whose connection has already closed is on their way out,
-so the timeout leaves them alone.
+proxy takes them off, which takes milliseconds. `getDeparture` describes the pending departure
+(the public `Departure`: a `Transfer` with its target and content, or a `Handoff`) from the
+request until the player leaves, including during PlayerQuitEvent; `PlayerSessionEndEvent`
+carries it too. If the player is still here and still connected after the timeout (10 seconds;
+25 ticks for a transfer to a shard network relay does not list as online), the proxy never
+acted: the departure is dropped, and the player is told. A player whose connection has already
+closed is on their way out, so the timeout leaves them alone.
 
 ### Transfers
 
@@ -297,7 +300,7 @@ sequenceDiagram
     participant X as Proxy
     participant R as Redis
     participant T as Target shard
-    H->>H: sendPlayer: transfer events, departure kept on the session
+    H->>H: sendPlayer: content requested, departure kept on the session
     H->>X: BungeeCord "Connect"
     X->>X: detach from the source, client into configuration
     Note over X: "Reconfiguring...", keepalives every second
@@ -314,7 +317,18 @@ sequenceDiagram
 
 The return location is applied to every save from the request on, so the logout save carries it.
 Plugins' PlayerQuitEvent handlers run before that save, so their changes are in it; they can tell
-a transfer from a logout with `isPlayerTransferring`.
+a transfer from a logout with `getDeparture`. Anything a transfer must enforce in that save
+belongs there, since the player plays on until they leave. A content passed to `sendPlayer` is
+requested (PlayerContentChangeRequestEvent) just before the proxy is asked, and recorded in the
+departure.
+
+The old transfer events are kept as deprecated bridges, scheduled for removal, so plugins built
+against older versions still load: `sendPlayer` fires `PlayerServerTransferEvent` (both the
+redis-sync and MonumentaCommon copies; cancelling either cancels the transfer) before anything
+else, and `PlayerTransferFailEvent` (both copies) when the departure times out or the request
+throws. A transfer the proxy accepts and then cannot complete fires no fail event: the player
+comes back as a new login. `isPlayerTransferring` is `getDeparture(player) != null`. Paper logs a
+deprecation warning for every listener registered for these events.
 
 ### Data handoffs
 
@@ -413,7 +427,7 @@ covers this itself (`PlayerStateManager`, `MessageManager`):
 | Situation | What happens |
 |---|---|
 | Target shard down or refusing | The proxy's connect fails; the player is back on the source within a second, told why |
-| Proxy never acts on a request (unknown target) | The departure times out on the source; the player is told, PlayerTransferFailEvent fires for a transfer |
+| Proxy never acts on a request (unknown target) | The departure times out on the source; the player is told |
 | Source save slow | The proxy holds the player until the lease is released |
 | Source shard crashes | Its leases expire within 90 seconds; meanwhile the proxy holds a switching player, and other logins wait 20 seconds and are refused ("Your previous session is still saving") |
 | Source shard hangs, then resumes | As a crash; once the player is elsewhere, the resumed shard's saves fail with `LEASE_LOST` and nothing is written |

@@ -308,7 +308,7 @@ public class LifecycleFuzzTest {
 		}
 
 		private static boolean transferring(TestPlayer player) {
-			return MonumentaRedisSyncAPI.isPlayerTransferring(player);
+			return MonumentaRedisSyncAPI.getDeparture(player) != null;
 		}
 
 		private static void check(boolean condition, String what) {

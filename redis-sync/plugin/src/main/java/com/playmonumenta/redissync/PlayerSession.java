@@ -24,8 +24,8 @@ import org.jetbrains.annotations.Nullable;
  * connection can never save over a newer one.
  *
  * <p>What the plugin keeps about a connection lives here, so it all starts and ends together: the
- * data cached from redis, the saves handed to redis that have not committed yet, and the
- * {@link Departure} the player is leaving for, if any.
+ * data cached from redis, the saves handed to redis that have not committed yet, and why the
+ * player is leaving ({@link Leaving}), if they are.
  */
 final class PlayerSession {
 	/**
@@ -52,15 +52,21 @@ final class PlayerSession {
 	private final String mName;
 
 	/** Why the proxy has been asked to take the player off this shard, until they leave or the request times out */
-	sealed interface Departure permits Transfer, Replacement {
+	sealed interface Leaving permits Transfer, Replacement {
+		Departure departure();
 	}
 
 	/** To another shard; the return location is applied to every save meanwhile, so the logout save carries it */
-	record Transfer(String target, @Nullable ReturnParams returnParams) implements Departure {
+	record Transfer(Departure.Transfer departure, @Nullable ReturnParams returnParams) implements Leaving {
 	}
 
 	/** Back to this shard with their data replaced: {@code write} is made after their final save, and {@code onWritten} told how it went */
-	record Replacement(String what, SessionLease.FencedWrite write, Consumer<@Nullable Throwable> onWritten) implements Departure {
+	record Replacement(String what, SessionLease.FencedWrite write, Consumer<@Nullable Throwable> onWritten) implements Leaving {
+		@Override
+		public Departure departure() {
+			return new Departure.Handoff(what);
+		}
+
 		@Override
 		public String toString() {
 			return "Replacement[" + what + "]";
@@ -69,7 +75,7 @@ final class PlayerSession {
 
 	private volatile State mState = State.LOADING;
 	/* Main thread only */
-	private @Nullable Departure mDeparture = null;
+	private @Nullable Leaving mLeaving = null;
 	/* This session's lease token; null if it holds none (saving disabled, or not kept) */
 	private final @Nullable String mLeaseToken;
 
@@ -173,20 +179,20 @@ final class PlayerSession {
 
 	/* ******************* Departure ******************* */
 
-	@Nullable Departure getDeparture() {
-		return mDeparture;
+	@Nullable Leaving getLeaving() {
+		return mLeaving;
 	}
 
-	void setDeparture(@Nullable Departure departure) {
-		mDeparture = departure;
+	void setLeaving(@Nullable Leaving leaving) {
+		mLeaving = leaving;
 	}
 
-	boolean isDeparting() {
-		return mDeparture != null;
+	boolean isLeaving() {
+		return mLeaving != null;
 	}
 
 	@Nullable ReturnParams getReturnParams() {
-		return mDeparture instanceof Transfer transfer ? transfer.returnParams() : null;
+		return mLeaving instanceof Transfer transfer ? transfer.returnParams() : null;
 	}
 
 	/* ******************* Other connections for this account ******************* */
@@ -292,6 +298,6 @@ final class PlayerSession {
 	@Override
 	public String toString() {
 		return "PlayerSession{name=" + mName + " uuid=" + mPlayer.getUniqueId() + " state=" + mState
-			+ (mDeparture != null ? " departure=" + mDeparture : "") + "}";
+			+ (mLeaving != null ? " leaving=" + mLeaving : "") + "}";
 	}
 }

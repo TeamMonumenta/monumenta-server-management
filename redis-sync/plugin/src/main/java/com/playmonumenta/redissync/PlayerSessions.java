@@ -5,6 +5,7 @@ import com.destroystokyo.paper.profile.PlayerProfile;
 import com.google.gson.JsonObject;
 import com.playmonumenta.redissync.adapters.VersionAdapter;
 import com.playmonumenta.redissync.data.ContentData;
+import com.playmonumenta.redissync.event.PlayerSessionEndEvent;
 import com.playmonumenta.redissync.utils.MMLog;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,6 +29,7 @@ import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Nullable;
 
@@ -450,6 +452,15 @@ public final class PlayerSessions implements Listener {
 
 	/* ******************* Disconnect ******************* */
 
+	/* A player without a kept session (saving disabled, or joined without one) is never saved, so their quit is their end */
+	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+	public void playerQuitEvent(PlayerQuitEvent event) {
+		Player player = event.getPlayer();
+		if (current(player) == null) {
+			Bukkit.getPluginManager().callEvent(new PlayerSessionEndEvent(player, null));
+		}
+	}
+
 	/*
 	 * The end of every connection past pre-login, including ones that never joined. Paper fires it
 	 * after the quit event and the final save, so nothing of the session is still needed. It is not
@@ -486,13 +497,16 @@ public final class PlayerSessions implements Listener {
 		}
 
 		MMLog.debug(() -> "Ending session " + session);
-		if (session.getDeparture() instanceof PlayerSession.Replacement replacement) {
+		PlayerSession.Leaving leaving = session.getLeaving();
+		if (leaving instanceof PlayerSession.Replacement replacement) {
 			try {
 				writeReplacement(session, replacement);
 			} catch (RuntimeException ex) {
 				MMLog.severe("Failed to write " + replacement.what() + " for player=" + session.getName(), ex);
 			}
 		}
+		/* Before the session ends, which every later login of this player (here or anywhere) waits for */
+		Bukkit.getPluginManager().callEvent(new PlayerSessionEndEvent(session.getPlayer(), leaving == null ? null : leaving.departure()));
 		/* Before anything else that could fail, so the next login can never wait on this one forever */
 		session.end();
 		session.finished().whenComplete((ignored, ex) -> {
@@ -522,7 +536,6 @@ public final class PlayerSessions implements Listener {
 		CompletableFuture<Long> write = token == null
 			? CompletableFuture.failedFuture(new IllegalStateException("the session holds no lease"))
 			: session.savesCommitted().thenCompose(ignored -> SessionLease.fencedWrite(uuid, token, replacement.write()));
-		session.setDeparture(null);
 		session.trackSave(write, () -> "Failed to write " + replacement.what() + " for player=" + session.getName());
 		write.whenComplete((ignored, ex) -> replacement.onWritten().accept(ex));
 	}
@@ -531,32 +544,32 @@ public final class PlayerSessions implements Listener {
 
 	/**
 	 * Asks the proxy, over the player's own connection, to take them off this shard for
-	 * {@code departure}. If they are still here and connected after {@code timeoutTicks}, the proxy
-	 * never acted: the departure is dropped and {@code onTimeout} runs. Main thread only.
+	 * {@code leaving}. If they are still here and connected after {@code timeoutTicks}, the proxy
+	 * never acted: the request is dropped and {@code onTimeout} runs. Main thread only.
 	 *
 	 * @throws RuntimeException if the message could not be sent; then nothing is left pending
 	 */
-	@SuppressWarnings("ReferenceEquality") // The same departure, not an equal one
-	static void depart(PlayerSession session, PlayerSession.Departure departure, String channel, byte[] message, int timeoutTicks, Runnable onTimeout) {
+	@SuppressWarnings("ReferenceEquality") // The same request, not an equal one
+	static void depart(PlayerSession session, PlayerSession.Leaving leaving, String channel, byte[] message, int timeoutTicks, Runnable onTimeout) {
 		Player player = session.getPlayer();
-		MMLog.debug(() -> "Asking the proxy to move player=" + session.getName() + " for " + departure);
-		session.setDeparture(departure);
+		MMLog.debug(() -> "Asking the proxy to move player=" + session.getName() + " for " + leaving);
+		session.setLeaving(leaving);
 		try {
 			player.sendPluginMessage(INSTANCE.mPlugin, channel, message);
 		} catch (RuntimeException ex) {
-			session.setDeparture(null);
+			session.setLeaving(null);
 			throw ex;
 		}
 		Bukkit.getScheduler().runTaskLater(INSTANCE.mPlugin, () -> {
-			if (session.getDeparture() != departure || INSTANCE.current(player) != session) {
+			if (session.getLeaving() != leaving || INSTANCE.current(player) != session) {
 				return;
 			}
 			if (!INSTANCE.mAdapter.isConnected(player)) {
 				/* The proxy has acted; the quit is on its way */
 				return;
 			}
-			MMLog.warning("Proxy did not act on " + departure + " for player=" + session.getName() + " in time");
-			session.setDeparture(null);
+			MMLog.warning("Proxy did not act on " + leaving + " for player=" + session.getName() + " in time");
+			session.setLeaving(null);
 			onTimeout.run();
 		}, timeoutTicks);
 	}
@@ -638,7 +651,7 @@ public final class PlayerSessions implements Listener {
 		}
 		/* Sessions removed at shutdown get no close event, so their pending handoffs are written here */
 		for (PlayerSession session : INSTANCE.mSessions.values()) {
-			if (!session.isEnded() && session.getDeparture() instanceof PlayerSession.Replacement replacement) {
+			if (!session.isEnded() && session.getLeaving() instanceof PlayerSession.Replacement replacement) {
 				INSTANCE.writeReplacement(session, replacement);
 			}
 		}

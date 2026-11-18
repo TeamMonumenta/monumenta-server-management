@@ -7,7 +7,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-import com.playmonumenta.common.event.PlayerServerTransferEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter.ReturnParams;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
 import com.playmonumenta.redissync.data.ContentData;
@@ -253,9 +252,26 @@ public class MonumentaRedisSyncAPI {
 		return mNameToUuidTrie.suggestions(currentInput, maxSuggestions);
 	}
 
-	public static boolean isPlayerTransferring(Player player) {
+	/**
+	 * Why the player is leaving this shard, or null if they are not (or not by this plugin's doing).
+	 * Set from a {@link #sendPlayer} or data handoff request until the player has left, so it holds
+	 * in PlayerQuitEvent and the final save; dropped if the proxy never acts on the request. Anything
+	 * a transfer must enforce belongs in PlayerQuitEvent: nothing is frozen before then.
+	 */
+	public static @Nullable Departure getDeparture(Player player) {
 		PlayerSession session = PlayerSessions.currentSession(player);
-		return session != null && session.isDeparting();
+		PlayerSession.Leaving leaving = session == null ? null : session.getLeaving();
+		return leaving == null ? null : leaving.departure();
+	}
+
+	/**
+	 * @deprecated Scheduled for removal; restored only so plugins built against older versions still
+	 * load. True while {@link #getDeparture} is not null, but nothing is frozen meanwhile: use
+	 * {@link #getDeparture} in PlayerQuitEvent instead.
+	 */
+	@Deprecated(forRemoval = true)
+	public static boolean isPlayerTransferring(Player player) {
+		return getDeparture(player) != null;
 	}
 
 	public static void sendPlayer(Player player, String target) throws Exception {
@@ -263,26 +279,29 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static void sendPlayer(Player player, String target, @Nullable Location returnLoc) throws Exception {
-		sendPlayer(player, target, returnLoc, null, null);
+		sendPlayer(player, target, null, returnLoc, null, null);
 	}
 
 	public static void sendPlayer(Player player, String target, @Nullable Location returnLoc, @Nullable Rotation rotation) throws Exception {
-		sendPlayer(player, target, returnLoc, rotation == null ? null : rotation.getNormalizedYaw(), rotation == null ? null : rotation.getNormalizedPitch());
+		sendPlayer(player, target, null, returnLoc, rotation == null ? null : rotation.getNormalizedYaw(), rotation == null ? null : rotation.getNormalizedPitch());
+	}
+
+	public static void sendPlayer(Player player, String target, @Nullable Location returnLoc, @Nullable Float returnYaw, @Nullable Float returnPitch) throws Exception {
+		sendPlayer(player, target, null, returnLoc, returnYaw, returnPitch);
 	}
 
 	/**
 	 * Transfers a player to another shard. This only asks the proxy, which takes them off this shard:
 	 * they log out as usual, and their final save (with {@code returnLoc}, if any) is what the target
-	 * loads. They play on, and are saved, until then. If the proxy has not acted by the timeout,
-	 * PlayerTransferFailEvent fires; once they have left, a failure is the proxy's to handle.
+	 * loads. They play on, and are saved, until then; {@link #getDeparture} says where they are going.
+	 * If the proxy has not acted by the timeout, the request is dropped and the player told.
+	 *
+	 * @param content If not null, requested as the player's content first (see {@link #requestPlayerContentDataChange})
 	 */
-	@SuppressWarnings({"deprecation", "ReferenceEquality"}) // Which connection's Player object is the question
-	public static void sendPlayer(Player player, String target, @Nullable Location returnLoc, @Nullable Float returnYaw, @Nullable Float returnPitch) throws Exception {
-		/*
-		 * A Player held past its disconnect (by a task scheduled before it, say) has nothing left to
-		 * transfer. The transfer events must not fire for it either: no fail event would follow, so
-		 * listeners would keep treating the player as transferring.
-		 */
+	@SuppressWarnings("ReferenceEquality") // Which connection's Player object is the question
+	public static void sendPlayer(Player player, String target, @Nullable ContentData content,
+	                              @Nullable Location returnLoc, @Nullable Float returnYaw, @Nullable Float returnPitch) throws Exception {
+		/* A Player held past its disconnect (by a task scheduled before it, say) has nothing left to transfer */
 		if (Bukkit.getPlayer(player.getUniqueId()) != player) {
 			MMLog.warning("Not transferring player=" + player.getName() + " to " + target + " because that connection is no longer in the game on this shard");
 			return;
@@ -292,26 +311,21 @@ public class MonumentaRedisSyncAPI {
 			MMLog.warning("Not transferring player=" + player.getName() + " to " + target + " because they have no session on this shard");
 			return;
 		}
-
-		/* Before the transfer events fire, which they must not for a player already transferring */
-		if (session.isDeparting()) {
+		if (session.isLeaving()) {
 			return;
 		}
-
 		if (target.equalsIgnoreCase(CommonConfig.getShardName())) {
 			player.sendMessage(Component.text("Can not transfer to the same server you are already on", NamedTextColor.RED));
 			return;
 		}
 
-		com.playmonumenta.redissync.event.PlayerServerTransferEvent legacyEvent = new com.playmonumenta.redissync.event.PlayerServerTransferEvent(player, target);
-		Bukkit.getPluginManager().callEvent(legacyEvent);
-		if (legacyEvent.isCancelled()) {
+		/* Scheduled for removal: deprecated transfer events, kept only for plugins built against older versions */
+		if (!callLegacyTransferEvents(player, target)) {
 			return;
 		}
-		PlayerServerTransferEvent event = new PlayerServerTransferEvent(player, target);
-		Bukkit.getPluginManager().callEvent(event);
-		if (event.isCancelled()) {
-			return;
+
+		if (content != null) {
+			requestPlayerContentDataChange(player, content);
 		}
 
 		player.sendMessage(Component.text("Transferring you to " + target, NamedTextColor.GOLD));
@@ -325,11 +339,34 @@ public class MonumentaRedisSyncAPI {
 		out.writeUTF("Connect");
 		out.writeUTF(target);
 		ReturnParams returnParams = returnLoc != null || returnYaw != null || returnPitch != null ? new ReturnParams(returnLoc, returnYaw, returnPitch) : null;
-		PlayerSessions.depart(session, new PlayerSession.Transfer(target, returnParams), "BungeeCord", out.toByteArray(), timeoutTicks, () -> {
-			player.sendMessage(Component.text("Transferring timed out", NamedTextColor.RED));
-			Bukkit.getPluginManager().callEvent(new com.playmonumenta.redissync.event.PlayerTransferFailEvent(player));
-			Bukkit.getPluginManager().callEvent(new com.playmonumenta.common.event.PlayerTransferFailEvent(player));
-		});
+		Departure.Transfer departure = new Departure.Transfer(target, content == null ? null : content.getId());
+		try {
+			PlayerSessions.depart(session, new PlayerSession.Transfer(departure, returnParams), "BungeeCord", out.toByteArray(), timeoutTicks, () -> {
+				player.sendMessage(Component.text("Transferring timed out", NamedTextColor.RED));
+				/* Scheduled for removal: deprecated transfer events */
+				callLegacyTransferFailEvents(player);
+			});
+		} catch (RuntimeException ex) {
+			/* Scheduled for removal: deprecated transfer events */
+			callLegacyTransferFailEvents(player);
+			throw ex;
+		}
+	}
+
+	/** Scheduled for removal with the deprecated transfer events. False if a listener cancelled the transfer. */
+	@SuppressWarnings("removal")
+	private static boolean callLegacyTransferEvents(Player player, String target) {
+		if (!new com.playmonumenta.redissync.event.PlayerServerTransferEvent(player, target).callEvent()) {
+			return false;
+		}
+		return new com.playmonumenta.common.event.PlayerServerTransferEvent(player, target).callEvent();
+	}
+
+	/** Scheduled for removal with the deprecated transfer events */
+	@SuppressWarnings("removal")
+	private static void callLegacyTransferFailEvents(Player player) {
+		new com.playmonumenta.redissync.event.PlayerTransferFailEvent(player).callEvent();
+		new com.playmonumenta.common.event.PlayerTransferFailEvent(player).callEvent();
 	}
 
 	public static void stashPut(Player player, @Nullable String name) throws Exception {
@@ -427,7 +464,7 @@ public class MonumentaRedisSyncAPI {
 		if (session == null) {
 			throw new Exception("Player " + to.getName() + " is not this player's current connection on this shard");
 		}
-		if (session.isDeparting()) {
+		if (session.isLeaving()) {
 			throw new Exception("Player " + to.getName() + " is transferring");
 		}
 		if (session.getLeaseToken() == null) {
@@ -451,7 +488,7 @@ public class MonumentaRedisSyncAPI {
 				notify.sendMessage(missing);
 				return;
 			}
-			if (PlayerSessions.currentSession(to) != session || session.isDeparting()) {
+			if (PlayerSessions.currentSession(to) != session || session.isLeaving()) {
 				notify.sendMessage(Component.text("Not loading " + what + ": " + to.getName() + " left or is transferring", NamedTextColor.RED));
 				return;
 			}
