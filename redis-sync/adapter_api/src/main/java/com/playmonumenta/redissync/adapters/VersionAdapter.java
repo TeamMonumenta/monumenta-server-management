@@ -48,6 +48,9 @@ public interface VersionAdapter {
 
 	void savePlayer(Player player) throws Exception;
 
+	/** Whether the player's network connection is still open; false once it has closed, before the server has processed their quit */
+	boolean isConnected(Player player);
+
 	Object upgradePlayerData(Object nbtTagCompound);
 
 	String upgradePlayerAdvancements(String advancementsStr) throws Exception;

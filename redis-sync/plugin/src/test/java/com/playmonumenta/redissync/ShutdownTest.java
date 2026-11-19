@@ -1,6 +1,7 @@
 package com.playmonumenta.redissync;
 
 import com.playmonumenta.redissync.RedisSyncTestHarness.TestPlayer;
+import java.util.List;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,12 +59,11 @@ public class ShutdownTest {
 	}
 
 	/**
-	 * A rollback mid-write holds its player's lock until the write is done, so the shutdown save is
-	 * skipped. Shutdown waits for the rollback's write, which is tracked like a save, and for
-	 * nothing more: the kick that would follow it is never run.
+	 * A rollback waiting for the proxy to reconnect the player when the shard stops: the shutdown
+	 * save is made as for anyone, and the rollback is written after it, as if they had left.
 	 */
 	@Test
-	void shutdownDuringARollbackKeepsTheRollbackWithoutStalling(RedisSyncTestHarness harness) throws Exception {
+	void shutdownWithAPendingRollbackWritesIt(RedisSyncTestHarness harness) throws Exception {
 		TestPlayer moderator = harness.join("Moderator");
 		TestPlayer player = harness.join("Tester");
 		harness.setProgress(player, 30);
@@ -72,14 +72,12 @@ public class ShutdownTest {
 		harness.setProgress(player, 31);
 
 		MonumentaRedisSyncAPI.playerRollback(moderator, player, 0);
-		harness.awaitSavedWithoutTicking(player);
-		harness.pauseRedisWrites(1000);
-		harness.tick();
-		assertTrue(PlayerSessions.hasPendingSaves(player), "the rollback is still being written");
+		harness.awaitWithTicks("proxy asked to reconnect", () -> MonumentaRedisSyncAPI.getDeparture(player) != null);
+		harness.pauseRedisWrites(500);
 
 		long start = System.currentTimeMillis();
 		harness.stopServer();
 		assertTrue(System.currentTimeMillis() - start < MonumentaRedisSyncAPI.TIMEOUT_SECONDS * 1000 / 2, "shutdown did not wait out the timeout");
-		assertEquals(30, harness.savedProgress(player), "the rollback is the newest save");
+		assertEquals(List.of(30, 31), harness.savedProgressHistory(player).subList(0, 2), "the rollback is the newest save, the shutdown save below it");
 	}
 }

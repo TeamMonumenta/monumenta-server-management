@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
@@ -23,12 +24,8 @@ import org.jetbrains.annotations.Nullable;
  * connection can never save over a newer one.
  *
  * <p>What the plugin keeps about a connection lives here, so it all starts and ends together: the
- * data cached from redis, the saves handed to redis that have not committed yet, and the
- * {@link SessionLock} held while the player's data moves elsewhere.
- *
- * <p>The lock is separate from the {@link State}, since a transfer can start in the join tick,
- * while the session is still loading. Only a session that is {@link State#PLAYING} and not
- * locked is saved; see {@link #canSave()}.
+ * data cached from redis, the saves handed to redis that have not committed yet, and why the
+ * player is leaving ({@link Leaving}), if they are.
  */
 final class PlayerSession {
 	/**
@@ -43,7 +40,7 @@ final class PlayerSession {
 	enum State {
 		/** From the first load event until the join event is over. Not saved: other plugins have not loaded their state yet */
 		LOADING,
-		/** Saved, unless locked */
+		/** Saved */
 		PLAYING,
 		/** The load failed or was refused. Never saved, since that would put partial data over the real thing; the player is refused at login, or kicked */
 		FAILED,
@@ -54,10 +51,33 @@ final class PlayerSession {
 	private final Player mPlayer;
 	private final String mName;
 
+	/** Why the proxy has been asked to take the player off this shard, until they leave or the request times out */
+	sealed interface Leaving permits Transfer, Replacement {
+		Departure departure();
+	}
+
+	/** To another shard; the return location is applied to every save meanwhile, so the logout save carries it */
+	record Transfer(Departure.Transfer departure, @Nullable ReturnParams returnParams) implements Leaving {
+	}
+
+	/** Back to this shard with their data replaced: {@code write} is made after their final save, and {@code onWritten} told how it went */
+	record Replacement(String what, SessionLease.FencedWrite write, Consumer<@Nullable Throwable> onWritten) implements Leaving {
+		@Override
+		public Departure departure() {
+			return new Departure.Handoff(what);
+		}
+
+		@Override
+		public String toString() {
+			return "Replacement[" + what + "]";
+		}
+	}
+
 	private volatile State mState = State.LOADING;
-	private volatile @Nullable SessionLock mLock = null;
-	/* Applied to saves while set: set only for the save made as a transfer locks the session, which is the one the target shard loads */
-	private @Nullable ReturnParams mReturnParams = null;
+	/* Main thread only */
+	private @Nullable Leaving mLeaving = null;
+	/* This session's lease token; null if it holds none (saving disabled, or not kept) */
+	private final @Nullable String mLeaseToken;
 
 	/*
 	 * Another connection for this account refused while loading, until PlayerLoginEvent refuses it
@@ -75,7 +95,6 @@ final class PlayerSession {
 	 */
 	private boolean mAwaitingAdvancementsSave = false;
 	private boolean mUnpairedAdvancementsAtHead = false;
-	private long mPlayerdataSaves = 0;
 
 	private JsonObject mPluginData = new JsonObject();
 	private Map<String, String> mShardData = new HashMap<>();
@@ -85,8 +104,17 @@ final class PlayerSession {
 	private final CompletableFuture<Void> mEnded = new CompletableFuture<>();
 
 	PlayerSession(Player player) {
+		this(player, null);
+	}
+
+	PlayerSession(Player player, @Nullable String leaseToken) {
 		mPlayer = player;
 		mName = player.getName();
+		mLeaseToken = leaseToken;
+	}
+
+	@Nullable String getLeaseToken() {
+		return mLeaseToken;
 	}
 
 	boolean belongsTo(Player player) {
@@ -136,44 +164,35 @@ final class PlayerSession {
 	}
 
 	/**
-	 * The connection has closed, so whatever the player was locked for is over. No save can be made
-	 * after this, so {@link #finished()} completes once the saves already made have committed.
+	 * The connection has closed. No save can be made after this, so {@link #finished()} completes
+	 * once the saves already made (and any replacement written after them) have committed.
 	 */
 	void end() {
 		setState(State.ENDED);
 		mEnded.complete(null);
-		SessionLock lock = mLock;
-		if (lock != null) {
-			lock.detach();
-		}
 	}
 
-	/** Whether the session's saves are written: it has loaded and joined, and is not locked */
+	/** Whether the session's saves are written: it has loaded and joined */
 	boolean canSave() {
-		return mState == State.PLAYING && !isLocked();
+		return mState == State.PLAYING;
 	}
 
-	/* ******************* Lock ******************* */
+	/* ******************* Departure ******************* */
 
-	@Nullable SessionLock getLock() {
-		return mLock;
+	@Nullable Leaving getLeaving() {
+		return mLeaving;
 	}
 
-	boolean isLocked() {
-		return mLock != null;
+	void setLeaving(@Nullable Leaving leaving) {
+		mLeaving = leaving;
 	}
 
-	/* For SessionLock, which puts itself on and takes itself off */
-	void setLock(@Nullable SessionLock lock) {
-		mLock = lock;
+	boolean isLeaving() {
+		return mLeaving != null;
 	}
 
 	@Nullable ReturnParams getReturnParams() {
-		return mReturnParams;
-	}
-
-	void setReturnParams(@Nullable ReturnParams returnParams) {
-		mReturnParams = returnParams;
+		return mLeaving instanceof Transfer transfer ? transfer.returnParams() : null;
 	}
 
 	/* ******************* Other connections for this account ******************* */
@@ -233,11 +252,6 @@ final class PlayerSession {
 	/** A playerdata save, which pushes onto every history list but advancements, is being made; its advancements save comes next */
 	void beginPlayerdataSave() {
 		mAwaitingAdvancementsSave = true;
-		mPlayerdataSaves++;
-	}
-
-	long getPlayerdataSaves() {
-		return mPlayerdataSaves;
 	}
 
 	/**
@@ -276,11 +290,6 @@ final class PlayerSession {
 		return mPendingSaves.stream().anyMatch(save -> !save.isDone());
 	}
 
-	/** Whether any save's completion callbacks have yet to finish. Stricter than {@link #hasPendingSaves()}, for tests */
-	boolean hasUnsettledSaves() {
-		return !mPendingSaves.isEmpty();
-	}
-
 	/** Completes once the session has ended and every save it made has been acknowledged by redis */
 	CompletableFuture<Void> finished() {
 		return mEnded.thenCompose(ignored -> savesCommitted());
@@ -288,6 +297,7 @@ final class PlayerSession {
 
 	@Override
 	public String toString() {
-		return "PlayerSession{name=" + mName + " uuid=" + mPlayer.getUniqueId() + " state=" + mState + " locked=" + isLocked() + "}";
+		return "PlayerSession{name=" + mName + " uuid=" + mPlayer.getUniqueId() + " state=" + mState
+			+ (mLeaving != null ? " leaving=" + mLeaving : "") + "}";
 	}
 }

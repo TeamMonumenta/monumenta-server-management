@@ -1,9 +1,7 @@
 package com.playmonumenta.redissync;
 
-import com.playmonumenta.common.event.PlayerTransferFailEvent;
 import com.playmonumenta.redissync.RedisSyncTestHarness.TestPlayer;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import net.kyori.adventure.text.Component;
 import org.bukkit.event.EventPriority;
@@ -152,35 +150,45 @@ public class ReconnectTest {
 		assertEquals(1, harness.redisListLength(MonumentaRedisSyncAPI.getRedisDataPath(saved)));
 	}
 
-	/*
-	 * Two connections for one account that both get through pre-login before either loads. Velocity
-	 * never does this to one backend, but a proxy bug could. Pre-login cannot tell which later load
-	 * belongs to which, and the close event carries only a UUID.
-	 */
-
-	/**
-	 * The second to load is refused, and that must leave the first alone: its session, and a
-	 * transfer it has started, since unlocking that would let it save over what the target shard loads.
-	 */
+	/** A second login while the first holds the session lease is refused at pre-login, and leaves the first alone */
 	@Test
-	void secondOverlappingLoginIsRefusedAndLeavesTheFirstAlone(RedisSyncTestHarness harness) throws Exception {
-		AtomicInteger transferFailures = harness.countEvents(PlayerTransferFailEvent.class);
+	void secondOverlappingLoginIsRefusedAtPreLogin(RedisSyncTestHarness harness) throws Exception {
 		TestPlayer first = harness.newPlayer("Tester");
 		TestPlayer second = harness.newPlayer("Tester");
 		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.preLogin(first));
+		assertNotEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.preLogin(second));
+		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.completeLogin(first));
+		harness.tick();
+		harness.setProgress(first, 6);
+		harness.disconnect(first);
+		assertEquals(6, harness.progress(harness.join("Tester")), "the first connection saved and released the lease");
+	}
+
+	/*
+	 * Two connections for one account that both get through pre-login before either loads. The
+	 * session lease prevents it, so the tests below delete the first's lease to get there, as if it
+	 * had vanished. Pre-login cannot tell which later load belongs to which, and the close event
+	 * carries only a UUID.
+	 */
+
+	/** The second to load is refused, and that must leave the first alone */
+	@Test
+	void secondOverlappingLoginIsRefusedAndLeavesTheFirstAlone(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer first = harness.newPlayer("Tester");
+		TestPlayer second = harness.newPlayer("Tester");
+		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.preLogin(first));
+		harness.redisDelete(SessionLease.key(first.getUniqueId()));
 		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.preLogin(second));
 		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.completeLogin(first));
 		harness.tick();
 		harness.setProgress(first, 6);
-		MonumentaRedisSyncAPI.sendPlayer(first, "other_shard");
 
 		assertNotEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.completeLogin(second));
 		harness.tick(2);
 		assertTrue(first.isPlaced(), "the first connection stays");
-		assertTrue(MonumentaRedisSyncAPI.isPlayerTransferring(first), "and stays locked");
-		assertEquals(0, transferFailures.get(), "no transfer failure reported");
+		MonumentaRedisSyncAPI.savePlayer(first);
 		harness.awaitSaved(first);
-		assertEquals(6, harness.savedProgress(first), "the first connection's transfer save landed");
+		assertEquals(6, harness.savedProgress(first), "and saves");
 	}
 
 	/**
@@ -193,6 +201,7 @@ public class ReconnectTest {
 		TestPlayer first = harness.newPlayer("Tester");
 		TestPlayer second = harness.newPlayer("Tester");
 		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.preLogin(first));
+		harness.redisDelete(SessionLease.key(first.getUniqueId()));
 		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.preLogin(second));
 		assertTrue(harness.verifyLogin(first));
 		assertFalse(harness.verifyLogin(second), "the second is refused");
@@ -213,6 +222,7 @@ public class ReconnectTest {
 		TestPlayer first = harness.newPlayer("Tester");
 		TestPlayer second = harness.newPlayer("Tester");
 		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.preLogin(first));
+		harness.redisDelete(SessionLease.key(first.getUniqueId()));
 		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.preLogin(second));
 		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.completeLogin(first));
 		harness.tick();
@@ -237,6 +247,7 @@ public class ReconnectTest {
 		TestPlayer first = harness.newPlayer("Tester");
 		TestPlayer second = harness.newPlayer("Tester");
 		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.preLogin(first));
+		harness.redisDelete(SessionLease.key(first.getUniqueId()));
 		assertEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.preLogin(second));
 		assertTrue(harness.verifyLogin(first));
 		harness.tick();

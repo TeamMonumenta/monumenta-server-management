@@ -671,7 +671,8 @@ PlayerSessions.waitForSaves(player, () -> {
 
 The most common pattern for plugins that need persistent per-player data.
 Data is stored as a `JsonObject` inside the player's plugin data blob, keyed
-by a unique plugin identifier string.
+by a unique plugin identifier string. Never change a plugin's identifier: data
+saved under the old one is not migrated and will no longer be loaded.
 
 ```java
 public class MyPluginListener implements Listener {
@@ -715,16 +716,12 @@ public class MyPluginListener implements Listener {
     }
 
     /**
-     * Clean up local cache after quit. Use a short delay to avoid a race
-     * where the save event fires after quit but before cleanup.
+     * Clean up local cache once the player's final save is made. It comes
+     * before the player can join again, so no timer is needed.
      */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        Bukkit.getScheduler().runTaskLater(mPlugin, () -> {
-            if (!event.getPlayer().isOnline()) {
-                mPlayerData.remove(event.getPlayer().getUniqueId());
-            }
-        }, 2);
+    public void onPlayerSessionEnd(PlayerSessionEndEvent event) {
+        mPlayerData.remove(event.getPlayer().getUniqueId());
     }
 
     public @Nullable MyData getData(Player player) {

@@ -8,6 +8,7 @@ import com.playmonumenta.redissync.data.OptionalLocation;
 import com.playmonumenta.redissync.event.PlayerContentChangeRequestEvent;
 import com.playmonumenta.redissync.event.PlayerJoinSetWorldEvent;
 import com.playmonumenta.redissync.event.PlayerSaveEvent;
+import com.playmonumenta.redissync.event.PlayerSessionEndEvent;
 import com.playmonumenta.redissync.event.UpdateAvailableContentIdsEvent;
 import com.playmonumenta.worlds.common.MMLog;
 import java.util.HashMap;
@@ -27,8 +28,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerKickEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
@@ -186,13 +185,6 @@ public class WorldManagementListener implements Listener {
 	public void playerJoinEvent(PlayerJoinEvent event) {
 		Player player = event.getPlayer();
 		World oldWorld = player.getWorld();
-		final var uuid = player.getUniqueId();
-		// FIXME: replace with configuration phase aware code
-		Bukkit.getScheduler().runTask(mPlugin, () -> {
-			if (Bukkit.getPlayer(uuid) == null) {
-				mHackJoinWorldFix.remove(uuid);
-			}
-		});
 		ContentInfo info = WorldManagementPlugin.getContentInfo(player);
 		if (info == null) {
 			return;
@@ -255,16 +247,10 @@ public class WorldManagementListener implements Listener {
 		}
 	}
 
+	/* Every connection past login ends here, including one that never got as far as joining */
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-	public void playerQuitEvent(PlayerQuitEvent event) {
-		final var uuid = event.getPlayer().getUniqueId();
-		mHackJoinWorldFix.remove(uuid);
-	}
-
-	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-	public void playerKickEvent(PlayerKickEvent event) {
-		final var uuid = event.getPlayer().getUniqueId();
-		mHackJoinWorldFix.remove(uuid);
+	public void playerSessionEndEvent(PlayerSessionEndEvent event) {
+		mHackJoinWorldFix.remove(event.getPlayer().getUniqueId());
 	}
 
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)

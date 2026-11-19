@@ -1,5 +1,7 @@
 package com.playmonumenta.redissync.example;
 
+import com.playmonumenta.redissync.event.PlayerSessionEndEvent;
+
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI;
@@ -109,14 +111,10 @@ public class ExampleServerListener implements Listener {
 		}
 	}
 
-	/* When player leaves, remove it from the local storage a short bit later */
+	/* After the player's final save, remove it from the local storage */
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
-	public void playerQuitEvent(PlayerQuitEvent event) {
-		Bukkit.getScheduler().runTaskLater(mPlugin, () -> {
-			if (!event.getPlayer().isOnline()) {
-				mAllPlayerData.remove(event.getPlayer().getUniqueId());
-			}
-		}, 100);
+	public void playerSessionEndEvent(PlayerSessionEndEvent event) {
+		mAllPlayerData.remove(event.getPlayer().getUniqueId());
 	}
 
 	/* Get the player's custom data for use by other parts of your plugin */

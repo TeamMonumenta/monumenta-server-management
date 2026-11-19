@@ -17,7 +17,7 @@ public class PlayerRollback {
 			.withPermission(CommandPermission.fromString("monumenta.command.playerrollback"))
 			.withArguments(playerArg)
 			.withArguments(indexArg)
-			.executesPlayer((sender, args) -> {
+			.executes((sender, args) -> {
 					try {
 						MonumentaRedisSyncAPI.playerRollback(sender, args.getByArgument(playerArg), args.getByArgument(indexArg));
 					} catch (Exception ex) {
