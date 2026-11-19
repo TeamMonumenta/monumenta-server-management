@@ -18,6 +18,12 @@ Not covered by `plugin/src/test` today, roughly in order of value. See the
   length.
 - **Concurrent saves**: two saves in flight at once are both waited on - by a reconnect, a
   transfer and shutdown.
+- **`Player#saveData`** saves only the playerdata, which pushes every history list except stats
+  and advancements, so those two fall one save behind the others. Nothing in this plugin calls it;
+  decide whether to guard against other plugins calling it, then add a test for that behavior.
+- **A stats save that throws** (an offline stats change) while the player is in the configuration
+  phase here: they have a session but are not in `Bukkit.getPlayer`, so CraftOfflinePlayer treats
+  them as offline.
 - **A login with no UUID** at pre-login is refused as `unverified_username`.
 - **A transfer's return location.** `sendPlayer` with a return location applies it to the
   transfer save only; nothing checks that it lands in the saved shard data.

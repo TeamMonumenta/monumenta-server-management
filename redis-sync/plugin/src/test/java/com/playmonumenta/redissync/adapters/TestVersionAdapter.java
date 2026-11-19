@@ -2,6 +2,7 @@ package com.playmonumenta.redissync.adapters;
 
 import com.destroystokyo.paper.event.player.PlayerAdvancementDataSaveEvent;
 import com.destroystokyo.paper.event.player.PlayerDataSaveEvent;
+import com.destroystokyo.paper.event.player.ServerStatsDataSaveEvent;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -12,6 +13,7 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -51,6 +53,8 @@ public class TestVersionAdapter implements VersionAdapter {
 	 */
 	private final Map<Player, JsonObject> mLivePlayerData = Collections.synchronizedMap(new IdentityHashMap<>());
 	private final Map<Player, String> mLiveAdvancements = Collections.synchronizedMap(new IdentityHashMap<>());
+	private final Map<Player, JsonObject> mLiveStats = Collections.synchronizedMap(new IdentityHashMap<>());
+	private volatile boolean mSkipStatsSaves = false;
 
 	/** Sets the data that the next {@link #savePlayer} for this player will write. */
 	public void setLiveData(Player player, JsonObject nbt, String advancementsJson) {
@@ -65,6 +69,23 @@ public class TestVersionAdapter implements VersionAdapter {
 
 	public void setLiveAdvancements(Player player, String advancementsJson) {
 		mLiveAdvancements.put(player, advancementsJson);
+	}
+
+	/** The player's live stats JSON, as the server's stats counter would write it. Created empty if nothing was set. */
+	public JsonObject getLiveStats(Player player) {
+		return mLiveStats.computeIfAbsent(player, k -> emptyStats());
+	}
+
+	public void setLiveStats(Player player, JsonObject stats) {
+		mLiveStats.put(player, stats);
+	}
+
+	/** What the server's stats counter writes for a player with no stats */
+	public static JsonObject emptyStats() {
+		JsonObject stats = new JsonObject();
+		stats.add("stats", new JsonObject());
+		stats.addProperty("DataVersion", 3700);
+		return stats;
 	}
 
 	/** The player's live "NBT", for tests to change between saves. Created empty if nothing was set. */
@@ -138,8 +159,9 @@ public class TestVersionAdapter implements VersionAdapter {
 	}
 
 	/**
-	 * Fires the two save events the same way a real server save does, so tests exercise the
-	 * production entry point ({@code MonumentaRedisSyncAPI.savePlayer}) rather than hand-firing.
+	 * Fires the three save events the same way {@code PlayerList.save} does (playerdata, stats, then
+	 * advancements), so tests exercise the production entry point
+	 * ({@code MonumentaRedisSyncAPI.savePlayer}) rather than hand-firing.
 	 */
 	@Override
 	public void savePlayer(Player player) {
@@ -147,10 +169,23 @@ public class TestVersionAdapter implements VersionAdapter {
 		JsonObject nbt = mLivePlayerData.computeIfAbsent(player, k -> new JsonObject());
 		File path = new File("unused-in-tests");
 		Bukkit.getPluginManager().callEvent(new PlayerDataSaveEvent(player, path, nbt.deepCopy()));
+		if (!mSkipStatsSaves) {
+			Bukkit.getPluginManager().callEvent(new ServerStatsDataSaveEvent(statsFile(player.getUniqueId()), getLiveStats(player).toString()));
+		}
 		String advancements = mLiveAdvancements.get(player);
 		if (advancements != null) {
 			Bukkit.getPluginManager().callEvent(new PlayerAdvancementDataSaveEvent(player, path, advancements));
 		}
+	}
+
+	/** Leaves the stats save out of full saves, as spigot.yml's stats.disable-saving does */
+	public void setSkipStatsSaves(boolean skip) {
+		mSkipStatsSaves = skip;
+	}
+
+	/** The stats file path the server passes to its stats events, which derive the player's UUID from its name */
+	public static File statsFile(UUID uuid) {
+		return new File("stats", uuid + ".json");
 	}
 
 	/** Saves only the advancements, as PlayerAdvancements.save does outside a full player save */

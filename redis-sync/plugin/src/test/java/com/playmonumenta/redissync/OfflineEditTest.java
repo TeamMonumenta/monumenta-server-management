@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.playmonumenta.redissync.MonumentaRedisSyncAPI.RedisPlayerData;
 import com.playmonumenta.redissync.RedisSyncTestHarness.TestPlayer;
+import com.playmonumenta.redissync.adapters.TestVersionAdapter;
 import java.util.List;
 import java.util.UUID;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -108,6 +110,38 @@ public class OfflineEditTest {
 		assertEquals(66, harness.progress(harness.join("Tester")));
 	}
 
+	/**
+	 * An edit that leaves out stats (as data from before stats were saved does) keeps the player's
+	 * current stats, which are pushed again so the stats history stays lined up with the others.
+	 */
+	@Test
+	void offlineEditWithoutStatsKeepsTheCurrentStats(RedisSyncTestHarness harness) throws Exception {
+		UUID uuid = savedPlayerWithProgress(harness, 3);
+		RedisPlayerData edit = MonumentaRedisSyncAPI.getOfflinePlayerData(uuid).get();
+		setProgress(edit, 50);
+		edit.setStats(null);
+
+		assertTrue(MonumentaRedisSyncAPI.saveOfflinePlayerData(edit).get());
+		TestPlayer player = harness.join("Tester");
+		assertEquals(50, harness.progressExceptStats(player));
+		assertEquals(3, harness.statProgress(player));
+		assertEquals(List.of(3, 3), harness.savedStatProgressHistory(player), "lined up with the other lists");
+	}
+
+	/** An edit without stats pushes no stats for a player who has none in redis, since that entry would pair with the wrong saves */
+	@Test
+	void offlineEditWithoutStatsOfAPlayerWithNonePushesNone(RedisSyncTestHarness harness) throws Exception {
+		UUID uuid = savedPlayerWithProgress(harness, 3);
+		harness.redisDelete(MonumentaRedisSyncAPI.getRedisStatsPath(uuid));
+		RedisPlayerData edit = MonumentaRedisSyncAPI.getOfflinePlayerData(uuid).get();
+		assertNull(edit.getStats());
+		setProgress(edit, 50);
+		edit.setStats(null);
+
+		assertTrue(MonumentaRedisSyncAPI.saveOfflinePlayerData(edit).get());
+		assertEquals(0, harness.redisListLength(MonumentaRedisSyncAPI.getRedisStatsPath(uuid)));
+	}
+
 	/* A player who logged in, made the given progress, and left; returns their UUID */
 	private static UUID savedPlayerWithProgress(RedisSyncTestHarness harness, int progress) throws Exception {
 		TestPlayer player = harness.savedAndLeft("Tester", progress);
@@ -123,5 +157,9 @@ public class OfflineEditTest {
 		scores.addProperty("Progress", value);
 		edit.setScores(scores.toString());
 		edit.setAdvancements("{\"progress\":" + value + "}");
+		String saved = edit.getStats();
+		JsonObject stats = saved == null ? TestVersionAdapter.emptyStats() : JsonParser.parseString(saved).getAsJsonObject();
+		RedisSyncTestHarness.putStat(stats, RedisSyncTestHarness.CUSTOM_STATS, RedisSyncTestHarness.PROGRESS_STAT, value);
+		edit.setStats(stats.toString());
 	}
 }

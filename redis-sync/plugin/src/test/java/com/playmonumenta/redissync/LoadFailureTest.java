@@ -52,6 +52,24 @@ public class LoadFailureTest {
 	}
 
 	/**
+	 * Stats load while the player is constructed, before advancements, so a failure there refuses
+	 * the login too. Otherwise the server's fallback stats would overwrite the ones in redis.
+	 */
+	@Test
+	void statsThatFailToLoadRefuseTheLogin(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer saved = harness.savedAndLeft("Tester", 9);
+		String statsPath = MonumentaRedisSyncAPI.getRedisStatsPath(saved);
+		harness.redisRename(statsPath, statsPath + ".good");
+		harness.redisBreakKey(statsPath);
+
+		assertNotEquals(AsyncPlayerPreLoginEvent.Result.ALLOWED, harness.login(harness.newPlayer("Tester")));
+
+		harness.redisDelete(statsPath);
+		harness.redisRename(statsPath + ".good", statsPath);
+		assertEquals(9, harness.progress(harness.join("Tester")), "logs in once the data is repaired");
+	}
+
+	/**
 	 * A datapack reload reloads the advancements of every player online. If that fails, the player
 	 * is left with none in memory, which must not be saved over the ones in redis.
 	 */
