@@ -6,7 +6,7 @@
 
 ### What changed and why
 
-Each Monumenta plugin previously maintained its own `CustomLogger` — a `java.util.logging.Logger` subclass with a manually-managed shadow level field that re-routed `FINE`/`FINER`/`FINEST` messages to `logger.info()` to bypass JUL's INFO threshold. Each plugin also had its own `ChangeLogLevel` command and a static `MMLog` facade over it.
+Each Monumenta plugin previously maintained its own `CustomLogger` - a `java.util.logging.Logger` subclass with a manually-managed shadow level field that re-routed `FINE`/`FINER`/`FINEST` messages to `logger.info()` to bypass JUL's INFO threshold. Each plugin also had its own `ChangeLogLevel` command and a static `MMLog` facade over it.
 
 Problems:
 - Debug messages appeared at INFO level with no indication they were debug output.
@@ -15,11 +15,11 @@ Problems:
 
 The new approach is a shared `com.playmonumenta.common.MMLog` class backed by **log4j2** (`LogManager.getLogger(pluginName)`). Both Paper and Velocity use log4j2 as their logging backend (JUL calls from Bukkit are bridged into it). Using log4j2 directly means:
 
-- `Configurator.setLevel()` actually works — it changes the logger's effective level in log4j2's hierarchy.
+- `Configurator.setLevel()` actually works - it changes the logger's effective level in log4j2's hierarchy.
 - Debug messages appear at `DEBUG` or `TRACE` level, not as fake `INFO`.
 - No manual level tracking, no re-leveling hack.
 
-`monumenta-common` ships as a single jar that loads as a plugin on both **Paper** and **Velocity**. Other plugins declare it as a hard dependency and construct their own `MMLog` instance. The `changeloglevel` command is registered per-plugin; the platform-specific registration path (CommandAPI on Paper, BrigadierCommand on Velocity) is handled by `MMLogPaper` and `MMLogVelocity` respectively — separate helper classes that are only loaded on their respective platforms.
+`monumenta-common` ships as a single jar that loads as a plugin on both **Paper** and **Velocity**. Other plugins declare it as a hard dependency and construct their own `MMLog` instance. The `changeloglevel` command is registered per-plugin; the platform-specific registration path (CommandAPI on Paper, BrigadierCommand on Velocity) is handled by `MMLogPaper` and `MMLogVelocity` respectively - separate helper classes that are only loaded on their respective platforms.
 
 ### Level mapping (JUL -> log4j2)
 
@@ -39,10 +39,10 @@ The new approach is a shared `com.playmonumenta.common.MMLog` class backed by **
 On Paper, each plugin registers `/changeloglevel <label> TRACE|DEBUG|INFO|WARN|ERROR`.
 On Velocity, the command is `/changeloglevelvelocity <label> TRACE|DEBUG|INFO|WARN|ERROR` to avoid conflicts.
 
-The label is derived automatically from the `MMLog` instance (`MMLog.getName()` returns the `pluginName` passed to its constructor), so `registerCommand` does not take a separate label argument. Use the plugin's display name as returned by `JavaPlugin.getName()` on Paper (e.g. `MonumentaNetworkRelay`, `MonumentaCommon`) — this keeps the command argument, permission node, and any `log4j2.xml` `<Logger name="...">` entries all consistent.
+The label is derived automatically from the `MMLog` instance (`MMLog.getName()` returns the `pluginName` passed to its constructor), so `registerCommand` does not take a separate label argument. Use the plugin's display name as returned by `JavaPlugin.getName()` on Paper (e.g. `MonumentaNetworkRelay`, `MonumentaCommon`) - this keeps the command argument, permission node, and any `log4j2.xml` `<Logger name="...">` entries all consistent.
 Permission is `<label>.changeloglevel` (all lowercase), e.g. `/changeloglevelvelocity MonumentaNetworkRelay INFO` requires `monumentanetworkrelay.changeloglevel`.
 
-**Velocity shared root:** Velocity does not allow two plugins to own the same top-level command name. `MMLogVelocity.registerCommand` works around this by accumulating all registered `MMLog` instances in a static list. Each call unregisters the existing `/changeloglevelvelocity` root and re-registers a fresh tree containing every plugin's label as a child node. Permission checks are per-label, so each plugin's subcommand is independently gated. No change is needed at the call site — each plugin still calls `registerCommand` exactly once.
+**Velocity shared root:** Velocity does not allow two plugins to own the same top-level command name. `MMLogVelocity.registerCommand` works around this by accumulating all registered `MMLog` instances in a static list. Each call unregisters the existing `/changeloglevelvelocity` root and re-registers a fresh tree containing every plugin's label as a child node. Permission checks are per-label, so each plugin's subcommand is independently gated. No change is needed at the call site - each plugin still calls `registerCommand` exactly once.
 
 **Admin note:** old subcommand argument names have changed:
 
@@ -57,11 +57,11 @@ Update any server scripts or admin tooling that used the old names.
 
 ### Key files
 
-- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MMLog.java` — core log class (log4j2 only, no platform imports)
-- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MMLogPaper.java` — Paper command registration helper (CommandAPI)
-- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MMLogVelocity.java` — Velocity command registration helper (Velocity API)
-- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MonumentaCommonPlugin.java` — Paper entry point
-- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MonumentaCommonVelocityPlugin.java` — Velocity entry point
+- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MMLog.java` - core log class (log4j2 only, no platform imports)
+- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MMLogPaper.java` - Paper command registration helper (CommandAPI)
+- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MMLogVelocity.java` - Velocity command registration helper (Velocity API)
+- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MonumentaCommonPlugin.java` - Paper entry point
+- `monumenta-server-management/monumenta-common/src/main/java/com/playmonumenta/common/MonumentaCommonVelocityPlugin.java` - Velocity entry point
 
 ### Why command registration is split into separate classes
 
@@ -73,9 +73,9 @@ Update any server scripts or admin tooling that used the old names.
 
 ## Part 2 -- Upgrading a plugin
 
-### Step 1 — Gradle setup
+### Step 1 - Gradle setup
 
-**`gradle/libs.versions.toml`** — add the version and library entry. Use the current SNAPSHOT commit hash from the local Maven repo (check `monumenta-server-management/gradle/libs.versions.toml` for the current hash):
+**`gradle/libs.versions.toml`** - add the version and library entry. Use the current SNAPSHOT commit hash from the local Maven repo (check `monumenta-server-management/gradle/libs.versions.toml` for the current hash):
 
 ```toml
 [versions]
@@ -85,7 +85,7 @@ monumenta-common = "f231e8a-SNAPSHOT"   # update to current hash
 monumenta-common = { module = "com.playmonumenta:monumenta-common", version.ref = "monumenta-common" }
 ```
 
-**`plugin/build.gradle.kts`** — add `mavenLocal()` to repositories (the common plugin is published locally) and add the compile-only dependency:
+**`plugin/build.gradle.kts`** - add `mavenLocal()` to repositories (the common plugin is published locally) and add the compile-only dependency:
 
 ```kotlin
 repositories {
@@ -117,11 +117,11 @@ allprojects {
 }
 ```
 
-### Step 2 — Declare the runtime dependency
+### Step 2 - Declare the runtime dependency
 
 `monumenta-common` must be listed as a hard dependency so the server loads it before your plugin.
 
-**Paper** — in the top-level `build.gradle.kts` `monumenta {}` block, add `"MonumentaCommon"` to the `depends` list:
+**Paper** - in the top-level `build.gradle.kts` `monumenta {}` block, add `"MonumentaCommon"` to the `depends` list:
 
 ```kotlin
 monumenta {
@@ -135,7 +135,7 @@ monumenta {
 }
 ```
 
-**Velocity** — in the `@Plugin` annotation on the Velocity plugin class, add a `@Dependency`:
+**Velocity** - in the `@Plugin` annotation on the Velocity plugin class, add a `@Dependency`:
 
 ```java
 @Plugin(
@@ -148,13 +148,13 @@ monumenta {
 )
 ```
 
-### Step 3 — Delete old files
+### Step 3 - Delete old files
 
 Remove:
 - `src/.../CustomLogger.java`
 - `src/.../commands/ChangeLogLevel.java` (or `ChangeLogLevelCommand.java`)
 
-### Step 4 — Update the main plugin class
+### Step 4 - Update the main plugin class
 
 #### Paper (`JavaPlugin` subclass)
 
@@ -179,7 +179,7 @@ Replace the `CustomLogger` construction and `ChangeLogLevel.register()` call in 
 ```java
 @Override
 public void onLoad() {
-    MMLog.init(getName()); // getName() == plugin.yml "name:" field — no string to keep in sync
+    MMLog.init(getName()); // getName() == plugin.yml "name:" field - no string to keep in sync
     com.playmonumenta.common.MMLogPaper.registerCommand(MMLog.getLog());
     // registers: /changeloglevel MyPlugin TRACE|DEBUG|INFO|WARN|ERROR
     // permission: myplugin.changeloglevel
@@ -189,7 +189,7 @@ public void onLoad() {
 
 The logger name is taken directly from `JavaPlugin.getName()`, so it automatically matches the plugin.yml `name:` field. The facade's `init(String)` stores it internally (see Step 5).
 
-Keep (or add) the `getLogger()` override, marked deprecated, **permanently** — even after all internal call sites are removed in Part 3. Without it, `plugin.getLogger()` silently falls through to the `JavaPlugin` super implementation and returns a raw JUL logger with no warning to the caller:
+Keep (or add) the `getLogger()` override, marked deprecated, **permanently** - even after all internal call sites are removed in Part 3. Without it, `plugin.getLogger()` silently falls through to the `JavaPlugin` super implementation and returns a raw JUL logger with no warning to the caller:
 
 ```java
 /** @deprecated Use {@link MMLog} static methods instead. */
@@ -202,7 +202,7 @@ public java.util.logging.Logger getLogger() {
 
 #### Velocity (Velocity-only plugins)
 
-For a Velocity-only plugin with no Paper counterpart, hold a `mLog` field directly on the plugin class. Pass the plugin name as a string literal — it lives right next to the `@Plugin` annotation so it is easy to keep in sync:
+For a Velocity-only plugin with no Paper counterpart, hold a `mLog` field directly on the plugin class. Pass the plugin name as a string literal - it lives right next to the `@Plugin` annotation so it is easy to keep in sync:
 
 ```java
 import com.playmonumenta.common.MMLog;
@@ -223,15 +223,15 @@ public void onProxyInit(ProxyInitializeEvent event) {
 
 Call `MMLog.init()` from the Velocity plugin constructor, then register the command. See Step 5 for the full facade template.
 
-### Step 5 — Replace `utils/MMLog.java` (static facade)
+### Step 5 - Replace `utils/MMLog.java` (static facade)
 
 The static facade holds a private `INSTANCE` of `com.playmonumenta.common.MMLog` and delegates all calls to it. All existing call sites (`MMLog.info("msg")` etc.) compile unchanged.
 
-> **Code style note:** the project requires braces and indented bodies on all methods — no single-line `{ body }` forms. The delegation methods below are shown compact for readability.
+> **Code style note:** the project requires braces and indented bodies on all methods - no single-line `{ body }` forms. The delegation methods below are shown compact for readability.
 
 **All plugins (Paper-only or dual Paper+Velocity):**
 
-The static facade must not call `MMLogPaper` or `MMLogVelocity` directly — doing so would pull those platform-specific classes into the facade's bytecode, causing the same cross-platform `NoClassDefFoundError` described above. Instead, the facade only creates the instance; command registration is the caller's responsibility.
+The static facade must not call `MMLogPaper` or `MMLogVelocity` directly - doing so would pull those platform-specific classes into the facade's bytecode, causing the same cross-platform `NoClassDefFoundError` described above. Instead, the facade only creates the instance; command registration is the caller's responsibility.
 
 ```java
 package com.example.myplugin.utils;
@@ -253,7 +253,7 @@ public class MMLog {
         }
     }
 
-    /** For use in tests — pass Mockito.mock(com.playmonumenta.common.MMLog.class) */
+    /** For use in tests - pass Mockito.mock(com.playmonumenta.common.MMLog.class) */
     public static void init(com.playmonumenta.common.MMLog log) {
         INSTANCE = log;
     }
@@ -331,7 +331,7 @@ On the Velocity plugin class, add `@Dependency(id = "monumenta-common")` alongsi
 )
 ```
 
-### Step 6 — Update tests (if applicable)
+### Step 6 - Update tests (if applicable)
 
 If the plugin has tests that exercise code paths that log via `MMLog`, initialize the facade before running. Use the `init(com.playmonumenta.common.MMLog log)` overload (already in the facade template) with a Mockito mock:
 
@@ -343,13 +343,13 @@ import org.mockito.Mockito;
 MMLog.init(Mockito.mock(com.playmonumenta.common.MMLog.class));
 ```
 
-**Why not construct a real instance?** `com.playmonumenta.common.MMLog`'s constructor is safe to call (it only calls `LogManager.getLogger()`). Direct construction works fine in tests — no platform classes are loaded by `MMLog` itself. The mock approach is also valid if you want to avoid any log4j2 initialization overhead.
+**Why not construct a real instance?** `com.playmonumenta.common.MMLog`'s constructor is safe to call (it only calls `LogManager.getLogger()`). Direct construction works fine in tests - no platform classes are loaded by `MMLog` itself. The mock approach is also valid if you want to avoid any log4j2 initialization overhead.
 
 ---
 
 ## Part 3 -- Upgrading MMLog call sites
 
-**Recommended order:** complete Parts 1 and 2 fully across all affected plugins and get them merged before starting Part 3. The deprecated aliases exist so this step can be deferred — touching call sites while the structural work is still in progress adds noise to diffs and increases the chance of merge conflicts.
+**Recommended order:** complete Parts 1 and 2 fully across all affected plugins and get them merged before starting Part 3. The deprecated aliases exist so this step can be deferred - touching call sites while the structural work is still in progress adds noise to diffs and increases the chance of merge conflicts.
 
 Once the structural changes are merged, work through each plugin's deprecation warnings. There are three categories:
 

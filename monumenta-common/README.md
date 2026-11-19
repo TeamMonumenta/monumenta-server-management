@@ -1,10 +1,10 @@
 # Monumenta Common
 
-Shared reusable logic used by all Monumenta infrastructure plugins. Must be installed as a plugin on both Paper and Velocity — other Monumenta plugins depend on it directly at runtime.
+Shared reusable logic used by all Monumenta infrastructure plugins. Must be installed as a plugin on both Paper and Velocity - other Monumenta plugins depend on it directly at runtime.
 
 ---
 
-## MMLog — Configuring Log Levels
+## MMLog - Configuring Log Levels
 
 Each Monumenta plugin has a named logger. By default all loggers follow the server's root log level (usually `INFO`). You can raise or lower the level for a specific plugin without restarting.
 
@@ -30,7 +30,7 @@ On a Velocity proxy:
 /changeloglevelvelocity <label> <LEVEL>
 ```
 
-Replace `<label>` with the plugin's full name — the same string used as the log4j2 logger name (e.g. `MonumentaNetworkRelay`, `ScriptedQuests`) — and `<LEVEL>` with one of the levels above. The change takes effect immediately and lasts until the server restarts. Requires the `<label>.changeloglevel` permission (all lowercase, e.g. `monumentanetworkrelay.changeloglevel`).
+Replace `<label>` with the plugin's full name - the same string used as the log4j2 logger name (e.g. `MonumentaNetworkRelay`, `ScriptedQuests`) - and `<LEVEL>` with one of the levels above. The change takes effect immediately and lasts until the server restarts. Requires the `<label>.changeloglevel` permission (all lowercase, e.g. `monumentanetworkrelay.changeloglevel`).
 
 ### Set a plugin's default level permanently (log4j2 config)
 
@@ -47,10 +47,10 @@ To persist a non-INFO default across restarts, add a `<Logger>` entry to the ser
 </Loggers>
 ```
 
-- `name` — the plugin's logger name; must exactly match the `<label>` used in the command (e.g. `MonumentaNetworkRelay`)
-- `level` — the desired default level
-- `additivity="false"` — prevents log messages appearing twice
-- `AppenderRef ref="Async"` — routes output through the same appender chain as everything else
+- `name` - the plugin's logger name; must exactly match the `<label>` used in the command (e.g. `MonumentaNetworkRelay`)
+- `level` - the desired default level
+- `additivity="false"` - prevents log messages appearing twice
+- `AppenderRef ref="Async"` - routes output through the same appender chain as everything else
 
 The runtime command still works on top of this; it overrides the XML-configured level until the next restart.
 
@@ -68,7 +68,7 @@ By default, Paper's `log4j2.xml` filters messages below `INFO` on the console `A
 <AppenderRef ref="ServerGuiConsole"/>
 ```
 
-The root logger's own `level="info"` still suppresses DEBUG/TRACE from all other plugins by default — only loggers you have explicitly lowered will produce extra output.
+The root logger's own `level="info"` still suppresses DEBUG/TRACE from all other plugins by default - only loggers you have explicitly lowered will produce extra output.
 
 ## monumenta-zones
 

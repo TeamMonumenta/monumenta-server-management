@@ -59,7 +59,7 @@
     <rule ref="category/java/performance.xml/BigIntegerInstantiation"/>
     <rule name="NoBorrowJoinOrGet"
           language="java"
-          message="Do not call .join() or .get() on a future inside a borrow() try block — holds the connection lock during a network wait. Capture the future, exit the try block, then wait outside."
+          message="Do not call .join() or .get() on a future inside a borrow() try block - holds the connection lock during a network wait. Capture the future, exit the try block, then wait outside."
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
         <description>
             Calling .join() or .get() on a CompletableFuture/RedisFuture inside a

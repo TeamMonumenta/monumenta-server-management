@@ -25,7 +25,7 @@ COPY --from=builder /build/target/release/chat-logger /app/chat-logger
 # Environment variables:
 #   AMQP_URI            - RabbitMQ connection string (default: amqp://guest:guest@127.0.0.1:5672)
 #   SHARD_NAME          - queue name / identity on the network (default: chat-logger)
-#   REDIS_URI           - Redis connection string for UUID→name lookups (optional; UUIDs used as fallback)
+#   REDIS_URI           - Redis connection string for UUID->name lookups (optional; UUIDs used as fallback)
 #   CHAT_LOGGER_DEBUG   - if set, prints raw RabbitMQ message JSON to stderr for each chat message
 
 USER $USERNAME
