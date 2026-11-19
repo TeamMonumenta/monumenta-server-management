@@ -22,7 +22,7 @@ public final class MMLogPaper {
 
 	/**
 	 * Registers {@code /changeloglevel <name> TRACE|DEBUG|INFO|WARN|ERROR} via CommandAPI,
-	 * where {@code <name>} is {@link MMLog#getName()} — the same {@code pluginName} passed to the
+	 * where {@code <name>} is {@link MMLog#getName()} - the same {@code pluginName} passed to the
 	 * constructor (e.g. {@code "MonumentaNetworkRelay"}).
 	 *
 	 * <p>The required permission is {@code <name>.changeloglevel} (all lowercase).

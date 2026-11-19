@@ -44,7 +44,7 @@ servers are unambiguous:
     [18:27:07 INFO]: [NetworkChatLog] [shard1] <l> Combustible >> test message
 
 By default every server logs chat from all shards (`ChatLogAllServers: true` in `config.yml`). Set it to `false` to
-only log messages that are visible to players on this server — useful when all but one server should have a
+only log messages that are visible to players on this server - useful when all but one server should have a
 filtered log and a single designated shard retains the full network-wide chat history.
 
 To separate chat into its own log file and give it a distinct console label, add the following to your

@@ -125,7 +125,7 @@ private fun setupProject(
             it.endWithNewline()
         }
         java {
-            // Regular imports first (alphabetical), then static imports — matches Checkstyle's
+            // Regular imports first (alphabetical), then static imports - matches Checkstyle's
             // THIRD_PARTY_PACKAGE###STATIC ordering. Note: "\\#" is the Spotless static import
             // marker (parsed as \# at runtime); plain "#" would not match static imports.
             it.importOrder("", "\\#")

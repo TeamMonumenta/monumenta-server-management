@@ -184,7 +184,7 @@ impl RedisState {
 
         let uuid_map: HashMap<String, String> = conn.hgetall(UUID2NAME_KEY).await?;
         eprintln!(
-            "Redis: loaded {} UUID→name mappings from {UUID2NAME_KEY}",
+            "Redis: loaded {} UUID->name mappings from {UUID2NAME_KEY}",
             uuid_map.len()
         );
 
@@ -237,7 +237,7 @@ impl RedisState {
 }
 
 // ---------------------------------------------------------------------------
-// Adventure Component → plain text
+// Adventure Component -> plain text
 // ---------------------------------------------------------------------------
 
 fn plain_text(v: &Value) -> String {
@@ -398,7 +398,7 @@ fn build_message(
     let ann_colored = if annotations.is_empty() {
         String::new()
     } else {
-        // Muted gray — visually distinct from channel-colored message text.
+        // Muted gray - visually distinct from channel-colored message text.
         format!(" \x1b[38;2;130;130;130m{}\x1b[0m", annotations.join(" "))
     };
     let colored_label = match label_color {
