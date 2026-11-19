@@ -24,7 +24,7 @@ import dev.jorel.commandapi.arguments.MultiLiteralArgument;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import dev.jorel.commandapi.wrappers.NativeProxyCommandSender;
 import java.time.Instant;
-import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
@@ -248,56 +248,18 @@ public class ChannelWorld extends Channel implements ChannelAutoJoin, ChannelPer
 	}
 
 	@Override
-	public void distributeMessage(Message message) {
+	protected boolean isAudience(Player player, Message message) {
+		// TODO Chat spy here
+		if (!Objects.equals(NetworkChatPlugin.getShardName(), getOriginShard(message))) {
+			return false;
+		}
 		JsonObject extraData = message.getExtraData();
-		if (extraData == null) {
-			MMLog.warning("Got world chat message with no fromShard, ignoring.");
-			return;
+		JsonElement fromWorld = extraData == null ? null : extraData.get("fromWorld");
+		if (!(fromWorld instanceof JsonPrimitive fromWorldPrimitive) || !fromWorldPrimitive.isString()) {
+			MMLog.trace("Got world chat message with invalid fromWorld json, ignoring.");
+			return false;
 		}
-
-		String fromShard;
-		JsonElement fromShardJsonElement = extraData.get("fromShard");
-		if (!fromShardJsonElement.isJsonPrimitive()) {
-			MMLog.warning("Got world chat message with invalid fromShard json, ignoring.");
-			return;
-		}
-		JsonPrimitive fromShardJsonPrimitive = fromShardJsonElement.getAsJsonPrimitive();
-		if (!fromShardJsonPrimitive.isString()) {
-			MMLog.warning("Got world chat message with invalid fromShard json, ignoring.");
-			return;
-		}
-		fromShard = fromShardJsonPrimitive.getAsString();
-		if (!fromShard.equals(NetworkChatPlugin.getShardName())) {
-			// TODO Chat spy here
-			return;
-		}
-
-		String fromWorld;
-		JsonElement fromWorldJsonElement = extraData.get("fromWorld");
-		if (!fromWorldJsonElement.isJsonPrimitive()) {
-			MMLog.warning("Got world chat message with invalid fromWorld json, ignoring.");
-			return;
-		}
-		JsonPrimitive fromWorldJsonPrimitive = fromWorldJsonElement.getAsJsonPrimitive();
-		if (!fromWorldJsonPrimitive.isString()) {
-			MMLog.warning("Got world chat message with invalid fromWorld json, ignoring.");
-			return;
-		}
-		fromWorld = fromWorldJsonPrimitive.getAsString();
-
-		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
-		for (Map.Entry<UUID, PlayerState> playerStateEntry : PlayerStateManager.getPlayerStates().entrySet()) {
-			PlayerState state = playerStateEntry.getValue();
-			Player player = state.getPlayer();
-			if (player == null || !player.getWorld().getName().equals(fromWorld) || !mayListen(player)) {
-				continue;
-			}
-
-			if (state.isListening(this)) {
-				// This accounts for players who have paused their chat
-				state.receiveMessage(message);
-			}
-		}
+		return player.getWorld().getName().equals(fromWorldPrimitive.getAsString());
 	}
 
 	@Override

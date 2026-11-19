@@ -12,7 +12,10 @@ import com.playmonumenta.networkrelay.NetworkRelayMessageEvent;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.lang.ref.Cleaner;
 import java.lang.ref.WeakReference;
+import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -34,6 +37,10 @@ public class MessageManager implements Listener {
 	private static @Nullable MessageManager INSTANCE = null;
 	private static final Cleaner mCleaner = Cleaner.create();
 	private static final Map<UUID, WeakReference<Message>> mMessages = new ConcurrentHashMap<>();
+	/* How long channel messages are kept for players arriving from another shard: longer than the proxy normally holds them */
+	public static final long RECENT_MESSAGE_SECONDS = 120;
+	/* Channel messages seen here recently, oldest first, for players who were between shards as they arrived */
+	private static final Deque<Message> mRecentMessages = new ArrayDeque<>();
 
 	private MessageManager() {
 		INSTANCE = this;
@@ -190,7 +197,25 @@ public class MessageManager implements Listener {
 			}
 			ChatLogger.log(logLine);
 		}
+		remember(message);
 		channel.distributeMessage(message);
+	}
+
+	private static void remember(Message message) {
+		Instant cutoff = Instant.now().minusSeconds(RECENT_MESSAGE_SECONDS);
+		synchronized (mRecentMessages) {
+			mRecentMessages.addLast(message);
+			while (!mRecentMessages.isEmpty() && mRecentMessages.peekFirst().getInstant().isBefore(cutoff)) {
+				mRecentMessages.removeFirst();
+			}
+		}
+	}
+
+	/** Channel messages seen here sent after {@code since}, oldest first, up to RECENT_MESSAGE_SECONDS back */
+	public static List<Message> recentMessagesSince(Instant since) {
+		synchronized (mRecentMessages) {
+			return mRecentMessages.stream().filter(message -> message.getInstant().isAfter(since)).toList();
+		}
 	}
 
 	public void deleteMessageHandler(JsonObject object) {

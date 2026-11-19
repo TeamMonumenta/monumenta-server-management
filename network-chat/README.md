@@ -2,6 +2,8 @@
 
 Cross-server chat system created for Monumenta using redis data storage and rabbitmq message broker.
 
+How it works (channels, a message's path, chat redraws, moving between shards): [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Configuration File
 
 This configuration file controls server-specific settings, and is useful for both testing and for disabling access to

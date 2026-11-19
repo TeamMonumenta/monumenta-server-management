@@ -409,6 +409,12 @@ support (3.3.0):
 If any is missing, a switch stores the target as the player's login server and disconnects them
 with "Please reconnect".
 
+## Chat across a transfer
+
+While the proxy holds a player, no shard has them, so no shard shows them chat. network-chat
+replays what they missed on arrival, from the quit time it writes into the final save: see
+[network-chat's ARCHITECTURE.md](../network-chat/ARCHITECTURE.md#moving-between-shards).
+
 ## When things go wrong
 
 | Situation | What happens |

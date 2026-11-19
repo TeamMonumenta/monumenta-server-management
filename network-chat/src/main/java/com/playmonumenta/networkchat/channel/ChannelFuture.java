@@ -11,6 +11,7 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
 // A channel that is from a future plugin version. This may not be saved.
@@ -82,7 +83,8 @@ public class ChannelFuture extends Channel {
 
 	// Messages will be replayed for anyone triggering the channel to load, nothing to do.
 	@Override
-	public void distributeMessage(Message message) {
+	protected boolean isAudience(Player player, Message message) {
+		return false;
 	}
 
 	// The channel is from a future version - we can't determine how to display this!

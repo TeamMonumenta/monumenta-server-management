@@ -469,52 +469,40 @@ public class ChannelWhisper extends Channel implements ChannelInviteOnly {
 	}
 
 	@Override
-	public void distributeMessage(Message message) {
-		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
+	protected boolean isAudience(Player player, Message message) {
+		return messageCounterpart(player.getUniqueId(), message) != null;
+	}
 
-		JsonObject extraData = message.getExtraData();
-		if (extraData == null) {
-			MMLog.warning("No receiver specified for whisper message");
-			return;
-		}
-		UUID receiverUuid;
-		try {
-			receiverUuid = UUID.fromString(extraData.getAsJsonPrimitive("receiver").getAsString());
-		} catch (Exception e) {
-			MMLog.warning("Could not get receiver from Message; reason: " + e.getMessage());
-			return;
-		}
-		UUID senderUuid = message.getSenderId();
-		if (senderUuid == null) {
-			senderUuid = new UUID(0L, 0L);
-		}
-		distributeMessageToPlayer(receiverUuid, senderUuid, message);
-		if (!senderUuid.equals(receiverUuid)) {
-			distributeMessageToPlayer(senderUuid, receiverUuid, message);
+	@Override
+	protected void onDeliver(PlayerState state, Message message) {
+		UUID otherId = messageCounterpart(state.getPlayerUniqueId(), message);
+		if (otherId != null) {
+			state.setWhisperChannel(otherId, this);
 		}
 	}
 
-	private void distributeMessageToPlayer(UUID playerId, UUID otherId, Message message) {
-		PlayerState state = PlayerStateManager.getPlayerState(playerId);
-		if (state == null) {
-			MMLog.trace("Receiver not on this shard.");
-			return;
+	// The other side of this whisper message for the given player, or null if they are not part of it
+	private static @Nullable UUID messageCounterpart(UUID playerId, Message message) {
+		JsonObject extraData = message.getExtraData();
+		if (extraData == null) {
+			MMLog.trace("No receiver specified for whisper message");
+			return null;
 		}
-		Player player = state.getPlayer();
-		if (player == null) {
-			MMLog.warning("Receiver not on this shard, but their player state is!");
-			return;
+		UUID receiverId;
+		try {
+			receiverId = UUID.fromString(extraData.getAsJsonPrimitive("receiver").getAsString());
+		} catch (Exception e) {
+			MMLog.trace(() -> "Could not get receiver from Message; reason: " + e.getMessage());
+			return null;
 		}
-		state.setWhisperChannel(otherId, this);
-
-		if (!mayListen(player)) {
-			return;
+		UUID senderId = message.getSenderId();
+		if (senderId == null) {
+			senderId = new UUID(0L, 0L);
 		}
-
-		if (state.isListening(this)) {
-			// This accounts for players who have paused their chat
-			state.receiveMessage(message);
+		if (playerId.equals(receiverId)) {
+			return senderId;
 		}
+		return playerId.equals(senderId) ? receiverId : null;
 	}
 
 	@Override

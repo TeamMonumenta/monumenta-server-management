@@ -19,6 +19,7 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
 // A channel that has not finished loading. This may not be saved.
@@ -113,7 +114,8 @@ public class ChannelLoading extends Channel {
 
 	// Messages will be replayed for anyone triggering the channel to load, nothing to do.
 	@Override
-	public void distributeMessage(Message message) {
+	protected boolean isAudience(Player player, Message message) {
+		return false;
 	}
 
 	// The channel is loading - we don't know how to display this message yet!
@@ -152,5 +154,7 @@ public class ChannelLoading extends Channel {
 				MessageManager.processMessage(channel, message);
 			}
 		}
+		mAwaitingPlayers.clear();
+		mQueuedMessages.clear();
 	}
 }
