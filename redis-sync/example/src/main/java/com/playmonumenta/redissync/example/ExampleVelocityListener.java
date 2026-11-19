@@ -1,10 +1,10 @@
 package com.playmonumenta.redissync.example;
 
-import com.google.common.eventbus.Subscribe;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.playmonumenta.redissync.RedisAPI;
+import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.connection.PostLoginEvent;
 import com.velocitypowered.api.proxy.Player;
@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import com.velocitypowered.api.proxy.Player;
 
 
 public class ExampleVelocityListener {

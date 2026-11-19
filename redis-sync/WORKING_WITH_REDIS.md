@@ -671,7 +671,8 @@ PlayerSessions.waitForSaves(player, () -> {
 
 The most common pattern for plugins that need persistent per-player data.
 Data is stored as a `JsonObject` inside the player's plugin data blob, keyed
-by a unique plugin identifier string.
+by a unique plugin identifier string. Never change a plugin's identifier: data
+saved under the old one is not migrated and will no longer be loaded.
 
 ```java
 public class MyPluginListener implements Listener {
