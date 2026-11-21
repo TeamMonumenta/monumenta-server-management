@@ -118,7 +118,7 @@
     </rule>
     <rule name="UseLocUtilForDistance"
           language="java"
-          message="Do not call Location.distance() or Location.distanceSquared() directly. Use LocUtil.withinRange(), notWithinRangeSameWorld(), notWithinRangeAnyWorld(), or safeDistanceSquared() instead."
+          message="Do not call Location.distance() or Location.distanceSquared() directly. Use LocUtil.withinRange(), notWithinRangeSameWorld(), notWithinRangeAnyWorld(), distance(), or distanceIgnoringWorld() instead (or the withinHorizontalRange()/withinCylinder() families for horizontal or cylinder checks). See the LocUtil class Javadoc for why and which to pick."
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
         <description>
             Location.distance() and Location.distanceSquared() throw IllegalArgumentException when called across worlds and have no null safety. Use the LocUtil family of methods, which handle null, unloaded worlds, and cross-world comparisons safely.
@@ -137,12 +137,34 @@
             </property>
         </properties>
     </rule>
-    <rule name="UseLocUtilNegation"
+    <rule name="UseLocUtilForLocationEquals"
           language="java"
-          message="Do not negate LocUtil.withinRange() with !. Use notWithinRangeSameWorld() or notWithinRangeAnyWorld() to explicitly define cross-world handling."
+          message="Do not compare Locations with Location.equals(). Use LocUtil.samePosition(), or compare Blocks with Block.equals() for exact block positions. See the LocUtil class Javadoc."
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
         <description>
-            !withinRange() is ambiguous with respect to handling cross-world comparisons. Use notWithinRangeSameWorld() or notWithinRangeAnyWorld() to make the intent explicit.
+            Location.equals() compares doubles exactly, also compares yaw/pitch, and treats locations whose worlds have unloaded as equal regardless of which world they were in. LocUtil.samePosition() compares x/y/z approximately and returns false for cross-world or unloaded inputs.
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+                    //MethodCall[
+                        @MethodName = 'equals'
+                        and *[1][pmd-java:typeIs('org.bukkit.Location')]
+                        and ArgumentList/*[1][pmd-java:typeIs('org.bukkit.Location')]
+                    ]
+                    ]]>
+                </value>
+            </property>
+        </properties>
+    </rule>
+    <rule name="UseLocUtilNegation"
+          language="java"
+          message="Do not negate LocUtil.withinRange(), withinHorizontalRange() or withinCylinder() with !. Use the matching notWithin...SameWorld() or notWithin...AnyWorld() method to explicitly define cross-world handling."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            !withinRange(), !withinHorizontalRange() and !withinCylinder() are ambiguous with respect to handling cross-world comparisons. Use the matching notWithin...SameWorld() or notWithin...AnyWorld() method to make the intent explicit.
         </description>
         <priority>2</priority>
         <properties>
@@ -152,7 +174,7 @@
                     //UnaryExpression[
                         @Operator = '!'
                         and MethodCall[
-                            @MethodName = 'withinRange'
+                            (@MethodName = 'withinRange' or @MethodName = 'withinHorizontalRange' or @MethodName = 'withinCylinder')
                             and *[1][pmd-java:typeIsExactly('com.playmonumenta.common.LocUtil')]
                         ]
                     ]

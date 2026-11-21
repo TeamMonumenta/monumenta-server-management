@@ -70,6 +70,16 @@ By default, Paper's `log4j2.xml` filters messages below `INFO` on the console `A
 
 The root logger's own `level="info"` still suppresses DEBUG/TRACE from all other plugins by default - only loggers you have explicitly lowered will produce extra output.
 
+## LocUtil - Cross-world-safe Location comparisons
+
+`com.playmonumenta.common.LocUtil` replaces `Location.distance()`, `distanceSquared()` and `equals()` for comparing two locations. Direct `distance()`/`distanceSquared()`/`equals()` calls on Locations are flagged by PMD (`UseLocUtilForDistance`, `UseLocUtilForLocationEquals`).
+
+Short version of why: those Bukkit methods throw when the inputs are in different worlds or a stored Location's world has unloaded, which never happens in testing and constantly happens in production (teleports, shard transfers, instance unloads, multiple dungeons per shard). And there is no single right answer for "how far apart are two things in different worlds" - it depends on the question being asked. So every LocUtil method name states its cross-world behavior, and the names are intentionally verbose so callers must choose every time.
+
+Horizontal (x/z only) and upright cylinder checks have their own variants following the same naming (`withinHorizontalRange`, `horizontalDistance`, `withinCylinder`, ...). Negating `withinRange`/`withinHorizontalRange`/`withinCylinder` with `!` is flagged by PMD (`UseLocUtilNegation`); use the `notWithin...SameWorld`/`notWithin...AnyWorld` variant.
+
+The full rationale and a "which method do I want" table live in the [LocUtil class Javadoc](src/main/java/com/playmonumenta/common/LocUtil.java) - link to that when this comes up.
+
 ## monumenta-zones
 
 Spatial zone manager with O(log(n)) lookup performance. Dependency for both ScriptedQuests and MonumentaStructureManagement.
