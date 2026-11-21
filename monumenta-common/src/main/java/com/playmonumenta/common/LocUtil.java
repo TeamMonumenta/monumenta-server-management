@@ -7,8 +7,10 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Location comparisons that force the caller to decide how cross-world and unloaded-world inputs
- * are handled. Direct use of {@code Location.distance()} / {@code distanceSquared()} is blocked by
- * the PMD rule UseLocUtilForDistance; use these instead.
+ * are handled. PMD flags direct use of {@code Location.distance()} / {@code distanceSquared()}
+ * (UseLocUtilForDistance; use these methods instead), {@code Location.equals()}
+ * (UseLocUtilForLocationEquals; use samePosition) and negating a within... method with {@code !}
+ * (UseLocUtilNegation; use the matching notWithin...SameWorld / notWithin...AnyWorld).
  *
  * <h2>Why this exists</h2>
  * <ul>
@@ -58,7 +60,6 @@ import org.jetbrains.annotations.Nullable;
  * Outside cylinder, other worlds outside?        notWithinCylinderAnyWorld                 true
  * </pre>
  */
-@SuppressWarnings("PMD.UseLocUtilForDistance")
 public class LocUtil {
 	private static final double POSITION_EPSILON_SQUARED = 1.0e-4 * 1.0e-4;
 
@@ -111,7 +112,8 @@ public class LocUtil {
 	 *   same world, same position:         true
 	 *
 	 * Prefer this over Location.equals(), which compares doubles exactly, also compares yaw/pitch,
-	 * and treats two locations in the same unloaded world as equal.
+	 * and treats locations whose worlds have unloaded as equal regardless of which world they were
+	 * in.
 	 */
 	public static boolean samePosition(@Nullable Location a, @Nullable Location b) {
 		if (a == null || b == null || !sameWorld(a, b)) {
@@ -127,16 +129,15 @@ public class LocUtil {
 	 *   same world, within radius:         true
 	 *   same world, outside radius:        false
 	 *
-	 * There are two options to get the opposite of this:
-	 * - notWithinRangeSameWorld: true means out of range AND on the same world
-	 * - notWithinRangeAnyWorld:  true means not within range; other worlds are always out of range
-	 * Using !withinRange will trigger a PMD warning
+	 * Opposites: notWithinRangeSameWorld (true only if out of range AND same world) /
+	 * notWithinRangeAnyWorld (other worlds always count as out of range).
+	 * Using !withinRange is flagged by PMD.
 	 */
 	public static boolean withinRange(@Nullable Location a, @Nullable Location b, double radius) {
 		if (a == null || b == null || !sameWorld(a, b)) {
 			return false;
 		}
-		return a.distanceSquared(b) <= radius * radius;
+		return distanceSquaredIgnoringWorld(a, b) <= radius * radius;
 	}
 
 	/**
@@ -149,7 +150,7 @@ public class LocUtil {
 		if (a == null || b == null || !sameWorld(a, b)) {
 			return false;
 		}
-		return a.distanceSquared(b) > radius * radius;
+		return !(distanceSquaredIgnoringWorld(a, b) <= radius * radius);
 	}
 
 	/**
@@ -176,7 +177,7 @@ public class LocUtil {
 		if (a == null || b == null || !sameWorld(a, b)) {
 			return OptionalDouble.empty();
 		}
-		return OptionalDouble.of(a.distance(b));
+		return OptionalDouble.of(distanceIgnoringWorld(a, b));
 	}
 
 	/**
@@ -187,7 +188,7 @@ public class LocUtil {
 		if (a == null || b == null || !sameWorld(a, b)) {
 			return OptionalDouble.empty();
 		}
-		return OptionalDouble.of(a.distanceSquared(b));
+		return OptionalDouble.of(distanceSquaredIgnoringWorld(a, b));
 	}
 
 	/**
@@ -239,7 +240,7 @@ public class LocUtil {
 	 *   same world, outside radius:        false
 	 *
 	 * Opposites: notWithinHorizontalRangeSameWorld / notWithinHorizontalRangeAnyWorld.
-	 * Using !withinHorizontalRange will trigger a PMD warning
+	 * Using !withinHorizontalRange is flagged by PMD.
 	 */
 	public static boolean withinHorizontalRange(@Nullable Location a, @Nullable Location b, double radius) {
 		if (a == null || b == null || !sameWorld(a, b)) {
@@ -259,7 +260,7 @@ public class LocUtil {
 		if (a == null || b == null || !sameWorld(a, b)) {
 			return false;
 		}
-		return horizontalDistanceSquaredIgnoringWorld(a, b) > radius * radius;
+		return !(horizontalDistanceSquaredIgnoringWorld(a, b) <= radius * radius);
 	}
 
 	/**
@@ -324,7 +325,7 @@ public class LocUtil {
 	 *   same world, outside cylinder:      false
 	 *
 	 * Opposites: notWithinCylinderSameWorld / notWithinCylinderAnyWorld.
-	 * Using !withinCylinder will trigger a PMD warning
+	 * Using !withinCylinder is flagged by PMD.
 	 */
 	public static boolean withinCylinder(@Nullable Location loc, @Nullable Location center, double radius, double below, double above) {
 		if (loc == null || center == null || !sameWorld(loc, center)) {
