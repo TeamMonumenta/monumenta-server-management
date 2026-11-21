@@ -118,7 +118,7 @@
     </rule>
     <rule name="UseLocUtilForDistance"
           language="java"
-          message="Do not call Location.distance() or Location.distanceSquared() directly. Use LocUtil.withinRange(), notWithinRangeSameWorld(), notWithinRangeAnyWorld(), distanceSameWorld(), or distanceIgnoringWorld() instead. See the LocUtil class Javadoc for why and which to pick."
+          message="Do not call Location.distance() or Location.distanceSquared() directly. Use LocUtil.withinRange(), notWithinRangeSameWorld(), notWithinRangeAnyWorld(), distance(), or distanceIgnoringWorld() instead (or the withinHorizontalRange()/withinCylinder() families for x/z-only checks). See the LocUtil class Javadoc for why and which to pick."
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
         <description>
             Location.distance() and Location.distanceSquared() throw IllegalArgumentException when called across worlds and have no null safety. Use the LocUtil family of methods, which handle null, unloaded worlds, and cross-world comparisons safely.
@@ -161,10 +161,10 @@
     </rule>
     <rule name="UseLocUtilNegation"
           language="java"
-          message="Do not negate LocUtil.withinRange() with !. Use notWithinRangeSameWorld() or notWithinRangeAnyWorld() to explicitly define cross-world handling."
+          message="Do not negate LocUtil.withinRange(), withinHorizontalRange() or withinCylinder() with !. Use the matching notWithin...SameWorld() or notWithin...AnyWorld() method to explicitly define cross-world handling."
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
         <description>
-            !withinRange() is ambiguous with respect to handling cross-world comparisons. Use notWithinRangeSameWorld() or notWithinRangeAnyWorld() to make the intent explicit.
+            !withinRange(), !withinHorizontalRange() and !withinCylinder() are ambiguous with respect to handling cross-world comparisons. Use the matching notWithin...SameWorld() or notWithin...AnyWorld() method to make the intent explicit.
         </description>
         <priority>2</priority>
         <properties>
@@ -174,7 +174,7 @@
                     //UnaryExpression[
                         @Operator = '!'
                         and MethodCall[
-                            @MethodName = 'withinRange'
+                            (@MethodName = 'withinRange' or @MethodName = 'withinHorizontalRange' or @MethodName = 'withinCylinder')
                             and *[1][pmd-java:typeIsExactly('com.playmonumenta.common.LocUtil')]
                         ]
                     ]
