@@ -3,6 +3,7 @@ package com.playmonumenta.common.zones;
 import com.playmonumenta.common.MonumentaCommonPlugin;
 import com.playmonumenta.common.event.ZoneChangeEvent;
 import com.playmonumenta.common.event.ZonePropertyChangeEvent;
+import com.playmonumenta.common.event.ZonePropertyChangeEvent.Change;
 import com.playmonumenta.common.utils.ArgUtils;
 import com.playmonumenta.common.utils.MMLog;
 import com.playmonumenta.common.utils.MessagingUtils;
@@ -686,17 +687,13 @@ public class ZoneManager {
 		Set<String> removedProperties = new LinkedHashSet<>(lastProperties);
 		removedProperties.removeAll(currentProperties);
 		for (String property : removedProperties) {
-			ZonePropertyChangeEvent event;
-			event = new ZonePropertyChangeEvent(player, namespaceName, "!" + property);
-			Bukkit.getPluginManager().callEvent(event);
+			Bukkit.getPluginManager().callEvent(new ZonePropertyChangeEvent(player, namespaceName, property, Change.REMOVED));
 		}
 
 		Set<String> addedProperties = new LinkedHashSet<>(currentProperties);
 		addedProperties.removeAll(lastProperties);
 		for (String property : addedProperties) {
-			ZonePropertyChangeEvent event;
-			event = new ZonePropertyChangeEvent(player, namespaceName, property);
-			Bukkit.getPluginManager().callEvent(event);
+			Bukkit.getPluginManager().callEvent(new ZonePropertyChangeEvent(player, namespaceName, property, Change.ADDED));
 		}
 
 		if (currentZone == null) {
