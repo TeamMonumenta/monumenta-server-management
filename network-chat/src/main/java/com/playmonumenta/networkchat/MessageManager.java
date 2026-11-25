@@ -37,8 +37,6 @@ public class MessageManager implements Listener {
 	private static @Nullable MessageManager INSTANCE = null;
 	private static final Cleaner mCleaner = Cleaner.create();
 	private static final Map<UUID, WeakReference<Message>> mMessages = new ConcurrentHashMap<>();
-	/* How long channel messages are kept for players arriving from another shard: longer than the proxy normally holds them */
-	public static final long RECENT_MESSAGE_SECONDS = 120;
 	/* Channel messages seen here recently, oldest first, for players who were between shards as they arrived */
 	private static final Deque<Message> mRecentMessages = new ArrayDeque<>();
 
@@ -202,7 +200,7 @@ public class MessageManager implements Listener {
 	}
 
 	private static void remember(Message message) {
-		Instant cutoff = Instant.now().minusSeconds(RECENT_MESSAGE_SECONDS);
+		Instant cutoff = Instant.now().minusSeconds(NetworkChatProperties.getRecentMessageSeconds());
 		synchronized (mRecentMessages) {
 			mRecentMessages.addLast(message);
 			while (!mRecentMessages.isEmpty() && mRecentMessages.peekFirst().getInstant().isBefore(cutoff)) {
@@ -211,7 +209,7 @@ public class MessageManager implements Listener {
 		}
 	}
 
-	/** Channel messages seen here sent after {@code since}, oldest first, up to RECENT_MESSAGE_SECONDS back */
+	/** Channel messages seen here sent after {@code since}, oldest first, up to RecentMessageSeconds back */
 	public static List<Message> recentMessagesSince(Instant since) {
 		synchronized (mRecentMessages) {
 			return mRecentMessages.stream().filter(message -> message.getInstant().isAfter(since)).toList();
@@ -231,7 +229,7 @@ public class MessageManager implements Listener {
 		if (message != null) {
 			message.markDeleted();
 			for (PlayerState state : PlayerStateManager.getPlayerStates().values()) {
-				state.refreshChat();
+				state.removeDeletedMessages();
 			}
 		}
 	}
@@ -261,7 +259,7 @@ public class MessageManager implements Listener {
 
 		if (changeFound) {
 			for (PlayerState state : PlayerStateManager.getPlayerStates().values()) {
-				state.refreshChat();
+				state.removeDeletedMessages();
 			}
 		}
 	}

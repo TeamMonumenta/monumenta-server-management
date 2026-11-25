@@ -301,6 +301,11 @@ public abstract class Channel {
 	protected void onDeliver(PlayerState state, Message message) {
 	}
 
+	// Whether a recipient's ignore list hides messages from this channel
+	public boolean isIgnorable() {
+		return true;
+	}
+
 	private void deliverMessage(PlayerState state, Message message) {
 		Player player = state.getPlayer();
 		if (player == null || !isAudience(player, message)) {
@@ -309,7 +314,7 @@ public abstract class Channel {
 		onDeliver(state, message);
 		if (mayListen(player) && state.isListening(this)) {
 			// This accounts for players who have paused their chat
-			state.receiveMessage(message);
+			state.receiveMessage(this, message);
 		}
 	}
 

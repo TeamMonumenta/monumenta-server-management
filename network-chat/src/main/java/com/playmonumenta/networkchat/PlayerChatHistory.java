@@ -213,14 +213,8 @@ public class PlayerChatHistory {
 			return;
 		}
 		mIsReplayingChat = true;
-		mSeenMessages.removeIf(message -> {
-			if (message.senderIsPlayer() && mPlayerId.equals(message.getSenderId())) {
-				// Show deleted messages to the original sender
-				return false;
-			}
-
-			return message.isDeleted();
-		});
+		// Deleted messages stay visible to their sender
+		mSeenMessages.removeIf(message -> message.isDeleted() && !isOwnMessage(message));
 
 		Component emptyMessage = Component.empty();
 
@@ -238,6 +232,18 @@ public class PlayerChatHistory {
 			showUnseen();
 		}
 		processUnprocessedMessages();
+	}
+
+	// Drops deleted messages not yet shown, and redraws chat only if this player was shown one
+	public void removeDeletedMessages() {
+		mUnseenMessages.removeIf(Message::isDeleted);
+		if (mSeenMessages.stream().anyMatch(message -> message.isDeleted() && !isOwnMessage(message))) {
+			refreshChat();
+		}
+	}
+
+	private boolean isOwnMessage(Message message) {
+		return message.senderIsPlayer() && mPlayerId.equals(message.getSenderId());
 	}
 
 	public void clearChat() {

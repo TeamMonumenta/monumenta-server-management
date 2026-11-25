@@ -31,6 +31,9 @@ commands:
 - `SudoEnabled` (default: `false`): If true, allows for modifying another player's current chat channel and various chat
   settings via commands. Note that while this can be used to move someone out of a chat channel, this plugin provides no
   option to force a player to say anything in chat.
+- `RecentMessageSeconds` (default: `120`): How long channel messages are kept for players who arrive from another
+  shard or log back in. Messages sent after a player left and within this window are shown to them on arrival. Raise it
+  if the proxy holds players longer than this.
 
 ## Chat Logging
 

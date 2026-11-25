@@ -46,14 +46,14 @@ flowchart LR
 | A player's chat state (`PlayerState`) | redis-sync plugin data `NetworkChat`, saved with the player | With the player |
 | Loaded channels | each shard's memory; party and whisper channels only while someone on the shard uses them | Unloaded when unused |
 | Chat history | memory of the player's shard; broadcast to all shards when they leave | 10s after leaving |
-| Recent channel messages | each shard's memory | 120s |
+| Recent channel messages | each shard's memory | 120s (`RecentMessageSeconds` in `config.yml`) |
 
 ## Channels
 
 | Type | Who sees a message (`isAudience`, then `mayListen`) |
 |---|---|
 | `ChannelGlobal` | Everyone with access, on every shard |
-| `ChannelAnnouncement` | Everyone with access; only those given chat access may talk |
+| `ChannelAnnouncement` | Everyone with access, ignoring the sender or not; only those given chat access may talk. The sender is not shown |
 | `ChannelLocal` | Players on the shard it was sent from |
 | `ChannelWorld` | Players in the world it was sent from |
 | `ChannelParty` | Its members |
@@ -96,7 +96,9 @@ Three steps, each owned by one class:
    the message's audience (`isAudience`), may listen to the channel (`mayListen`), and are
    listening (`isListening`). Channels override `isAudience` and `mayListen`; the loop itself is
    shared.
-2. **When.** `PlayerState.receiveMessage` drops messages from ignored players. The player's
+2. **When.** `PlayerState.receiveMessage` drops messages from ignored players, unless the
+   channel is not ignorable (`Channel.isIgnorable`: announcements, so they are not missed by
+   players who ignore a moderator). The player's
    `PlayerChatHistory` shows the message now, or keeps it as unseen while chat is paused.
 3. **How.** `Message.showMessage` asks the channel to render the message for this recipient
    (`Channel.showMessage`): formats, colors and hover text can differ per player.
@@ -112,11 +114,17 @@ The client cannot remove one line of chat. To take back a message, the server re
 ```mermaid
 flowchart TB
     D["moderator deletes a message"] -- "broadcast delete" --> M["each shard: mark it deleted"]
-    M --> RF["every player here: refreshChat"]
+    M --> Q["every player here: drop it from<br/>messages not yet shown (paused)"]
+    Q --> S{"was it shown to them,<br/>and not their own?"}
+    S -- "no" --> N["nothing redrawn"]
+    S -- "yes" --> RF["refreshChat"]
     RF --> E["send 100 empty lines<br/>less the history"]
     E --> H["show the seen history again,<br/>without deleted messages<br/>(the sender still sees their own)"]
     H --> U["then unseen messages, unless paused"]
 ```
+
+Only players who were shown the message have their chat redrawn. A deleted message that was
+waiting while a player's chat was paused is dropped without a redraw.
 
 `PlayerChatHistory` keeps up to 100 seen messages (the vanilla chat limit), unseen messages while
 paused, and messages that arrive during a redraw. The same redraw runs on join for clients on
@@ -131,7 +139,7 @@ follow them. Two more things travel separately:
   The shard they join uses it to redraw their chat; the others discard it after 10 seconds.
 - **Messages sent while they were away.** On a clean transfer, the proxy holds the player between
   shards until their data is saved, so for a while no shard has them. Every shard keeps the
-  channel messages it has seen for 120 seconds. The final save records when the player quit
+  channel messages it has seen for 120 seconds (`RecentMessageSeconds`). The final save records when the player quit
   (`leftAt`), and redis-sync guarantees that save is the data the next shard loads.
 
 ```mermaid
@@ -155,7 +163,7 @@ The replay happens at the end of the join, once other plugins have set the playe
 shard (their team, their world), and goes through the same `isAudience` and `mayListen` checks
 as live chat. So a player arriving on shard B sees B's local chat from the hold, not A's, and
 team, party and whisper rules apply as they would have. A replayed whisper sets the reply
-target. A player who logs out and back in within 120 seconds gets the same replay.
+target. A player who logs out and back in within that window gets the same replay.
 
 ## Messages between shards
 

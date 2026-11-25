@@ -22,6 +22,7 @@ public class NetworkChatProperties {
 	private boolean mChatRequiresPlayer = false;
 	private boolean mSudoEnabled = false;
 	private boolean mChatLogAllServers = true;
+	private int mRecentMessageSeconds = 2 * 60;
 
 	private NetworkChatProperties() {
 		INSTANCE = this;
@@ -62,6 +63,10 @@ public class NetworkChatProperties {
 		return getInstance().mChatLogAllServers;
 	}
 
+	public static int getRecentMessageSeconds() {
+		return getInstance().mRecentMessageSeconds;
+	}
+
 	public static void load(Plugin plugin, @Nullable CommandSender sender) {
 		getInstance().loadInternal(plugin, sender);
 	}
@@ -98,6 +103,10 @@ public class NetworkChatProperties {
 			mChatLogAllServers = config.getBoolean("ChatLogAllServers", mChatLogAllServers);
 		}
 
+		if (config.isInt("RecentMessageSeconds")) {
+			mRecentMessageSeconds = config.getInt("RecentMessageSeconds", mRecentMessageSeconds);
+		}
+
 		MMLog.info("Properties:");
 		if (sender != null) {
 			sender.sendMessage("Properties:");
@@ -120,6 +129,7 @@ public class NetworkChatProperties {
 		out.add("mChatRequiresPlayer = " + mChatRequiresPlayer);
 		out.add("mSudoEnabled = " + mSudoEnabled);
 		out.add("mChatLogAllServers = " + mChatLogAllServers);
+		out.add("mRecentMessageSeconds = " + mRecentMessageSeconds);
 
 		return out;
 	}
@@ -170,6 +180,10 @@ public class NetworkChatProperties {
 
 		if (!config.contains("ChatLogAllServers")) {
 			config.set("ChatLogAllServers", mChatLogAllServers);
+		}
+
+		if (!config.contains("RecentMessageSeconds")) {
+			config.set("RecentMessageSeconds", mRecentMessageSeconds);
 		}
 
 		try {

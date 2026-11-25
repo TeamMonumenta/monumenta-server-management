@@ -164,6 +164,12 @@ public class ChannelAnnouncement extends Channel implements ChannelAutoJoin, Cha
 		}
 	}
 
+	// Announcements are seen even by players who ignore the sender
+	@Override
+	public boolean isIgnorable() {
+		return false;
+	}
+
 	@Override
 	public boolean mayListen(CommandSender sender) {
 		if (!CommandUtils.hasPermission(sender, "networkchat.see.announcement")) {

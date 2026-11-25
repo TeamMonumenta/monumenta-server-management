@@ -305,9 +305,9 @@ public class PlayerState {
 		return mDefaultChannels;
 	}
 
-	public void receiveMessage(Message message) {
+	public void receiveMessage(Channel channel, Message message) {
 		@Nullable UUID senderId = message.getSenderId();
-		if (senderId == null || !mIgnoredPlayers.contains(senderId)) {
+		if (senderId == null || !channel.isIgnorable() || !mIgnoredPlayers.contains(senderId)) {
 			getPlayerChatHistory().receiveMessage(message);
 		}
 	}
@@ -319,6 +319,10 @@ public class PlayerState {
 	// Re-show chat with deleted messages removed, even while paused.
 	public void refreshChat() {
 		getPlayerChatHistory().refreshChat();
+	}
+
+	public void removeDeletedMessages() {
+		getPlayerChatHistory().removeDeletedMessages();
 	}
 
 	public void clearChat() {

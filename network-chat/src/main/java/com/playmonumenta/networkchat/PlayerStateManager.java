@@ -428,7 +428,7 @@ public class PlayerStateManager implements Listener {
 			return;
 		}
 		Instant leftAt = Instant.ofEpochMilli(leftAtJson.getAsLong());
-		if (leftAt.isBefore(Instant.now().minusSeconds(MessageManager.RECENT_MESSAGE_SECONDS))) {
+		if (leftAt.isBefore(Instant.now().minusSeconds(NetworkChatProperties.getRecentMessageSeconds()))) {
 			return;
 		}
 		List<Message> messages = MessageManager.recentMessagesSince(leftAt);
