@@ -68,6 +68,7 @@ public class CleanSwitchListener {
 		if (current == null || current.getServer().equals(target)) {
 			return;
 		}
+		/* Velocity's own switch connects the target before leaving the source, which would wait on the lease: deny it and switch ourselves */
 		event.setResult(ServerPreConnectEvent.ServerResult.denied());
 		Switch sw = new Switch();
 		existing = mSwitches.putIfAbsent(player.getUniqueId(), sw);
