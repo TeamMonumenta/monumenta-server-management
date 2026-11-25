@@ -17,7 +17,7 @@ import org.apache.logging.log4j.core.config.Configurator;
  * <p>Paper registers {@code /changeloglevel <label> TRACE|DEBUG|INFO|WARN|ERROR}.
  * Velocity registers {@code /changeloglevelvelocity <label> TRACE|DEBUG|INFO|WARN|ERROR}.
  *
- * <p>Paper example — derive the name from the plugin itself so it can never diverge from
+ * <p>Paper example - derive the name from the plugin itself so it can never diverge from
  * plugin.yml:
  * <pre>{@code
  * public void onEnable() {
@@ -26,7 +26,7 @@ import org.apache.logging.log4j.core.config.Configurator;
  * }
  * }</pre>
  *
- * <p>Velocity example — pass the string directly; it lives right next to the {@code @Plugin}
+ * <p>Velocity example - pass the string directly; it lives right next to the {@code @Plugin}
  * annotation so drift is easy to spot:
  * <pre>{@code
  * // @Plugin(name = "MyPlugin", ...)

@@ -2,6 +2,7 @@ package com.playmonumenta.structures;
 
 import com.fastasyncworldedit.core.extent.clipboard.DiskOptimizedClipboard;
 import com.fastasyncworldedit.core.extent.processor.lighting.RelightMode;
+import com.playmonumenta.common.LocUtil;
 import com.playmonumenta.structures.utils.CommandUtils;
 import com.playmonumenta.structures.utils.MMLog;
 import com.playmonumenta.structures.utils.MessagingUtils;
@@ -171,7 +172,7 @@ public class StructuresAPI {
 		Location copyLoc1 = loc1.clone();
 		Location copyLoc2 = loc2.clone();
 
-		if (!copyLoc1.getWorld().equals(copyLoc2.getWorld())) {
+		if (!LocUtil.sameWorld(copyLoc1, copyLoc2)) {
 			MMLog.debug("copyAreaAndSaveStructure: Completing with exception for '" + path + "' due to world mismatch");
 			future.completeExceptionally(new Exception("Locations must have the same world"));
 			return future;
@@ -246,7 +247,7 @@ public class StructuresAPI {
 			return future;
 		}
 
-		if (!copyLoc1.getWorld().equals(copyLoc2.getWorld())) {
+		if (!LocUtil.sameWorld(copyLoc1, copyLoc2)) {
 			future.completeExceptionally(new Exception("Locations must have the same world"));
 			return future;
 		}

@@ -142,12 +142,12 @@ CompletableFuture.allOf(futureA, futureB, futureC).whenComplete((unused, ex) -> 
 
 ### DANGER: do not block the Lettuce I/O thread inside whenComplete()
 
-`whenComplete()` callbacks run on the **Lettuce I/O thread** — the single thread
+`whenComplete()` callbacks run on the **Lettuce I/O thread** - the single thread
 that both sends commands to and reads responses from Redis. Blocking it, or
 keeping it busy for a long time, stalls every other pending Redis response on the
 server.
 
-**Deadlock** — issuing a new Redis command and calling `.join()`/`.get()` on it
+**Deadlock** - issuing a new Redis command and calling `.join()`/`.get()` on it
 inside a `whenComplete()` callback:
 
 ```java
@@ -162,7 +162,7 @@ future.whenComplete((result, ex) -> {
 });
 ```
 
-**Fix option 1 — chain another `.whenComplete()`** (the current callback returns
+**Fix option 1 - chain another `.whenComplete()`** (the current callback returns
 immediately; the new callback fires later on the I/O thread):
 
 ```java
@@ -180,7 +180,7 @@ future.whenComplete((result, ex) -> {
 });
 ```
 
-**Fix option 2 — schedule onto a Bukkit async thread** (safe to block there):
+**Fix option 2 - schedule onto a Bukkit async thread** (safe to block there):
 
 ```java
 // ✅ Hand off to async thread before blocking
@@ -198,12 +198,12 @@ future.whenComplete((result, ex) -> {
 ```
 
 **Guideline:** keep `whenComplete()` callbacks short and non-blocking. Even
-work that never calls `.join()` / `.get()` — large JSON parsing, loops over
-big data sets, multiple chained Redis calls — should be handed off to a Bukkit
+work that never calls `.join()` / `.get()` - large JSON parsing, loops over
+big data sets, multiple chained Redis calls - should be handed off to a Bukkit
 async thread via `runTaskAsynchronously()` so the I/O thread is freed
 immediately.
 
-**Safe exception — `.join()` on already-complete futures:** inside a
+**Safe exception - `.join()` on already-complete futures:** inside a
 `CompletableFuture.allOf()` callback, the constituent futures are **guaranteed
 complete** before the callback fires, so `.join()` returns instantly without
 blocking. This is safe. Never call `.join()` on a future unless you have such a

@@ -432,7 +432,7 @@ wrapper inside it.
 
 `whenComplete()` callbacks fire on a **Lettuce I/O thread**. Lettuce uses a
 single shared I/O thread both to write commands to the socket and to read
-responses from it. If you block that thread — or keep it busy for a long time —
+responses from it. If you block that thread - or keep it busy for a long time -
 you starve every other pending Redis request on the server.
 
 #### Deadlock: issuing a new Redis command and blocking on it
@@ -485,8 +485,8 @@ future.whenComplete((result, ex) -> {
 #### Long-running work - schedule off the I/O thread even when not blocking
 
 The I/O thread is a shared resource. Even work that never calls `.join()` or
-`.get()` — complex JSON parsing, loops over large data sets, multiple chained
-Redis calls — should be moved off the I/O thread with
+`.get()` - complex JSON parsing, loops over large data sets, multiple chained
+Redis calls - should be moved off the I/O thread with
 `runTaskAsynchronously()`:
 
 ```java
@@ -510,7 +510,7 @@ future.whenComplete((bigPayload, ex) -> {
 #### Safe exception: `.join()` on futures you know are already complete
 
 Calling `.join()` on a `CompletableFuture` that is **already complete** returns
-instantly — no network I/O, no blocking. This is safe on the I/O thread and is
+instantly - no network I/O, no blocking. This is safe on the I/O thread and is
 the intended usage inside a `CompletableFuture.allOf()` callback (see
 [section 5.5](#55-multiple-parallel-requests-with-completablefutureallof)):
 

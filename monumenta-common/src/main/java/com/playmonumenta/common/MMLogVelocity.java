@@ -34,7 +34,7 @@ public final class MMLogVelocity {
 	 * Registers (or extends) {@code /changeloglevelvelocity <name> TRACE|DEBUG|INFO|WARN|ERROR}
 	 * via Brigadier, where {@code <name>} is {@link MMLog#getName()}.
 	 *
-	 * <p>Velocity does not allow two plugins to register the same top-level command name — the
+	 * <p>Velocity does not allow two plugins to register the same top-level command name - the
 	 * second registration silently replaces the first. To support multiple plugins sharing the root,
 	 * this method accumulates all {@link MMLog} instances in a static list and rebuilds the entire
 	 * command tree on every call, unregistering the previous version first. Each label subcommand
