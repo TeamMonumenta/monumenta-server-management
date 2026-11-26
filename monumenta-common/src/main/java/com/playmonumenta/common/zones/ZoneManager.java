@@ -53,7 +53,6 @@ public class ZoneManager {
 	private ZoneState mActiveState = new ZoneState();
 	private final Map<String, ZoneNamespace> mPluginNamespaces = new HashMap<>();
 
-	private final Set<UUID> mTransferringPlayers = new HashSet<>();
 	private final Map<UUID, ZoneFragment> mLastPlayerZoneFragment = new HashMap<>();
 	private final Map<UUID, Map<String, Zone>> mLastPlayerZones = new HashMap<>();
 
@@ -605,26 +604,19 @@ public class ZoneManager {
 		}
 		mLastPlayerZoneFragment.remove(playerUuid);
 		mLastPlayerZones.remove(playerUuid);
-		mTransferringPlayers.remove(playerUuid);
 	}
 
+	/**
+	 * @deprecated Scheduled for removal; restored only so plugins built against older versions still
+	 * load. Does nothing: zones now follow the player until they log out.
+	 */
+	@Deprecated(forRemoval = true)
 	public void setTransferring(Player player, boolean isTransferring) {
-		UUID playerUuid = player.getUniqueId();
-		if (isTransferring) {
-			mTransferringPlayers.add(playerUuid);
-			unregisterPlayer(player);
-		} else {
-			mTransferringPlayers.remove(playerUuid);
-		}
 	}
 
 	private void applyFragmentChange(Player player, @Nullable ZoneFragment currentZoneFragment) {
 		UUID playerUuid = player.getUniqueId();
 		World world = player.getWorld();
-		if (currentZoneFragment != null && mTransferringPlayers.contains(playerUuid)) {
-			return;
-		}
-
 		Map<String, Zone> lastZones = mLastPlayerZones.get(playerUuid);
 
 		Map<String, Zone> currentZones = new HashMap<>();

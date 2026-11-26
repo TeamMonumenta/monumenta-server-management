@@ -37,7 +37,6 @@ import net.kyori.adventure.audience.MessageType;
 import net.kyori.adventure.identity.Identity;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventPriority;
@@ -106,7 +105,6 @@ import org.junit.jupiter.api.extension.ParameterResolver;
  * <h2>Waiting</h2>
  * <ul>
  * <li>{@link #awaitSaved} - ticks until the player's saves have committed.</li>
- * <li>{@link #awaitSavedWithoutTicking} - the same in real time, for tests that count ticks.</li>
  * <li>{@link #awaitPluginCommandsExecuted} - until redis has run everything the plugin has sent,
  * so a test can check that something was <em>not</em> written.</li>
  * <li>{@link #awaitWithTicks} - ticks until any condition holds.</li>
@@ -135,6 +133,9 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 	private final RedisClient mControlClient;
 	private final StatefulRedisConnection<String, String> mControlConnection;
 
+	/* How long a login waits for a session lease in tests */
+	public static final long ACQUIRE_WAIT_MILLIS = 200;
+
 	public RedisSyncTestHarness() throws Exception {
 		mRedis = TestRedisServer.get();
 		mServer = MockBukkit.mock();
@@ -159,6 +160,9 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 		if (!connected) {
 			new RedisAPI(mRedis.getHost(), mRedis.getPort());
 		}
+
+		/* A login waiting on a lease held elsewhere gives up quickly, so tests that expect that refusal stay fast */
+		SessionLease.setAcquireWaitMillis(ACQUIRE_WAIT_MILLIS);
 
 		/* The same listeners MonumentaRedisSync.onEnable registers, bar autosave which tests drive by hand */
 		MonumentaRedisSync.registerPlayerDataListeners(mPlugin, mAdapter);
@@ -325,7 +329,7 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 
 	/**
 	 * A player connection. Kicking it disconnects the way Paper does rather than the way MockBukkit
-	 * does. Also implements the shoulder entity getters that transfers read and MockBukkit lacks.
+	 * does.
 	 */
 	@SuppressWarnings("unchecked") // PlayerMock's ban() overrides, inherited as-is
 	public final class TestPlayer extends PlayerMock {
@@ -339,6 +343,8 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 		private final List<String> mPluginMessages = new CopyOnWriteArrayList<>();
 		private final List<String> mChat = new CopyOnWriteArrayList<>();
 		private volatile boolean mFailPluginMessages = false;
+		/* Whether the network connection is open; it closes before the server processes the quit */
+		private volatile boolean mConnected = true;
 		/* What the advancement load handed the server, applied once the player is placed */
 		private @Nullable String mLoadedAdvancements = null;
 
@@ -380,6 +386,16 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 			mPluginMessages.add(channel + ":" + new String(message, StandardCharsets.UTF_8));
 		}
 
+		@Override
+		public boolean isConnected() {
+			return mConnected;
+		}
+
+		/** The network connection closes (the proxy dropped it), but the server has yet to process the quit */
+		public void loseConnection() {
+			mConnected = false;
+		}
+
 		/** Makes sending plugin messages to this player throw, as a closed channel would */
 		public void failPluginMessages() {
 			mFailPluginMessages = true;
@@ -412,18 +428,6 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 			return mChat;
 		}
 
-		@Override
-		@SuppressWarnings("deprecation")
-		public @Nullable Entity getShoulderEntityLeft() {
-			return null;
-		}
-
-		@Override
-		@SuppressWarnings("deprecation")
-		public @Nullable Entity getShoulderEntityRight() {
-			return null;
-		}
-
 		/* PlayerList.remove: quit event, the synchronous final save, then removal from the server */
 		private void disconnectFromWorld() {
 			callEvent(new PlayerQuitEvent(this, Component.empty(), PlayerQuitEvent.QuitReason.DISCONNECTED));
@@ -433,6 +437,7 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 		}
 
 		private void closeConnection() {
+			mConnected = false;
 			callEvent(new PlayerConnectionCloseEvent(getUniqueId(), getName(), InetAddress.getLoopbackAddress(), false));
 		}
 	}
@@ -636,26 +641,6 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 	}
 
 	/**
-	 * Waits in real time, without advancing the scheduler, until redis has acknowledged every save
-	 * in flight for this player. For tests where how many ticks pass is part of what is asserted.
-	 */
-	public void awaitSavedWithoutTicking(Player player) throws InterruptedException {
-		long deadline = System.currentTimeMillis() + AWAIT_TIMEOUT_MS;
-		while (PlayerSessions.hasUnsettledSaves(player)) {
-			if (System.currentTimeMillis() > deadline) {
-				throw new AssertionError("Timed out waiting for saves to commit for " + player.getName());
-			}
-			Thread.sleep(5);
-		}
-		/*
-		 * Whatever waits on the save (scheduling the next step onto the main thread) runs on the
-		 * redis thread as the save completes, and is not ordered against the bookkeeping checked
-		 * above. It takes microseconds; this margin keeps a test's next tick from overtaking it.
-		 */
-		Thread.sleep(20);
-	}
-
-	/**
 	 * Waits until redis has executed every command the plugin has sent so far. Each of the plugin's
 	 * connections is FIFO, so a round trip on both is a barrier: after it, a save that was never
 	 * made cannot still be on its way.
@@ -693,6 +678,27 @@ public final class RedisSyncTestHarness implements AutoCloseable {
 	 * Reads and writes below go over the harness's own connection, so they never queue behind the
 	 * plugin's commands: a read sees exactly what redis has committed.
 	 */
+
+	public @Nullable String redisGet(String key) throws Exception {
+		return mControlConnection.async().get(key).get(AWAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+	}
+
+	public long redisPttl(String key) throws Exception {
+		return mControlConnection.async().pttl(key).get(AWAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+	}
+
+	/** Sets a key, expiring after {@code ttlMillis} if positive */
+	public void redisSet(String key, String value, long ttlMillis) throws Exception {
+		if (ttlMillis > 0) {
+			mControlConnection.async().psetex(key, ttlMillis, value).get(AWAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+		} else {
+			mControlConnection.async().set(key, value).get(AWAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+		}
+	}
+
+	public void redisDelete(String key) throws Exception {
+		mControlConnection.async().del(key).get(AWAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+	}
 
 	public @Nullable String redisListEntry(String path, int index) throws Exception {
 		return mControlConnection.async().lindex(path, index).get(AWAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);

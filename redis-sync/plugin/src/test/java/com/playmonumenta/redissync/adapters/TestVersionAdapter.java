@@ -142,6 +142,11 @@ public class TestVersionAdapter implements VersionAdapter {
 	 * production entry point ({@code MonumentaRedisSyncAPI.savePlayer}) rather than hand-firing.
 	 */
 	@Override
+	public boolean isConnected(Player player) {
+		return player.isConnected();
+	}
+
+	@Override
 	public void savePlayer(Player player) {
 		/* A real server always has some state to save, even for a player nothing was loaded for */
 		JsonObject nbt = mLivePlayerData.computeIfAbsent(player, k -> new JsonObject());

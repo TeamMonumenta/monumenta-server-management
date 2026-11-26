@@ -22,6 +22,7 @@ import io.papermc.paper.event.server.ServerResourcesReloadedEvent;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -154,14 +156,16 @@ public class DataEventListener implements Listener {
 		long startTime = System.currentTimeMillis();
 		MMLog.trace("Started loading advancements data for player=" + playerName);
 
-		RedisFuture<String> advanceFuture;
-		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
+		/* Over the connection saves use, so a datapack reload's re-load comes after the advancements save just before it */
+		RedisFuture<byte[]> advanceFuture;
+		try (RedisAPI.BorrowedCommands<String, byte[]> conn = RedisAPI.borrowStringBytes()) {
 			advanceFuture = conn.lindex(MonumentaRedisSyncAPI.getRedisAdvancementsPath(player), 0);
 		}
 
 		try {
 			/* Advancements */
-			final String advanceData = advanceFuture.get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
+			final byte[] advanceBytes = advanceFuture.get(MonumentaRedisSyncAPI.TIMEOUT_SECONDS, TimeUnit.SECONDS);
+			final String advanceData = advanceBytes == null ? null : new String(advanceBytes, StandardCharsets.UTF_8);
 			MMLog.debug(() -> "Advancements data loaded for player=" + playerName);
 			MMLog.trace(() -> "Advancements data:" + advanceData);
 			if (advanceData != null) {
@@ -203,14 +207,30 @@ public class DataEventListener implements Listener {
 		 * pushes once, and replaces that entry until a full save's advancements take its place.
 		 */
 		boolean replaceHead = session.beginAdvancementsSave();
-		session.trackSave(RedisAPI.multi(commands -> {
-			if (replaceHead) {
-				commands.lset(advPath, 0, advJsonData);
-			} else {
-				commands.lpush(advPath, advJsonData);
-				commands.ltrim(advPath, 0, BukkitConfigAPI.getHistoryAmount());
+		SessionLease.FencedWrite write = new SessionLease.FencedWrite();
+		if (replaceHead) {
+			write.replaceHead(advPath, advJsonData);
+		} else {
+			write.push(advPath, advJsonData);
+		}
+		fencedSave(session, write, "Advancements saving for player=" + playerName + " failed");
+	}
+
+	/* Writes a save if the session still holds the lease; one that has lost it is kicked. One connection, so saves commit in order */
+	private void fencedSave(PlayerSession session, SessionLease.FencedWrite write, String failureMessage) {
+		String token = session.getLeaseToken();
+		UUID uuid = session.getPlayer().getUniqueId();
+		if (token == null) {
+			MMLog.severe(failureMessage + ": the session holds no lease");
+			return;
+		}
+		CompletableFuture<Long> save = SessionLease.fencedWrite(uuid, token, write);
+		session.trackSave(save, () -> failureMessage);
+		save.whenComplete((ignored, ex) -> {
+			if (SessionLease.isLeaseLost(ex)) {
+				PlayerSessions.runOnMainThread(() -> mSessions.leaseLost(uuid, token));
 			}
-		}), () -> "Advancements saving for player=" + playerName + " failed");
+		});
 	}
 
 	private interface Callable {
@@ -496,12 +516,8 @@ public class DataEventListener implements Listener {
 
 			MMLog.trace(() -> "data: " + b64encode(data.getData()));
 			String dataPath = MonumentaRedisSyncAPI.getRedisDataPath(player);
-			/* Counted before either transaction runs: the advancements save that follows, and a lock's savePushedEntry, rely on it */
+			/* Counted before the write runs: the advancements save that follows relies on it */
 			session.beginPlayerdataSave();
-			session.trackSave(RedisAPI.multiStringBytes(byteConn -> {
-				byteConn.lpush(dataPath, data.getData());
-				byteConn.ltrim(dataPath, 0, BukkitConfigAPI.getHistoryAmount());
-			}), () -> "Failed to save player nbt data for player=" + playerName);
 
 			/*
 			 * sharddata
@@ -545,18 +561,17 @@ public class DataEventListener implements Listener {
 			MMLog.trace(() -> "Data:" + scoreboardData);
 			String scorePath = MonumentaRedisSyncAPI.getRedisScoresPath(player);
 
-			session.trackSave(RedisAPI.multi(commands -> {
-				commands.hset(shardDataPath, worldKey, data.getShardData());
-				commands.hset(shardDataPath, BukkitConfigAPI.getShardName(), overallShardDataStr);
-				commands.lpush(histPath, history);
-				commands.ltrim(histPath, 0, BukkitConfigAPI.getHistoryAmount());
-				commands.lpush(contentPath, contentData);
-				commands.ltrim(contentPath, 0, BukkitConfigAPI.getHistoryAmount());
-				commands.lpush(pluginDataPath, pluginDataStr);
-				commands.ltrim(pluginDataPath, 0, BukkitConfigAPI.getHistoryAmount());
-				commands.lpush(scorePath, scoreboardData);
-				commands.ltrim(scorePath, 0, BukkitConfigAPI.getHistoryAmount());
-			}), () -> "Failed to save player data for player=" + playerName);
+			SessionLease.FencedWrite write = new SessionLease.FencedWrite().push(dataPath, data.getData());
+			String worldShardData = data.getShardData();
+			if (worldShardData != null) {
+				write.hset(shardDataPath, worldKey, worldShardData);
+			}
+			fencedSave(session, write
+				.hset(shardDataPath, BukkitConfigAPI.getShardName(), overallShardDataStr)
+				.push(histPath, history)
+				.push(contentPath, contentData)
+				.push(pluginDataPath, pluginDataStr)
+				.push(scorePath, scoreboardData), "Failed to save player data for player=" + playerName);
 		} catch (IOException ex) {
 			MMLog.severe("Failed to save player data for player=" + playerName, ex);
 		}

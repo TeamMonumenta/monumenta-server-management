@@ -7,7 +7,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-import com.playmonumenta.common.event.PlayerServerTransferEvent;
 import com.playmonumenta.redissync.adapters.VersionAdapter.ReturnParams;
 import com.playmonumenta.redissync.adapters.VersionAdapter.SaveData;
 import com.playmonumenta.redissync.data.ContentData;
@@ -20,7 +19,6 @@ import dev.jorel.commandapi.wrappers.Rotation;
 import io.lettuce.core.KeyValue;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.ScriptOutputType;
-import io.lettuce.core.TransactionResult;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
@@ -141,6 +139,8 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static final int TIMEOUT_SECONDS = 10;
+	/* How long the proxy has to act on a transfer or handoff request */
+	static final int TRANSFER_TIMEOUT_TICKS = 10 * 20;
 	/* A transfer to a shard network relay does not list as online is expected to fail fast */
 	static final int OFFLINE_TARGET_TRANSFER_TIMEOUT_TICKS = 25;
 	public static final ArgumentSuggestions<CommandSender> SUGGESTIONS_ALL_CACHED_PLAYER_NAMES = ArgumentSuggestions.strings((info) ->
@@ -252,8 +252,26 @@ public class MonumentaRedisSyncAPI {
 		return mNameToUuidTrie.suggestions(currentInput, maxSuggestions);
 	}
 
+	/**
+	 * Why the player is leaving this shard, or null if they are not (or not by this plugin's doing).
+	 * Set from a {@link #sendPlayer} or data handoff request until the player has left, so it holds
+	 * in PlayerQuitEvent and the final save; dropped if the proxy never acts on the request. Anything
+	 * a transfer must enforce belongs in PlayerQuitEvent: nothing is frozen before then.
+	 */
+	public static @Nullable Departure getDeparture(Player player) {
+		PlayerSession session = PlayerSessions.currentSession(player);
+		PlayerSession.Leaving leaving = session == null ? null : session.getLeaving();
+		return leaving == null ? null : leaving.departure();
+	}
+
+	/**
+	 * @deprecated Scheduled for removal; restored only so plugins built against older versions still
+	 * load. True while {@link #getDeparture} is not null, but nothing is frozen meanwhile: use
+	 * {@link #getDeparture} in PlayerQuitEvent instead.
+	 */
+	@Deprecated(forRemoval = true)
 	public static boolean isPlayerTransferring(Player player) {
-		return PlayerSessions.isLocked(player);
+		return getDeparture(player) != null;
 	}
 
 	public static void sendPlayer(Player player, String target) throws Exception {
@@ -261,73 +279,94 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static void sendPlayer(Player player, String target, @Nullable Location returnLoc) throws Exception {
-		sendPlayer(player, target, returnLoc, null, null);
+		sendPlayer(player, target, null, returnLoc, null, null);
 	}
 
 	public static void sendPlayer(Player player, String target, @Nullable Location returnLoc, @Nullable Rotation rotation) throws Exception {
-		sendPlayer(player, target, returnLoc, rotation == null ? null : rotation.getNormalizedYaw(), rotation == null ? null : rotation.getNormalizedPitch());
+		sendPlayer(player, target, null, returnLoc, rotation == null ? null : rotation.getNormalizedYaw(), rotation == null ? null : rotation.getNormalizedPitch());
 	}
 
-	@SuppressWarnings({"deprecation", "ReferenceEquality"}) // Which connection's Player object is the question
 	public static void sendPlayer(Player player, String target, @Nullable Location returnLoc, @Nullable Float returnYaw, @Nullable Float returnPitch) throws Exception {
-		Plugin mrs = DataEventListener.getPlugin();
+		sendPlayer(player, target, null, returnLoc, returnYaw, returnPitch);
+	}
 
-		/*
-		 * A Player held past its disconnect (by a task scheduled before it, say) has nothing left to
-		 * transfer. The transfer events must not fire for it either: no fail event would follow, so
-		 * listeners would keep treating the player as transferring.
-		 */
+	/**
+	 * Transfers a player to another shard. This only asks the proxy, which takes them off this shard:
+	 * they log out as usual, and their final save (with {@code returnLoc}, if any) is what the target
+	 * loads. They play on, and are saved, until then; {@link #getDeparture} says where they are going.
+	 * If the proxy has not acted by the timeout, the request is dropped and the player told.
+	 *
+	 * @param content If not null, requested as the player's content first (see {@link #requestPlayerContentDataChange})
+	 */
+	@SuppressWarnings("ReferenceEquality") // Which connection's Player object is the question
+	public static void sendPlayer(Player player, String target, @Nullable ContentData content,
+	                              @Nullable Location returnLoc, @Nullable Float returnYaw, @Nullable Float returnPitch) throws Exception {
+		/* A Player held past its disconnect (by a task scheduled before it, say) has nothing left to transfer */
 		if (Bukkit.getPlayer(player.getUniqueId()) != player) {
 			MMLog.warning("Not transferring player=" + player.getName() + " to " + target + " because that connection is no longer in the game on this shard");
 			return;
 		}
-
-		/* Before the transfer events fire, which they must not for a player already locked */
-		if (PlayerSessions.isLocked(player)) {
+		PlayerSession session = PlayerSessions.currentSession(player);
+		if (session == null) {
+			MMLog.warning("Not transferring player=" + player.getName() + " to " + target + " because they have no session on this shard");
 			return;
 		}
-
-		long startTime = System.currentTimeMillis();
-
+		if (session.isLeaving()) {
+			return;
+		}
 		if (target.equalsIgnoreCase(CommonConfig.getShardName())) {
 			player.sendMessage(Component.text("Can not transfer to the same server you are already on", NamedTextColor.RED));
 			return;
 		}
 
-		com.playmonumenta.redissync.event.PlayerServerTransferEvent legacyEvent = new com.playmonumenta.redissync.event.PlayerServerTransferEvent(player, target);
-		Bukkit.getPluginManager().callEvent(legacyEvent);
-		if (legacyEvent.isCancelled()) {
+		/* Scheduled for removal: deprecated transfer events, kept only for plugins built against older versions */
+		if (!callLegacyTransferEvents(player, target)) {
 			return;
 		}
-		PlayerServerTransferEvent event = new PlayerServerTransferEvent(player, target);
-		Bukkit.getPluginManager().callEvent(event);
-		if (event.isCancelled()) {
-			return;
+
+		if (content != null) {
+			requestPlayerContentDataChange(player, content);
 		}
 
 		player.sendMessage(Component.text("Transferring you to " + target, NamedTextColor.GOLD));
 
-		int timeoutTicks = SessionLock.TIMEOUT_TICKS;
+		int timeoutTicks = TRANSFER_TIMEOUT_TICKS;
 		if (!Arrays.asList(NetworkRelayIntegration.getOnlineTransferTargets()).contains(target)) {
 			timeoutTicks = OFFLINE_TARGET_TRANSFER_TIMEOUT_TICKS;
 		}
 
-		/* The save the target shard loads, with any return location applied to it */
+		ByteArrayDataOutput out = ByteStreams.newDataOutput();
+		out.writeUTF("Connect");
+		out.writeUTF(target);
 		ReturnParams returnParams = returnLoc != null || returnYaw != null || returnPitch != null ? new ReturnParams(returnLoc, returnYaw, returnPitch) : null;
-		SessionLock lock = PlayerSessions.lock(player, timeoutTicks, returnParams);
+		Departure.Transfer departure = new Departure.Transfer(target, content == null ? null : content.getId());
+		try {
+			PlayerSessions.depart(session, new PlayerSession.Transfer(departure, returnParams), "BungeeCord", out.toByteArray(), timeoutTicks, () -> {
+				player.sendMessage(Component.text("Transferring timed out", NamedTextColor.RED));
+				/* Scheduled for removal: deprecated transfer events */
+				callLegacyTransferFailEvents(player);
+			});
+		} catch (RuntimeException ex) {
+			/* Scheduled for removal: deprecated transfer events */
+			callLegacyTransferFailEvents(player);
+			throw ex;
+		}
+	}
 
-		/* The target shard loads from redis, so the proxy must not move the player before the save commits */
-		lock.afterSaves(List.of(), () -> {
-			/* Sent over the player's own connection, so it reaches whichever proxy they are on */
-			ByteArrayDataOutput out = ByteStreams.newDataOutput();
-			out.writeUTF("Connect");
-			out.writeUTF(target);
+	/** Scheduled for removal with the deprecated transfer events. False if a listener cancelled the transfer. */
+	@SuppressWarnings("removal")
+	private static boolean callLegacyTransferEvents(Player player, String target) {
+		if (!new com.playmonumenta.redissync.event.PlayerServerTransferEvent(player, target).callEvent()) {
+			return false;
+		}
+		return new com.playmonumenta.common.event.PlayerServerTransferEvent(player, target).callEvent();
+	}
 
-			player.sendPluginMessage(mrs, "BungeeCord", out.toByteArray());
-			return CompletableFuture.completedFuture(null);
-		});
-
-		MMLog.trace(() -> "Transferring players took " + (System.currentTimeMillis() - startTime) + " milliseconds on main thread");
+	/** Scheduled for removal with the deprecated transfer events */
+	@SuppressWarnings("removal")
+	private static void callLegacyTransferFailEvents(Player player) {
+		new com.playmonumenta.redissync.event.PlayerTransferFailEvent(player).callEvent();
+		new com.playmonumenta.common.event.PlayerTransferFailEvent(player).callEvent();
 	}
 
 	public static void stashPut(Player player, @Nullable String name) throws Exception {
@@ -395,103 +434,94 @@ public class MonumentaRedisSyncAPI {
 	}
 
 	public static void stashGet(Player player, @Nullable String name) throws Exception {
-
-		/* Saves the player first, in case this was a mistake, so they can get back */
-		SessionLock lock = PlayerSessions.lock(player);
-		lock.afterSaves(List.of(), () -> {
-			final String saveName = name != null ? name : player.getUniqueId().toString();
-			Component missing = name == null
-				? Component.text("You don't have any stash data", NamedTextColor.RED)
-				: Component.text("No stash data found for '" + name + "'", NamedTextColor.RED);
-
-			return copySavedStateThenKick(lock, player, "stash data", conn -> {
-				conn.hget(getStashPath(), saveName + "-data");
-				conn.hget(getStashPath(), saveName + "-advancements");
-				conn.hget(getStashPath(), saveName + "-scores");
-				conn.hget(getStashPath(), saveName + "-plugins");
-				conn.hget(getStashPath(), saveName + "-content");
-				conn.hget(getStashPath(), saveName + "-history");
-			}, missing, "stash@", null, Component.text("Stash data loaded successfully"));
-		});
+		final String saveName = name != null ? name : player.getUniqueId().toString();
+		Component missing = name == null
+			? Component.text("You don't have any stash data", NamedTextColor.RED)
+			: Component.text("No stash data found for '" + name + "'", NamedTextColor.RED);
+		replaceData(player, player, "stash data", CompletableFuture.completedFuture(null), conn -> {
+			conn.hget(getStashPath(), saveName + "-data");
+			conn.hget(getStashPath(), saveName + "-advancements");
+			conn.hget(getStashPath(), saveName + "-scores");
+			conn.hget(getStashPath(), saveName + "-plugins");
+			conn.hget(getStashPath(), saveName + "-content");
+			conn.hget(getStashPath(), saveName + "-history");
+		}, missing, "stash@", Component.text("Loading stash data", NamedTextColor.GOLD), null);
 	}
 
 	/**
-	 * The end of a data handoff: reads one saved state (the six fields {@code read} queues, in order
-	 * data, advancements, scores, plugin data, content, history), pushes it as the locked player's
-	 * newest save, and kicks them so they rejoin with it. Any failure is reported to {@code notify};
-	 * one before the write releases the lock.
+	 * A data handoff: reads a saved state (the six fields {@code read} queues: data, advancements,
+	 * scores, plugin data, content, history) once {@code readAfter} completes, then has the proxy
+	 * reconnect the player, and pushes it after their final save as they leave. If it is missing or
+	 * unreadable, {@code notify} is told and nothing else happens.
 	 *
-	 * @return the redis work, complete once the state is written or the handoff has failed
+	 * @throws Exception if {@code to} is not the player's current connection, is already
+	 *                   transferring, or their data is not saved on this shard
 	 */
-	private static CompletableFuture<Void> copySavedStateThenKick(SessionLock lock, Player notify, String what,
-	                                                                Consumer<RedisAPI.BorrowedCommands<String, byte[]>> read, Component missing,
-	                                                                String historyPrefix, @Nullable Component success, Component kickMessage) {
-		Player to = lock.getPlayer();
-		return RedisAPI.multiStringBytes(read).<CompletableFuture<Void>>handle((readResult, readEx) -> {
+	private static void replaceData(Player to, CommandSender notify, String what, CompletableFuture<?> readAfter,
+	                                Consumer<RedisAPI.BorrowedCommands<String, byte[]>> read, Component missing,
+	                                String historyPrefix, Component notice, @Nullable Component success) throws Exception {
+		PlayerSession session = PlayerSessions.currentSession(to);
+		if (session == null) {
+			throw new Exception("Player " + to.getName() + " is not this player's current connection on this shard");
+		}
+		if (session.isLeaving()) {
+			throw new Exception("Player " + to.getName() + " is transferring");
+		}
+		if (session.getLeaseToken() == null) {
+			throw new Exception("Player data is not saved on this shard");
+		}
+
+		readAfter.thenCompose(ignored -> RedisAPI.multiStringBytes(read)).whenComplete((readResult, readEx) -> PlayerSessions.runOnMainThread(() -> {
 			if (readEx != null) {
 				MMLog.severe("Got exception while reading " + what + " for player '" + to.getName() + "'", readEx);
-				tell(notify, Component.text("Failed to load " + what + ": " + readEx.getMessage(), NamedTextColor.RED));
-				lock.releaseLater();
-				return CompletableFuture.<Void>completedFuture(null);
+				notify.sendMessage(Component.text("Failed to load " + what + ": " + readEx.getMessage(), NamedTextColor.RED));
+				return;
 			}
-
 			byte[] data = readResult.get(0);
 			byte[] advance = readResult.get(1);
 			byte[] score = readResult.get(2);
 			byte[] plugin = readResult.get(3);
 			byte[] content = Objects.requireNonNullElse(readResult.get(4), DEFAULT_CONTENT_BYTES);
-			byte[] historyRaw = readResult.get(5);
-
-			/* Make sure there's actually data */
-			if (data == null || advance == null || score == null || plugin == null || historyRaw == null) {
+			byte[] history = readResult.get(5);
+			if (data == null || advance == null || score == null || plugin == null || history == null) {
 				MMLog.warning("No " + what + " to load for player '" + to.getName() + "'");
-				tell(notify, missing);
-				lock.releaseLater();
-				return CompletableFuture.<Void>completedFuture(null);
+				notify.sendMessage(missing);
+				return;
+			}
+			if (PlayerSessions.currentSession(to) != session || session.isLeaving()) {
+				notify.sendMessage(Component.text("Not loading " + what + ": " + to.getName() + " left or is transferring", NamedTextColor.RED));
+				return;
 			}
 
-			byte[] historyOut = (historyPrefix + new String(historyRaw, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
-
-			/*
-			 * From here the player's in-memory state is stale, even if the kick below never happens.
-			 * So from here every outcome kicks them: a failed write may still have partly landed, and
-			 * only a rejoin loads whatever redis now holds.
-			 */
-			lock.handOff();
-
-			/* Push them onto every history list atomically as bytes */
-			CompletableFuture<TransactionResult> write;
-			try {
-				write = RedisAPI.multiStringBytes(conn -> {
-					conn.lpush(getRedisDataPath(to), data);
-					conn.lpush(getRedisAdvancementsPath(to), advance);
-					conn.lpush(getRedisScoresPath(to), score);
-					conn.lpush(getRedisPluginDataPath(to), plugin);
-					conn.lpush(getRedisContentPath(to), content);
-					conn.lpush(getRedisHistoryPath(to), historyOut);
-				});
-			} catch (RuntimeException ex) {
-				write = CompletableFuture.failedFuture(ex);
-			}
-			return write.<Void>handle((writeResult, writeEx) -> {
-				Throwable failure = writeEx != null ? writeEx : RedisAPI.firstCommandError(writeResult);
-				if (failure != null) {
-					MMLog.severe("Got exception while writing " + what + " for player '" + to.getName() + "'; kicking them so they reload whatever was saved", failure);
-					tell(notify, Component.text("Failed to load " + what + ": " + failure.getMessage(), NamedTextColor.RED));
+			SessionLease.FencedWrite write = new SessionLease.FencedWrite()
+				.push(getRedisDataPath(to), data)
+				.push(getRedisAdvancementsPath(to), advance)
+				.push(getRedisScoresPath(to), score)
+				.push(getRedisPluginDataPath(to), plugin)
+				.push(getRedisContentPath(to), content)
+				.push(getRedisHistoryPath(to), (historyPrefix + new String(history, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8));
+			PlayerSession.Replacement replacement = new PlayerSession.Replacement(what, write, writeEx -> {
+				if (writeEx != null) {
+					tell(notify, Component.text("Failed to load " + what + " for " + to.getName() + ": " + writeEx.getMessage(), NamedTextColor.RED));
 				} else if (success != null) {
 					tell(notify, success);
 				}
-				/* The rejoin loads the replacement; until they go, the lock keeps kicking them */
-				PlayerSessions.runOnMainThread(() -> to.kick(failure == null ? kickMessage
-					: Component.text("Failed to load " + what + ", please rejoin", NamedTextColor.RED)));
-				return null;
 			});
-		}).thenCompose(written -> written);
+			try {
+				PlayerSessions.depart(session, replacement, CleanSwitchListener.RECONNECT_CHANNEL, new byte[0], TRANSFER_TIMEOUT_TICKS,
+					() -> notify.sendMessage(Component.text("Loading " + what + " timed out", NamedTextColor.RED)));
+			} catch (RuntimeException ex) {
+				MMLog.severe("Failed to ask the proxy to reconnect player '" + to.getName() + "' to load " + what, ex);
+				notify.sendMessage(Component.text("Failed to load " + what + ": " + ex.getMessage(), NamedTextColor.RED));
+				return;
+			}
+			to.sendMessage(notice);
+		}));
 	}
 
 	/* Messages from redis callbacks, which are not on the main thread */
-	private static void tell(Player player, Component message) {
-		PlayerSessions.runOnMainThread(() -> player.sendMessage(message));
+	private static void tell(CommandSender recipient, Component message) {
+		PlayerSessions.runOnMainThread(() -> recipient.sendMessage(message));
 	}
 
 	public static void stashInfo(Player player, @Nullable String name) {
@@ -629,30 +659,23 @@ public class MonumentaRedisSyncAPI {
 		});
 	}
 
-	public static void playerRollback(Player moderator, Player player, int index) throws Exception {
-
-		/* Saves the player first, in case this was a mistake, so they can get back */
-		SessionLock lock = PlayerSessions.lock(player);
-		/* If that save pushed an entry, the one to roll back to is one older, once it has committed */
-		final int rollbackIndex = lock.savePushedEntry() ? index + 1 : index;
-		lock.afterSaves(List.of(), () -> copySavedStateThenKick(lock, moderator, "rollback data", conn -> {
-			conn.lindex(getRedisDataPath(player), rollbackIndex);
-			conn.lindex(getRedisAdvancementsPath(player), rollbackIndex);
-			conn.lindex(getRedisScoresPath(player), rollbackIndex);
-			conn.lindex(getRedisPluginDataPath(player), rollbackIndex);
-			conn.lindex(getRedisContentPath(player), rollbackIndex);
-			conn.lindex(getRedisHistoryPath(player), rollbackIndex);
+	/** Rolls a player back to the save {@code index} back from their newest, counting every save made before this call */
+	public static void playerRollback(CommandSender moderator, Player player, int index) throws Exception {
+		replaceData(player, moderator, "rollback data", PlayerSessions.savesCommitted(player), conn -> {
+			conn.lindex(getRedisDataPath(player), index);
+			conn.lindex(getRedisAdvancementsPath(player), index);
+			conn.lindex(getRedisScoresPath(player), index);
+			conn.lindex(getRedisPluginDataPath(player), index);
+			conn.lindex(getRedisContentPath(player), index);
+			conn.lindex(getRedisHistoryPath(player), index);
 		}, Component.text("Failed to retrieve player's rollback data", NamedTextColor.RED), "rollback@",
-			Component.text("Player " + player.getName() + " rolled back successfully", NamedTextColor.GREEN),
-			Component.text("Your player data has been rolled back, and you can now re-join the server")));
+			Component.text("Your player data is being rolled back", NamedTextColor.GOLD),
+			Component.text("Player " + player.getName() + " rolled back successfully", NamedTextColor.GREEN));
 	}
 
 	public static void playerLoadFromPlayer(Player loadTo, Player loadFrom, int index) throws Exception {
-
-		/* Saves the player first, in case this was a mistake, so they can get back */
-		SessionLock lock = PlayerSessions.lock(loadTo);
-		/* Waits for loadFrom's saves too, so the copy is of their newest data */
-		lock.afterSaves(List.of(loadFrom), () -> copySavedStateThenKick(lock, loadTo, "data", conn -> {
+		/* Once loadFrom's saves have committed, so the copy is of their newest data */
+		replaceData(loadTo, loadTo, "data", PlayerSessions.savesCommitted(loadFrom), conn -> {
 			conn.lindex(getRedisDataPath(loadFrom), index);
 			conn.lindex(getRedisAdvancementsPath(loadFrom), index);
 			conn.lindex(getRedisScoresPath(loadFrom), index);
@@ -660,7 +683,7 @@ public class MonumentaRedisSyncAPI {
 			conn.lindex(getRedisContentPath(loadFrom), index);
 			conn.lindex(getRedisHistoryPath(loadFrom), index);
 		}, Component.text("Failed to retrieve player's data to load", NamedTextColor.RED), "loadfrom@" + loadFrom.getName() + "@",
-			null, Component.text("Data loaded from player " + loadFrom.getName() + " at index " + index + " and you can now re-join the server")));
+			Component.text("Loading data from player " + loadFrom.getName() + " at index " + index, NamedTextColor.GOLD), null);
 	}
 
 	/**
@@ -1320,10 +1343,12 @@ public class MonumentaRedisSyncAPI {
 	/*
 	 * Pushes an offline write onto every history list, but only if the newest history entry is still
 	 * the one expected. The check and push are one step, so nothing can save in between.
-	 * KEYS: data, advancements, scores, plugin data, content, history. ARGV 1-6: the values; 7: "any",
-	 * "none" (the history must be empty) or "is" (it must be ARGV 8).
+	 * KEYS: data, advancements, scores, plugin data, content, history, session lease. ARGV 1-6: the
+	 * values; 7: "any", "none" (the history must be empty) or "is" (it must be ARGV 8). Returns 1 if
+	 * written, 0 if the history moved on, 2 if the player holds a session lease (is online somewhere).
 	 */
 	private static final String OFFLINE_WRITE_SCRIPT = """
+		if redis.call('EXISTS', KEYS[7]) == 1 then return 2 end
 		local newest = redis.call('LINDEX', KEYS[6], 0)
 		if ARGV[7] == 'none' and newest then return 0 end
 		if ARGV[7] == 'is' and newest ~= ARGV[8] then return 0 end
@@ -1361,7 +1386,7 @@ public class MonumentaRedisSyncAPI {
 			try (RedisAPI.BorrowedCommands<String, byte[]> conn = RedisAPI.borrowStringBytes()) {
 				written = conn.eval(OFFLINE_WRITE_SCRIPT, ScriptOutputType.INTEGER,
 					new String[] {getRedisDataPath(uuid), getRedisAdvancementsPath(uuid), getRedisScoresPath(uuid),
-						getRedisPluginDataPath(uuid), getRedisContentPath(uuid), getRedisHistoryPath(uuid)},
+						getRedisPluginDataPath(uuid), getRedisContentPath(uuid), getRedisHistoryPath(uuid), SessionLease.key(uuid)},
 					splitData.getData(), data.getAdvancements().getBytes(StandardCharsets.UTF_8), data.getScores().getBytes(StandardCharsets.UTF_8),
 					data.getPluginData().getBytes(StandardCharsets.UTF_8), data.getContent().getBytes(StandardCharsets.UTF_8),
 					history.getBytes(StandardCharsets.UTF_8), mode.getBytes(StandardCharsets.UTF_8), expected);
@@ -1369,6 +1394,9 @@ public class MonumentaRedisSyncAPI {
 			written.toCompletableFuture().whenComplete((pushed, ex) -> {
 				if (ex != null) {
 					MMLog.severe("Failed to commit offline player data for uuid=" + uuid, ex);
+					result.complete(false);
+				} else if (pushed != null && pushed == 2L) {
+					MMLog.warning("Refusing offline data write for uuid=" + uuid + ": they hold a session lease, so are online somewhere");
 					result.complete(false);
 				} else if (pushed == null || pushed != 1L) {
 					MMLog.warning("Refusing offline data write for uuid=" + uuid + ": their data has been saved since it was read");
