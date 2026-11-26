@@ -156,8 +156,13 @@ sequenceDiagram
     Note over B: chat keeps arriving: kept as recent messages
     X->>B: player connects
     B->>B: PlayerJoinEvent (LOWEST): load chat state, redraw from history
-    B->>B: PlayerJoinEvent (MONITOR): replay recent messages sent after leftAt
+    B->>B: PlayerJoinEvent (MONITOR): replay recent messages sent after leftAt - 5s, less those A had
 ```
+
+The final save also lists the messages the old shard had received in the 5 seconds before
+`leftAt`, and the replay starts 5 seconds early, skipping those. A message sent just before the
+player left, but still on its way to the old shard, is therefore replayed rather than lost, and
+small clock differences between shards neither lose nor repeat messages.
 
 The replay happens at the end of the join, once other plugins have set the player up on the
 shard (their team, their world), and goes through the same `isAudience` and `mayListen` checks

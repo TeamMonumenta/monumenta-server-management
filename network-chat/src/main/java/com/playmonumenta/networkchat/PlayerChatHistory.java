@@ -236,7 +236,7 @@ public class PlayerChatHistory {
 
 	// Drops deleted messages not yet shown, and redraws chat only if this player was shown one
 	public void removeDeletedMessages() {
-		mUnseenMessages.removeIf(Message::isDeleted);
+		mUnseenMessages.removeIf(message -> message.isDeleted() && !isOwnMessage(message));
 		if (mSeenMessages.stream().anyMatch(message -> message.isDeleted() && !isOwnMessage(message))) {
 			refreshChat();
 		}
