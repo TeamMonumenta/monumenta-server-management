@@ -2,7 +2,6 @@ package com.playmonumenta.networkchat.channel;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
 import com.playmonumenta.networkchat.ChannelManager;
 import com.playmonumenta.networkchat.Message;
 import com.playmonumenta.networkchat.MessageManager;
@@ -14,7 +13,6 @@ import com.playmonumenta.networkchat.channel.interfaces.ChannelPermissionNode;
 import com.playmonumenta.networkchat.channel.property.ChannelAccess;
 import com.playmonumenta.networkchat.commands.ChatCommand;
 import com.playmonumenta.networkchat.utils.CommandUtils;
-import com.playmonumenta.networkchat.utils.MMLog;
 import com.playmonumenta.networkchat.utils.MessagingUtils;
 import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.BooleanArgument;
@@ -23,7 +21,6 @@ import dev.jorel.commandapi.arguments.LiteralArgument;
 import dev.jorel.commandapi.arguments.MultiLiteralArgument;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
@@ -232,39 +229,9 @@ public class ChannelLocal extends Channel implements ChannelAutoJoin, ChannelPer
 	}
 
 	@Override
-	public void distributeMessage(Message message) {
-		JsonObject extraData = message.getExtraData();
-		if (extraData == null) {
-			MMLog.warning("Got local chat message with no fromShard, ignoring.");
-			return;
-		}
-		JsonElement fromShardJsonElement = extraData.get("fromShard");
-		if (!fromShardJsonElement.isJsonPrimitive()) {
-			MMLog.warning("Got local chat message with invalid fromShard json, ignoring.");
-			return;
-		}
-		JsonPrimitive fromShardJsonPrimitive = fromShardJsonElement.getAsJsonPrimitive();
-		if (!fromShardJsonPrimitive.isString()) {
-			MMLog.warning("Got local chat message with invalid fromShard json, ignoring.");
-			return;
-		}
-		if (!Objects.equals(NetworkChatPlugin.getShardName(), fromShardJsonPrimitive.getAsString())) {
-			// TODO Chat spy here
-			return;
-		}
-		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
-		for (Map.Entry<UUID, PlayerState> playerStateEntry : PlayerStateManager.getPlayerStates().entrySet()) {
-			PlayerState state = playerStateEntry.getValue();
-			Player player = state.getPlayer();
-			if (player == null || !mayListen(player)) {
-				continue;
-			}
-
-			if (state.isListening(this)) {
-				// This accounts for players who have paused their chat
-				state.receiveMessage(message);
-			}
-		}
+	protected boolean isAudience(Player player, Message message) {
+		// TODO Chat spy here
+		return Objects.equals(NetworkChatPlugin.getShardName(), getOriginShard(message));
 	}
 
 	@Override

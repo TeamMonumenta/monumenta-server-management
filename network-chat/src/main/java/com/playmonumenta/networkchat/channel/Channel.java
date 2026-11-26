@@ -280,8 +280,43 @@ public abstract class Channel {
 	public abstract void sendMessage(CommandSender sender, String message) throws WrapperCommandSyntaxException;
 
 	// Distributes a received message to the appropriate local player chat states. May be local or remote messages.
-	// Note that sending to player chat state allows chat to be paused.
-	public abstract void distributeMessage(Message message);
+	// Note that sending to player chat state allows chat to be paused. Chat is logged centrally by ChatLogger.
+	public final void distributeMessage(Message message) {
+		for (PlayerState state : PlayerStateManager.getPlayerStates().values()) {
+			deliverMessage(state, message);
+		}
+	}
+
+	// Shows a message to one player who missed it while moving between shards, if this shard would have shown it to them
+	public final void replayMessage(Message message, PlayerState state) {
+		deliverMessage(state, message);
+	}
+
+	// Whether this player, on this shard, is among those the message is for, before access and listening checks
+	protected boolean isAudience(Player player, Message message) {
+		return true;
+	}
+
+	// Called for each audience member before access and listening checks
+	protected void onDeliver(PlayerState state, Message message) {
+	}
+
+	// Whether a recipient's ignore list hides messages from this channel
+	public boolean isIgnorable() {
+		return true;
+	}
+
+	private void deliverMessage(PlayerState state, Message message) {
+		Player player = state.getPlayer();
+		if (player == null || !isAudience(player, message)) {
+			return;
+		}
+		onDeliver(state, message);
+		if (mayListen(player) && state.isListening(this)) {
+			// This accounts for players who have paused their chat
+			state.receiveMessage(this, message);
+		}
+	}
 
 	// Returns the shard that originated this message, or null for network-wide channels.
 	public @Nullable String getOriginShard(Message message) {

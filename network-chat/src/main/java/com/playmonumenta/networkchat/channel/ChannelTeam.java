@@ -16,7 +16,6 @@ import dev.jorel.commandapi.CommandAPICommand;
 import dev.jorel.commandapi.arguments.GreedyStringArgument;
 import dev.jorel.commandapi.exceptions.WrapperCommandSyntaxException;
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -278,39 +277,21 @@ public class ChannelTeam extends Channel {
 	}
 
 	@Override
-	public void distributeMessage(Message message) {
-		// Chat is logged centrally by MessageManager.receiveMessageHandler via ChatLogger.
-
+	protected boolean isAudience(Player player, Message message) {
 		JsonObject extraData = message.getExtraData();
 		if (extraData == null) {
-			MMLog.warning("Could not get Team from Message; no extraData provided");
-			return;
+			MMLog.trace("Could not get Team from Message; no extraData provided");
+			return false;
 		}
 		String teamName;
 		try {
 			teamName = extraData.getAsJsonPrimitive("team").getAsString();
 		} catch (Exception e) {
-			MMLog.warning("Could not get Team from Message; reason: " + e.getMessage());
-			return;
+			MMLog.trace(() -> "Could not get Team from Message; reason: " + e.getMessage());
+			return false;
 		}
-		Team team = Bukkit.getScoreboardManager().getMainScoreboard().getTeam(teamName);
-		if (team == null) {
-			MMLog.trace("No such team " + teamName + " on this shard, ignoring.");
-			return;
-		}
-
-		for (Map.Entry<UUID, PlayerState> playerStateEntry : PlayerStateManager.getPlayerStates().entrySet()) {
-			PlayerState state = playerStateEntry.getValue();
-			Player player = state.getPlayer();
-			if (player == null || !mayListen(player)) {
-				continue;
-			}
-
-			if (state.isListening(this)) {
-				// This accounts for players who have paused their chat
-				state.receiveMessage(message);
-			}
-		}
+		// Team membership is checked by mayListen
+		return Bukkit.getScoreboardManager().getMainScoreboard().getTeam(teamName) != null;
 	}
 
 	@Override
