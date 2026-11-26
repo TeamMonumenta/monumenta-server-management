@@ -30,8 +30,8 @@ final class SessionLease {
 
 	private static final SecureRandom RANDOM = new SecureRandom();
 
-	/* How long the last writer of a player's data is remembered: far longer than any hang */
-	static final long WRITER_TTL_MILLIS = 7L * 24 * 60 * 60 * 1000;
+	/* How long the last writer of a player's data is remembered: longer than a shard can hang before it is restarted */
+	static final long WRITER_TTL_MILLIS = 60L * 60 * 1000;
 
 	/*
 	 * KEYS[1]: the lease, KEYS[2]: the last writer. ARGV[1]: token, ARGV[2]: TTL ms, ARGV[3]: history

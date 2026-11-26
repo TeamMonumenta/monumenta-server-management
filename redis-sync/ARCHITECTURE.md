@@ -64,7 +64,7 @@ cannot load until the logout's save is in.
 | `<domain>:playerdata:<uuid>:data`, `:advancements`, `:scores`, `:plugins`, `:content`, `:history` | History lists, newest first. Every full save pushes one entry onto each, so index *n* of every list is the same save |
 | `<domain>:playerdata:<uuid>:sharddata` | Hash: position and world per shard and world, outside the history |
 | `<domain>:session:<uuid>` | The session lease: the token of the session that may save, with a TTL |
-| `<domain>:session:<uuid>:writer` | The token of the last session that saved the player, kept 7 days |
+| `<domain>:session:<uuid>:writer` | The token of the last session that saved the player, kept an hour |
 | `<domain>:stash` | Hash of stashed saves, by name |
 | `<domain>:bungee:locations` | Hash: each player's last server, kept by the proxy |
 
