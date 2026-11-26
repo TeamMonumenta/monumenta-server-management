@@ -11,7 +11,6 @@ import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import com.velocitypowered.api.scheduler.ScheduledTask;
-import io.lettuce.core.RedisFuture;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -33,6 +32,7 @@ public class CleanSwitchListener {
 	public static final String RECONNECT_CHANNEL = "redissync:reconnect";
 	private static final MinecraftChannelIdentifier RECONNECT_ID = MinecraftChannelIdentifier.from(RECONNECT_CHANNEL);
 	private static final long ACKNOWLEDGE_TIMEOUT_SECONDS = 10;
+	private static final long LEASE_CHECK_TIMEOUT_SECONDS = 5;
 	/* Past the lease TTL, so a lease no one renews is gone by then */
 	private static final long LEASE_WAIT_MILLIS = SessionLease.TTL_MILLIS + 5_000;
 	private static final long LEASE_POLL_MAX_MILLIS = 200;
@@ -186,9 +186,12 @@ public class CleanSwitchListener {
 	}
 
 	private void pollLease(Player player, String key, long startNanos, long nextDelayMillis, CompletableFuture<Void> released) {
-		RedisFuture<Long> exists;
+		CompletableFuture<Long> exists;
 		try (RedisAPI.BorrowedCommands<String, String> conn = RedisAPI.borrow()) {
-			exists = conn.exists(key);
+			/* Lettuce has no command timeout of its own: without one, a stalled connection would hold the player forever */
+			exists = conn.exists(key).toCompletableFuture().orTimeout(LEASE_CHECK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+		} catch (RuntimeException ex) {
+			exists = CompletableFuture.failedFuture(ex);
 		}
 		exists.whenComplete((count, ex) -> {
 			long waited = elapsedMillis(startNanos);

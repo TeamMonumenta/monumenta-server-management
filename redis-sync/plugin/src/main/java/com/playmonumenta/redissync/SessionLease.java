@@ -22,26 +22,34 @@ import org.jetbrains.annotations.Nullable;
  */
 final class SessionLease {
 	static final long TTL_MILLIS = 90_000;
-	static final long HEARTBEAT_TICKS = 30 * 20;
+	/* Often enough that only a shard below ~2 TPS for the whole TTL loses its leases */
+	static final long HEARTBEAT_TICKS = 10 * 20;
 	static final long ACQUIRE_WAIT_MILLIS = 20_000;
 	/* ACQUIRE_WAIT_MILLIS, but shorter in tests */
 	private static volatile long mAcquireWaitMillis = ACQUIRE_WAIT_MILLIS;
 
 	private static final SecureRandom RANDOM = new SecureRandom();
 
+	/* How long the last writer of a player's data is remembered: far longer than any hang */
+	static final long WRITER_TTL_MILLIS = 7L * 24 * 60 * 60 * 1000;
+
 	/*
-	 * KEYS[1]: the lease. ARGV[1]: token, ARGV[2]: TTL ms, ARGV[3]: history length. Then ops: L key value
-	 * (push and trim), S key value (replace list head), H key field value (hset). Writes only if the
-	 * lease is this token's, or free (then takes it).
+	 * KEYS[1]: the lease, KEYS[2]: the last writer. ARGV[1]: token, ARGV[2]: TTL ms, ARGV[3]: history
+	 * length, ARGV[4]: writer TTL ms. Then ops: L key value (push and trim), S key value (replace list
+	 * head), H key field value (hset). Writes only if the lease is this token's, or free and no other
+	 * session has written since this one (then takes it). Extends the lease and records the writer.
 	 */
 	static final String FENCED_WRITE_SCRIPT = """
 		local holder = redis.call('GET', KEYS[1])
 		if holder ~= ARGV[1] then
 			if holder then return redis.error_reply('LEASE_LOST held by ' .. holder) end
-			redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
+			local writer = redis.call('GET', KEYS[2])
+			if writer and writer ~= ARGV[1] then return redis.error_reply('LEASE_LOST written since by ' .. writer) end
 		end
+		redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
+		redis.call('SET', KEYS[2], ARGV[1], 'PX', ARGV[4])
 		local trim = tonumber(ARGV[3])
-		local i = 4
+		local i = 5
 		while i <= #ARGV do
 			local op = ARGV[i]
 			if op == 'L' then
@@ -61,17 +69,29 @@ final class SessionLease {
 		return 1
 		""";
 
-	/* ARGV[1]: TTL ms, then a token per key. Returns the 1-based indexes of leases held by someone else */
+	/*
+	 * KEYS: n leases, then their n last-writer keys. ARGV[1]: TTL ms, ARGV[2]: how many of the first
+	 * leases may be taken again if missing (and no other session has written since), then a token per
+	 * lease. The rest are only extended. Returns the 1-based indexes of leases held or written by someone else.
+	 */
 	private static final String RENEW_SCRIPT = """
 		local lost = {}
-		for i = 1, #KEYS do
+		local n = #KEYS / 2
+		local retakable = tonumber(ARGV[2])
+		for i = 1, n do
+			local token = ARGV[i + 2]
 			local holder = redis.call('GET', KEYS[i])
-			if holder == ARGV[i + 1] then
+			if holder == token then
 				redis.call('PEXPIRE', KEYS[i], ARGV[1])
-			elseif not holder then
-				redis.call('SET', KEYS[i], ARGV[i + 1], 'PX', ARGV[1])
-			else
+			elseif holder then
 				table.insert(lost, i)
+			elseif i <= retakable then
+				local writer = redis.call('GET', KEYS[n + i])
+				if writer and writer ~= token then
+					table.insert(lost, i)
+				else
+					redis.call('SET', KEYS[i], token, 'PX', ARGV[1])
+				end
 			end
 		end
 		return lost
@@ -104,6 +124,10 @@ final class SessionLease {
 
 	static String key(UUID uuid) {
 		return CommonConfig.getServerDomain() + ":session:" + uuid;
+	}
+
+	static String writerKey(UUID uuid) {
+		return CommonConfig.getServerDomain() + ":session:" + uuid + ":writer";
 	}
 
 	static String newToken() {
@@ -139,19 +163,29 @@ final class SessionLease {
 		}
 	}
 
-	/** Renews these leases (key: player, value: token). Completes with the players whose lease someone else holds. */
-	static CompletableFuture<List<UUID>> renew(Map<UUID, String> leases) {
-		if (leases.isEmpty()) {
+	/**
+	 * Renews these leases (key: player, value: token): {@code retakable} ones are taken again if missing,
+	 * {@code extendOnly} ones (sessions that ended, logins not yet loaded) only extended. Completes with
+	 * the players whose lease someone else holds, or whose data another session wrote since.
+	 */
+	static CompletableFuture<List<UUID>> renew(Map<UUID, String> retakable, Map<UUID, String> extendOnly) {
+		if (retakable.isEmpty() && extendOnly.isEmpty()) {
 			return CompletableFuture.completedFuture(List.of());
 		}
-		List<UUID> players = new ArrayList<>(leases.size());
-		List<String> keys = new ArrayList<>(leases.size());
-		List<byte[]> args = new ArrayList<>(leases.size() + 1);
+		List<UUID> players = new ArrayList<>(retakable.size() + extendOnly.size());
+		List<String> keys = new ArrayList<>();
+		List<byte[]> args = new ArrayList<>();
 		args.add(bytes(Long.toString(TTL_MILLIS)));
-		for (Map.Entry<UUID, String> lease : leases.entrySet()) {
-			players.add(lease.getKey());
-			keys.add(key(lease.getKey()));
-			args.add(bytes(lease.getValue()));
+		args.add(bytes(Integer.toString(retakable.size())));
+		for (Map<UUID, String> leases : List.of(retakable, extendOnly)) {
+			for (Map.Entry<UUID, String> lease : leases.entrySet()) {
+				players.add(lease.getKey());
+				keys.add(key(lease.getKey()));
+				args.add(bytes(lease.getValue()));
+			}
+		}
+		for (UUID player : players) {
+			keys.add(writerKey(player));
 		}
 		RedisFuture<List<Long>> result;
 		try (RedisAPI.BorrowedCommands<String, byte[]> conn = RedisAPI.borrowStringBytes()) {
@@ -182,7 +216,7 @@ final class SessionLease {
 	static CompletableFuture<Long> fencedWrite(UUID uuid, String token, FencedWrite ops) {
 		RedisFuture<Long> result;
 		try (RedisAPI.BorrowedCommands<String, byte[]> conn = RedisAPI.borrowStringBytes()) {
-			result = conn.eval(FENCED_WRITE_SCRIPT, ScriptOutputType.INTEGER, new String[] {key(uuid)}, ops.args(token));
+			result = conn.eval(FENCED_WRITE_SCRIPT, ScriptOutputType.INTEGER, new String[] {key(uuid), writerKey(uuid)}, ops.args(token));
 		}
 		return result.toCompletableFuture();
 	}
@@ -262,10 +296,11 @@ final class SessionLease {
 		}
 
 		private byte[][] args(String token) {
-			List<byte[]> args = new ArrayList<>(mOps.size() + 3);
+			List<byte[]> args = new ArrayList<>(mOps.size() + 4);
 			args.add(bytes(token));
 			args.add(bytes(Long.toString(TTL_MILLIS)));
 			args.add(bytes(Integer.toString(BukkitConfigAPI.getHistoryAmount())));
+			args.add(bytes(Long.toString(WRITER_TTL_MILLIS)));
 			args.addAll(mOps);
 			return args.toArray(byte[][]::new);
 		}

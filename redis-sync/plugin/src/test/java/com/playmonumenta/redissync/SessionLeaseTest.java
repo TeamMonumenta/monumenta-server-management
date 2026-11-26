@@ -102,6 +102,33 @@ public class SessionLeaseTest {
 		assertEquals(token, lease(harness, player.getUniqueId()));
 	}
 
+	/** A session that lost its lease while hung, after which another session took and released it, must not write its older data */
+	@Test
+	void saveDoesNotRetakeALeaseAnotherSessionWroteUnder(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer player = harness.join("Tester");
+		harness.setProgress(player, 5);
+		MonumentaRedisSyncAPI.savePlayer(player);
+		harness.awaitSaved(player);
+
+		harness.redisDelete(SessionLease.key(player.getUniqueId()));
+		harness.redisSet(SessionLease.writerKey(player.getUniqueId()), ELSEWHERE, 60_000);
+		harness.setProgress(player, 6);
+		MonumentaRedisSyncAPI.savePlayer(player);
+		harness.awaitWithTicks("kicked", () -> !player.isPlaced());
+		assertEquals(5, harness.savedProgress(player), "the stale save wrote nothing");
+		assertEquals(null, lease(harness, player.getUniqueId()), "and did not take the lease");
+	}
+
+	@Test
+	void heartbeatDoesNotRetakeALeaseAnotherSessionWroteUnder(RedisSyncTestHarness harness) throws Exception {
+		TestPlayer player = harness.join("Tester");
+		harness.redisDelete(SessionLease.key(player.getUniqueId()));
+		harness.redisSet(SessionLease.writerKey(player.getUniqueId()), ELSEWHERE, 60_000);
+		harness.tick((int) SessionLease.HEARTBEAT_TICKS);
+		harness.awaitWithTicks("kicked", () -> !player.isPlaced());
+		assertEquals(null, lease(harness, player.getUniqueId()));
+	}
+
 	@Test
 	void heartbeatRenewsTheLease(RedisSyncTestHarness harness) throws Exception {
 		TestPlayer player = harness.join("Tester");

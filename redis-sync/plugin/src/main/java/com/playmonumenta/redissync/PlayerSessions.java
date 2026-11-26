@@ -372,21 +372,25 @@ public final class PlayerSessions implements Listener {
 
 	/* The heartbeat: renews every lease held here (ended sessions' too, until released) and pending logins', in one script */
 	private void renewLeases() {
-		Map<UUID, String> leases = new HashMap<>();
+		/* A lease that went missing is taken again only for a session still playing: an ended one's may have just been released */
+		Map<UUID, String> retakable = new HashMap<>();
+		Map<UUID, String> extendOnly = new HashMap<>();
 		synchronized (this) {
 			for (UUID uuid : Set.copyOf(mExpectedLogins.keySet())) {
 				expectedLogin(uuid);
 			}
-			leases.putAll(mPendingLeases);
+			extendOnly.putAll(mPendingLeases);
 		}
 		for (PlayerSession session : mSessions.values()) {
 			String token = session.getLeaseToken();
 			if (token != null) {
-				leases.put(session.getPlayer().getUniqueId(), token);
+				(session.isEnded() ? extendOnly : retakable).put(session.getPlayer().getUniqueId(), token);
 			}
 		}
+		Map<UUID, String> leases = new HashMap<>(extendOnly);
+		leases.putAll(retakable);
 		long startTime = System.currentTimeMillis();
-		SessionLease.renew(leases).whenComplete((lost, ex) -> {
+		SessionLease.renew(retakable, extendOnly).whenComplete((lost, ex) -> {
 			if (ex != null) {
 				MMLog.severe("Failed to renew " + leases.size() + " session leases", ex);
 				return;

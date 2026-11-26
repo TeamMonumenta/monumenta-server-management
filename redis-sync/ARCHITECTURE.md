@@ -64,6 +64,7 @@ cannot load until the logout's save is in.
 | `<domain>:playerdata:<uuid>:data`, `:advancements`, `:scores`, `:plugins`, `:content`, `:history` | History lists, newest first. Every full save pushes one entry onto each, so index *n* of every list is the same save |
 | `<domain>:playerdata:<uuid>:sharddata` | Hash: position and world per shard and world, outside the history |
 | `<domain>:session:<uuid>` | The session lease: the token of the session that may save, with a TTL |
+| `<domain>:session:<uuid>:writer` | The token of the last session that saved the player, kept 7 days |
 | `<domain>:stash` | Hash of stashed saves, by name |
 | `<domain>:bungee:locations` | Hash: each player's last server, kept by the proxy |
 
@@ -243,8 +244,8 @@ stateDiagram-v2
     [*] --> pending: pre-login takes it (SET NX PX, waiting up to 20s)
     pending --> held: first load event: the session takes the token
     pending --> [*]: login refused later, or never loads: released
-    held --> held: heartbeat or fenced save: renewed, or taken again if missing
-    held --> lost: another session holds it
+    held --> held: heartbeat or fenced save: renewed, or taken again if missing and no other session saved since
+    held --> lost: another session holds it, or saved since
     lost --> [*]: session failed and kicked, nothing more written
     held --> [*]: session ended, saves committed: released
     held --> [*]: shard stops renewing (crash, hang): expires after 90s
@@ -255,21 +256,26 @@ stateDiagram-v2
   backoff for up to 20 seconds, which stays under Velocity's 30 second read timeout for a backend
   login. A login refused afterwards (MONITOR) releases it; the token is handed from one handler
   to the other through a thread-local, as both run on the same pre-login thread.
-- **Renewed** every 30 seconds by one script per shard, from the main thread, covering every
-  session and pending login there, so the cost scales with shards, not players. A shard whose
-  main thread stops (a crash, a hang) stops renewing, and its leases expire after 90 seconds. On
-  prod the liveness probe usually restarts a hung shard first. A lease the heartbeat finds held
-  by someone else means this session has been replaced: it is failed and kicked.
+- **Renewed** every 10 seconds (200 ticks) by one script per shard, from the main thread, covering
+  every session and pending login there, so the cost scales with shards, not players. Counting in
+  ticks means a shard whose main thread stops (a crash, a hang) stops renewing, and its leases
+  expire after 90 seconds; a shard that is only slow keeps them unless it stays under about 2 TPS
+  for the whole TTL. Every save extends the lease too. A lease the heartbeat finds held by someone
+  else means this session has been replaced: it is failed and kicked. The heartbeat takes a missing
+  lease again only for a session still playing; for an ended session or a pending login it only
+  extends one that exists, since an ended session's lease may have been released a moment before.
 - **Fenced.** Every save, and a handoff's replacement, is one script that writes only if the
-  session's token holds the lease, or the lease is missing (then it takes it again). A session
-  whose shard hung past the TTL, while the player logged in elsewhere, therefore writes nothing
-  when it resumes: the script fails with `LEASE_LOST`, and the session is kicked.
+  session's token holds the lease, or the lease is missing and the last writer
+  (`<domain>:session:<uuid>:writer`) is this session or nobody (then it takes it again). The
+  script records the writer. A session whose shard hung past the TTL, while the player logged in
+  elsewhere, therefore writes nothing when it resumes, even if the other session has already
+  left and released the lease: the script fails with `LEASE_LOST`, and the session is kicked.
 - **Released** once the session has ended and every write it made has committed, so whoever takes
   it next finds them all. At shutdown, the leases of sessions whose saves committed are released;
   any others are left to expire. A plugin reload releases leases this shard holds for players it
   finds online.
 - **Missing** (redis restarted, a moderator cleared it) is not an error: the holder's next save or
-  heartbeat takes it again, unless someone else has meanwhile.
+  heartbeat takes it again, unless someone else has taken it or saved the player meanwhile.
 - **Offline edits** are refused while a lease exists, since the player is then online somewhere.
 
 `/sessionlease <player> [clear]` shows the holder and its remaining time, or deletes it.
@@ -419,7 +425,8 @@ with "Please reconnect".
 | Source shard crashes | Its leases expire within 90 seconds; meanwhile the proxy holds a switching player, and other logins wait 20 seconds and are refused ("Your previous session is still saving") |
 | Source shard hangs, then resumes | As a crash; once the player is elsewhere, the resumed shard's saves fail with `LEASE_LOST` and nothing is written |
 | Lease left behind by a bug | Expires within 90 seconds; `/sessionlease <player> clear` frees it at once |
-| Redis loses the lease | The holder's next save or heartbeat takes it again |
+| Redis loses the lease | The holder's next save or heartbeat takes it again, unless another session saved the player since |
+| Proxy's redis stalls | Each lease check gives up after 5 seconds and connects anyway; the target's login decides |
 | Player clicks Disconnect during a hold | The source has already saved and released; they can rejoin at once |
 | Shard shuts down with players online | Saved and released in `onDisable`; pending handoffs written first |
 | A save fails (redis error) | Logged, not retried; the lease is still released, so the next login loads the save before it |
