@@ -143,14 +143,14 @@ public class ContentCommand {
 		ContentOptionalsState state = scan(input);
 
 		// input malformed or still expecting another required token
-		int index = state.index + 4; // offset index: command + 3 required arguments = 4, improve this later
-		if (state.corrupted) {
+		int index = state.mIndex + 4; // offset index: command + 3 required arguments = 4, improve this later
+		if (state.mCorrupted) {
 			throw CommandAPI.failWithString("malformed token at index " + index);
-		} else if (state.expecting != null && !state.optional) {
+		} else if (state.mExpecting != null && !state.mOptional) {
 			throw CommandAPI.failWithString("missing required token at index " + index);
 		}
 
-		return new ContentOptionals(state.returnTo, state.arriveAt, state.onArrival);
+		return new ContentOptionals(state.mReturnTo, state.mArriveAt, state.mOnArrival);
 	}
 
 	private static CompletableFuture<Suggestions> optionalSuggestions(SuggestionInfo<CommandSender> info, SuggestionsBuilder builder) {
@@ -162,27 +162,27 @@ public class ContentCommand {
 		ContentOptionalsState state = scan(prefix);
 
 		// input malformed, stop suggestions
-		if (state.corrupted) {
+		if (state.mCorrupted) {
 			return builder.buildFuture();
 		}
 
 		// suggest all options if expecting option or if next token is optional
-		if (state.expecting == null || state.optional) {
-			state.unused.stream()
+		if (state.mExpecting == null || state.mOptional) {
+			state.mUnused.stream()
 				.map(s -> s.toString().toLowerCase(Locale.ROOT))
 				.forEach(builder::suggest);
 		}
 
-		if (state.expecting == ContentOption.ONARRIVAL) {
+		if (state.mExpecting == ContentOption.ONARRIVAL) {
 			// function suggestion logic, probably should cache, unsure how expensive this is
 			CommandAPIBukkit.get().getFunctions().stream()
 				.map(NamespacedKey::asString)
 				.forEach(builder::suggest);
-		} else if (state.expecting == ContentOption.RETURNTO || state.expecting == ContentOption.ARRIVEAT) {
+		} else if (state.mExpecting == ContentOption.RETURNTO || state.mExpecting == ContentOption.ARRIVEAT) {
 			// location/rotation suggestion logic
 			if (info.sender() instanceof Entity sender) {
 				Location location = sender.getLocation();
-				double suggestion = switch (state.count) {
+				double suggestion = switch (state.mCount) {
 					case 0 -> Math.round(location.getX() * 2.0) / 2.0;
 					case 1 -> Math.round(location.getY() * 2.0) / 2.0;
 					case 2 -> Math.round(location.getZ() * 2.0) / 2.0;
@@ -190,7 +190,7 @@ public class ContentCommand {
 					case 4 -> Math.round(location.getPitch() / 45) * 45;
 					default -> 0;
 				};
-				builder.suggest(state.count > 2 ? Integer.toString((int) suggestion) : Double.toString(suggestion));
+				builder.suggest(state.mCount > 2 ? Integer.toString((int) suggestion) : Double.toString(suggestion));
 			} else {
 				builder.suggest("0");
 			}
@@ -206,75 +206,75 @@ public class ContentCommand {
 		}
 		String[] tokens = input.split("\\s+");
 
-		while (state.index < tokens.length) {
+		while (state.mIndex < tokens.length) {
 			// reset count, optional, and expecting
 			state.reset();
 			// parse option
 			ContentOption option;
 			try {
-				option = ContentOption.valueOf(tokens[state.index].toUpperCase(Locale.ROOT));
+				option = ContentOption.valueOf(tokens[state.mIndex].toUpperCase(Locale.ROOT));
 			} catch (IllegalArgumentException e) {
-				state.corrupted = true;
+				state.mCorrupted = true;
 				break;
 			}
 			// check if option already used
-			if (!state.unused.remove(option)) {
-				state.corrupted = true;
+			if (!state.mUnused.remove(option)) {
+				state.mCorrupted = true;
 				break;
 			}
-			state.index++;
+			state.mIndex++;
 			if (option == ContentOption.ONARRIVAL) {
 				// expecting a string
-				if (state.index == tokens.length) {
-					state.expecting = option;
+				if (state.mIndex == tokens.length) {
+					state.mExpecting = option;
 					break;
 				}
 				// set onArrival
-				NamespacedKey key = NamespacedKey.fromString(tokens[state.index]);
+				NamespacedKey key = NamespacedKey.fromString(tokens[state.mIndex]);
 				if (key == null) {
-					state.corrupted = true;
+					state.mCorrupted = true;
 					break;
 				}
-				state.index++;
-				state.onArrival = key;
+				state.mIndex++;
+				state.mOnArrival = key;
 			} else if (option == ContentOption.RETURNTO || option == ContentOption.ARRIVEAT) {
 				double[] values = new double[5];
 				// expecting up to 5 doubles
-				while (state.count < 5 && state.index < tokens.length) {
+				while (state.mCount < 5 && state.mIndex < tokens.length) {
 					try {
-						values[state.count] = Double.parseDouble(tokens[state.index]);
+						values[state.mCount] = Double.parseDouble(tokens[state.mIndex]);
 						// x and z round up by 0.5 if integer values, otherwise parse as usual
-						if ((state.count == 0 || state.count == 2) && !tokens[state.index].contains(".")) {
-							values[state.count] += 0.5;
+						if ((state.mCount == 0 || state.mCount == 2) && !tokens[state.mIndex].contains(".")) {
+							values[state.mCount] += 0.5;
 						}
-						state.count++;
-						state.index++;
+						state.mCount++;
+						state.mIndex++;
 					} catch (NumberFormatException e) {
 						break;
 					}
 				}
 
-				if (state.count < 5) {
+				if (state.mCount < 5) {
 					// expecting more doubles
-					state.expecting = option;
+					state.mExpecting = option;
 				}
 
-				if (state.count >= 3) {
+				if (state.mCount >= 3) {
 					// future tokens can be either numbers or options
-					state.optional = true;
+					state.mOptional = true;
 					OptionalLocation location = new OptionalLocation(values[0], values[1], values[2]);
 					// rotation if count is 4 or 5
-					if (state.count >= 4) {
+					if (state.mCount >= 4) {
 						location.yaw((float) values[3]);
-						if (state.count >= 5) {
+						if (state.mCount >= 5) {
 							location.pitch((float) values[4]);
 						}
 					}
 					// set returnTo or arriveAt
 					if (option == ContentOption.RETURNTO) {
-						state.returnTo = location;
+						state.mReturnTo = location;
 					} else {
-						state.arriveAt = location;
+						state.mArriveAt = location;
 					}
 				} else {
 					break;
@@ -285,20 +285,20 @@ public class ContentCommand {
 	}
 
 	private static class ContentOptionalsState {
-		private int index = 0;
-		private int count = 0;
-		private boolean corrupted = false;
-		private boolean optional = false;
-		private final Set<ContentOption> unused = EnumSet.allOf(ContentOption.class);
-		private @Nullable ContentOption expecting = null;
-		private @Nullable OptionalLocation returnTo = null;
-		private @Nullable OptionalLocation arriveAt = null;
-		private @Nullable NamespacedKey onArrival = null;
+		private int mIndex = 0;
+		private int mCount = 0;
+		private boolean mCorrupted = false;
+		private boolean mOptional = false;
+		private final Set<ContentOption> mUnused = EnumSet.allOf(ContentOption.class);
+		private @Nullable ContentOption mExpecting = null;
+		private @Nullable OptionalLocation mReturnTo = null;
+		private @Nullable OptionalLocation mArriveAt = null;
+		private @Nullable NamespacedKey mOnArrival = null;
 
 		private void reset() {
-			count = 0;
-			optional = false;
-			expecting = null;
+			mCount = 0;
+			mOptional = false;
+			mExpecting = null;
 		}
 	}
 
