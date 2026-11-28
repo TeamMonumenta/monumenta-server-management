@@ -8,4 +8,8 @@
 	<suppress files=".*[\\/]\w*Adapter_.*\.java"
 			  checks="TypeName"
 			  message=".*Type name.*must match pattern.*"/>
+	<!-- Accessors named like Bukkit's Location.x(); public API, so not renamed -->
+	<suppress files=".*[\\/]redissync[\\/]data[\\/]OptionalLocation\.java"
+			  checks="MethodName"
+			  message=".*Method name '[xyz]' must match pattern.*"/>
 </suppressions>
